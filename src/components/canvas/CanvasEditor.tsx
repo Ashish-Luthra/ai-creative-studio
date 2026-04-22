@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback } from 'react'
-import dynamic from 'next/dynamic'
 import type { Canvas, FabricObject } from 'fabric'
 import { useCanvasStore } from '@/lib/canvas/canvasStore'
 import { initFabricCanvas, disposeCanvas } from '@/lib/canvas/fabricInit'
@@ -52,18 +51,23 @@ export const CanvasEditor: React.FC = () => {
 
   // Toolbar position derived from selected object's bounding rect
   const [toolbarPos, setToolbarPos] = useState({ x: 0, y: 0 })
+  // Increment to force a fresh <canvas> DOM element — prevents Fabric
+  // "already initialized" error from Strict Mode double-invoke or mode switches
+  const [canvasKey, setCanvasKey] = useState(0)
 
   // ── Init Fabric (canvas mode only) ─────────────────────────
   useEffect(() => {
-    // Always clean up any existing canvas first to avoid double-init
-    if (fabricRef.current) {
-      disposeCanvas(fabricRef.current)
-      fabricRef.current = null
-      setFabricCanvas(null)
-      setSelectedLayer(null)
+    if (mode !== 'canvas') {
+      // Dispose when leaving canvas mode
+      if (fabricRef.current) {
+        disposeCanvas(fabricRef.current)
+        fabricRef.current = null
+        setFabricCanvas(null)
+        setSelectedLayer(null)
+      }
+      return
     }
 
-    if (mode !== 'canvas') return
     if (!canvasElRef.current || !containerRef.current) return
 
     const { offsetWidth: w, offsetHeight: h } = containerRef.current
@@ -95,6 +99,8 @@ export const CanvasEditor: React.FC = () => {
         setFabricCanvas(null)
         setSelectedLayer(null)
       }
+      // Force a new <canvas> DOM node next time we mount
+      setCanvasKey((k) => k + 1)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode])
@@ -136,6 +142,7 @@ export const CanvasEditor: React.FC = () => {
           {/* Fabric.js canvas — canvas mode only */}
           {mode === 'canvas' && (
             <canvas
+              key={canvasKey}
               ref={canvasElRef}
               className="absolute inset-0"
             />
