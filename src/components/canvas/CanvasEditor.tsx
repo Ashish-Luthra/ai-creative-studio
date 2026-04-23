@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import type { Canvas, FabricObject } from 'fabric'
 import { useCanvasStore } from '@/lib/canvas/canvasStore'
-import { initFabricCanvas, disposeCanvas } from '@/lib/canvas/fabricInit'
+import { initFabricCanvas, disposeCanvas, seedDefaultCreative } from '@/lib/canvas/fabricInit'
 import { TopBar } from './TopBar'
 import { ToolbarLeft } from './ToolbarLeft'
 import { AgentPill } from './AgentPill'
@@ -14,7 +14,6 @@ import { FloatMjmlCard } from './FloatMjmlCard'
 // ── Email viewport placeholder (replace with react-email later) ──
 const EmailViewport: React.FC = () => (
   <div className="absolute left-[46%] top-1/2 w-[420px] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-[0_8px_40px_rgba(0,0,0,0.12)]">
-    {/* Browser chrome */}
     <div className="flex h-8 items-center gap-1.5 border-b border-gray-100 bg-gray-50 px-3">
       <div className="h-2.5 w-2.5 rounded-full bg-red-300" />
       <div className="h-2.5 w-2.5 rounded-full bg-yellow-300" />
@@ -23,7 +22,6 @@ const EmailViewport: React.FC = () => (
         <span className="text-[9px] text-gray-400">Email Preview</span>
       </div>
     </div>
-    {/* Email body */}
     <div className="p-4">
       <div className="mb-2.5 flex h-[90px] items-center justify-center rounded-lg bg-gradient-to-br from-purple-100 to-purple-200 text-[11px] font-semibold text-purple-700">
         Hero Image Block
@@ -38,6 +36,27 @@ const EmailViewport: React.FC = () => (
   </div>
 )
 
+// ── Toolbar state shape ──────────────────────────────────────
+interface TbState {
+  fontFamily: string
+  fontSize: number
+  isBold: boolean
+  isItalic: boolean
+  isUnderline: boolean
+  textAlign: 'left' | 'center' | 'right'
+  color: string
+}
+
+const DEFAULT_TB: TbState = {
+  fontFamily: 'Georgia',
+  fontSize: 40,
+  isBold: true,
+  isItalic: false,
+  isUnderline: false,
+  textAlign: 'center',
+  color: '#FFFFFF',
+}
+
 // ── Main component ──────────────────────────────────────────
 export const CanvasEditor: React.FC = () => {
   const canvasElRef = useRef<HTMLCanvasElement>(null)
@@ -49,63 +68,114 @@ export const CanvasEditor: React.FC = () => {
     setSelectedLayer, setFabricCanvas, pushUndo,
   } = useCanvasStore()
 
-  // Toolbar position derived from selected object's bounding rect
   const [toolbarPos, setToolbarPos] = useState({ x: 0, y: 0 })
-  // Increment to force a fresh <canvas> DOM element — prevents Fabric
-  // "already initialized" error from Strict Mode double-invoke or mode switches
-  const [canvasKey, setCanvasKey] = useState(0)
+  const [tbState, setTbState] = useState<TbState>(DEFAULT_TB)
+  const tbStateRef = useRef<TbState>(DEFAULT_TB)
+  tbStateRef.current = tbState
+
+  // Read fabric text properties into toolbar state
+  const syncToolbar = useCallback((obj: FabricObject | null) => {
+    if (!obj) return
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const t = obj as any
+    if (t.text !== undefined) {
+      setTbState({
+        fontFamily: t.fontFamily ?? 'Georgia',
+        fontSize: typeof t.fontSize === 'number' ? t.fontSize : 40,
+        isBold: t.fontWeight === 'bold' || t.fontWeight === 700,
+        isItalic: t.fontStyle === 'italic',
+        isUnderline: !!t.underline,
+        textAlign: (['left', 'center', 'right'].includes(t.textAlign) ? t.textAlign : 'center') as TbState['textAlign'],
+        color: typeof t.fill === 'string' ? t.fill : '#FFFFFF',
+      })
+    }
+  }, [])
+
+  // Sync toolbar position from object bounding rect
+  const syncPos = useCallback((obj: FabricObject) => {
+    const br = obj.getBoundingRect()
+    setToolbarPos({ x: br.left, y: br.top })
+  }, [])
+
+  // Apply toolbar changes to the selected fabric object
+  const applyToLayer = useCallback((changes: Partial<TbState>) => {
+    const fc = fabricRef.current
+    if (!fc || !selectedLayer) return
+    const next = { ...tbStateRef.current, ...changes }
+    setTbState(next)
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const t = selectedLayer as any
+    if (t.text !== undefined) {
+      if ('fontFamily' in changes) t.set({ fontFamily: changes.fontFamily })
+      if ('fontSize' in changes) t.set({ fontSize: changes.fontSize })
+      if ('isBold' in changes) t.set({ fontWeight: next.isBold ? 'bold' : 'normal' })
+      if ('isItalic' in changes) t.set({ fontStyle: next.isItalic ? 'italic' : 'normal' })
+      if ('isUnderline' in changes) t.set({ underline: next.isUnderline })
+      if ('textAlign' in changes) t.set({ textAlign: changes.textAlign })
+      if ('color' in changes) t.set({ fill: changes.color })
+      fc.renderAll()
+      pushUndo(fc.getObjects() as FabricObject[])
+    }
+  }, [selectedLayer, pushUndo])
 
   // ── Init Fabric (canvas mode only) ─────────────────────────
+  // Uses rAF so layout is complete before we read container dimensions.
+  // The `cancelled` flag stops the async chain if the effect cleans up first
+  // (e.g. React Strict Mode double-invoke).
+  // We do NOT dispose Fabric on mode switch — the <canvas> stays in the DOM
+  // (just hidden via CSS). Disposing while React has already removed the element
+  // causes a removeChild NotFoundError because Fabric wraps the canvas in its own div.
   useEffect(() => {
     if (mode !== 'canvas') {
-      // Dispose when leaving canvas mode
-      if (fabricRef.current) {
-        disposeCanvas(fabricRef.current)
-        fabricRef.current = null
-        setFabricCanvas(null)
-        setSelectedLayer(null)
-      }
+      setSelectedLayer(null)
       return
     }
 
-    if (!canvasElRef.current || !containerRef.current) return
-
-    const { offsetWidth: w, offsetHeight: h } = containerRef.current
     let cancelled = false
+    let rafId: ReturnType<typeof requestAnimationFrame>
 
-    initFabricCanvas({
-      canvasEl: canvasElRef.current,
-      width: w,
-      height: h,
-      onSelect: (obj) => {
-        setSelectedLayer(obj)
-        if (obj) {
-          const br = obj.getBoundingRect()
-          setToolbarPos({ x: br.left, y: br.top })
-        }
-      },
-      onModified: (snapshot) => pushUndo(snapshot),
-    }).then((c) => {
+    rafId = requestAnimationFrame(async () => {
+      if (cancelled || !canvasElRef.current || !containerRef.current) return
+      const { offsetWidth: w, offsetHeight: h } = containerRef.current
+      if (w === 0 || h === 0) return
+
+      const c = await initFabricCanvas({
+        canvasEl: canvasElRef.current,
+        width: w,
+        height: h,
+        onSelect: (obj) => {
+          setSelectedLayer(obj)
+          if (obj) { syncPos(obj); syncToolbar(obj) }
+        },
+        onModified: (snapshot) => pushUndo(snapshot),
+      })
+
       if (cancelled) { disposeCanvas(c); return }
+
       fabricRef.current = c
       setFabricCanvas(c)
+
+      c.on('object:moving', (e) => { if (e.target) syncPos(e.target) })
+      c.on('object:scaling', (e) => { if (e.target) syncPos(e.target) })
+
+      seedDefaultCreative(c, '/CoffeeInsta.png', 'Enjoy Coffee')
     })
 
     return () => {
       cancelled = true
+      cancelAnimationFrame(rafId)
       if (fabricRef.current) {
         disposeCanvas(fabricRef.current)
         fabricRef.current = null
         setFabricCanvas(null)
         setSelectedLayer(null)
       }
-      // Force a new <canvas> DOM node next time we mount
-      setCanvasKey((k) => k + 1)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode])
 
-  // ── Resize observer — keep canvas filling its container ────
+  // ── Resize observer ────────────────────────────────────────
   useEffect(() => {
     if (!containerRef.current) return
     const ro = new ResizeObserver(([entry]) => {
@@ -117,9 +187,12 @@ export const CanvasEditor: React.FC = () => {
   }, [])
 
   const handleAgentSubmit = useCallback((cmd: string) => {
-    // TODO: stream to LangGraph agent harness via /api/agent
     console.log('[AgentPill] command:', cmd)
   }, [])
+
+  // Show FloatToolbar only when a text object is selected
+  const isTextSelected =
+    selectedLayer?.type === 'textbox' || selectedLayer?.type === 'i-text'
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-[#FDFDFD]">
@@ -133,22 +206,18 @@ export const CanvasEditor: React.FC = () => {
           ref={containerRef}
           className="relative flex-1 overflow-hidden"
           style={{
-            // Spec: #FDFDFD bg + dot grid overlay
             backgroundColor: '#FDFDFD',
             backgroundImage: 'radial-gradient(circle, #E5E7EB 1px, transparent 1px)',
             backgroundSize: '24px 24px',
           }}
         >
-          {/* Fabric.js canvas — canvas mode only */}
-          {mode === 'canvas' && (
-            <canvas
-              key={canvasKey}
-              ref={canvasElRef}
-              className="absolute inset-0"
-            />
-          )}
+          {/* Always in DOM — Fabric owns the wrapper div, removing it causes removeChild errors */}
+          <canvas
+            ref={canvasElRef}
+            className="absolute inset-0"
+            style={{ display: mode === 'canvas' ? 'block' : 'none' }}
+          />
 
-          {/* Email mode — viewport + MJML card */}
           {mode === 'email' && (
             <>
               <EmailViewport />
@@ -156,21 +225,32 @@ export const CanvasEditor: React.FC = () => {
             </>
           )}
 
-          {/* Floating typography toolbar — shown when a layer is selected */}
-          {mode === 'canvas' && selectedLayer && (
+          {/* Typography toolbar — shown only when a text layer is selected */}
+          {mode === 'canvas' && isTextSelected && (
             <FloatToolbar
               position={toolbarPos}
+              fontFamily={tbState.fontFamily}
+              fontSize={tbState.fontSize}
+              isBold={tbState.isBold}
+              isItalic={tbState.isItalic}
+              isUnderline={tbState.isUnderline}
+              textAlign={tbState.textAlign}
+              color={tbState.color}
+              onFontChange={(f) => applyToLayer({ fontFamily: f })}
+              onSizeChange={(s) => applyToLayer({ fontSize: s })}
+              onBoldToggle={() => applyToLayer({ isBold: !tbState.isBold })}
+              onItalicToggle={() => applyToLayer({ isItalic: !tbState.isItalic })}
+              onUnderlineToggle={() => applyToLayer({ isUnderline: !tbState.isUnderline })}
+              onAlignChange={(a) => applyToLayer({ textAlign: a })}
+              onColorChange={(c) => applyToLayer({ color: c })}
             />
           )}
 
-          {/* Floating properties card — shown when a layer is selected */}
+          {/* Properties card — shown for any selected layer */}
           {mode === 'canvas' && selectedLayer && (
-            <FloatPropertiesCard
-              selectedLayer={selectedLayer}
-            />
+            <FloatPropertiesCard selectedLayer={selectedLayer} />
           )}
 
-          {/* Agent pill — always present in canvas + email mode */}
           {mode !== 'feeds' && (
             <AgentPill onSubmit={handleAgentSubmit} />
           )}
