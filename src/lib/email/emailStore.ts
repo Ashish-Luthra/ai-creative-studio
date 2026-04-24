@@ -52,6 +52,7 @@ interface EmailEditorState {
 
   // ── Document mutations (all push to history) ──
   addSection: (payload: AddSectionPayload) => void
+  insertSection: (section: EmailSection, afterSectionId?: string | null) => void
   removeSection: (sectionId: string) => void
   moveSection: (sectionId: string, direction: 'up' | 'down') => void
   addBlock: (payload: AddBlockPayload) => void
@@ -157,6 +158,17 @@ export const useEmailStore = create<EmailEditorState>((set, get) => ({
 
     const next = { ...doc, sections }
     set({ document: next, history: pushHistory(history, doc), future: [], selectedSectionId: newSection.id })
+    void get().recompile()
+  },
+
+  insertSection: (section, afterSectionId) => {
+    const { document: doc, history } = get()
+    const sections = [...doc.sections]
+    const idx = afterSectionId ? sections.findIndex((s) => s.id === afterSectionId) : -1
+    if (idx >= 0) sections.splice(idx + 1, 0, section)
+    else sections.push(section)
+    const next = { ...doc, sections }
+    set({ document: next, history: pushHistory(history, doc), future: [], selectedSectionId: section.id })
     void get().recompile()
   },
 

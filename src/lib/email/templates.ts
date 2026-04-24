@@ -8,7 +8,7 @@
 import { nanoid } from 'nanoid'
 import type {
   EmailDocument, EmailSection, EmailColumn, EmailBlock,
-  TextBlock, ImageBlock, ButtonBlock, SpacerBlock, LogoBlock,
+  TextBlock, ImageBlock, ButtonBlock, DividerBlock, SpacerBlock, LogoBlock,
   UnsubscribeBlock, GlobalEmailStyles,
   TextStyles, ButtonStyles, ImageStyles,
   SectionLayout, SectionStyles,
@@ -121,6 +121,19 @@ export function makeImageBlock(src: string, alt = ''): ImageBlock {
 
 export function makeSpacerBlock(height = 24): SpacerBlock {
   return { id: nanoid(), type: 'spacer', height }
+}
+
+export function makeDividerBlock(): DividerBlock {
+  return {
+    id: nanoid(),
+    type: 'divider',
+    styles: {
+      color: '#E5E7EB',
+      height: 1,
+      style: 'solid',
+      margin: { top: 8, bottom: 8 },
+    },
+  }
 }
 
 export function makeLogoBlock(opts: {
