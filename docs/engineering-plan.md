@@ -487,7 +487,7 @@ data: { total: number, duration_ms: number }
 | Vector store (POC) | pgvector on Supabase | 5,000 creatives = ~10K vectors; fits comfortably in Postgres; no separate infra |
 | LLM for all copy/insight | claude-sonnet-4-20250514 | Consistent quality across brief, copy gen, asset tagging, cluster labelling |
 | Image generation | FLUX.1 via Replicate | Best quality for background generation; Replicate handles GPU scaling |
-| Email compiler | MJML | Actively maintained, React component model, inbox-safe output, no BeeFree dependency |
+| Email compiler | The compiler stack is react-email | Actively maintained, React component model, inbox-safe output, no BeeFree dependency |
 | Streaming | SSE (Server-Sent Events) | Simpler than WebSockets for unidirectional agent streams; native browser support |
 | State management | Zustand | Minimal, canvas-compatible, no Redux boilerplate |
 | Export | Puppeteer | Server-side rendering of Fabric canvas at 2x = pixel-accurate retina export |
