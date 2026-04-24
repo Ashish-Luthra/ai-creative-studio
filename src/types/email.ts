@@ -223,6 +223,7 @@ export type CompilerErrorCode =
   | 'MISSING_UNSUBSCRIBE'    // unsubscribe block missing or malformed
   | 'INVALID_COLUMN_WIDTHS'  // column widths in a section do not sum to 100
   | 'EMPTY_BUTTON_HREF'      // ButtonBlock href is empty
+  | 'RENDER_FAILED'          // @react-email/render or HTML post-process threw
 
 export type CompilerWarningCode =
   | 'MISSING_ALT_TEXT'       // ImageBlock or LogoBlock has empty alt
@@ -249,6 +250,8 @@ export interface CompilerOptions {
   width?: number
   /** 'html' = full document with doctype. 'preview' = inner body only (for live preview). */
   mode?: 'html' | 'preview'
+  /** When true, run Prettier on HTML (can fail on email-tolerant markup). Default false. */
+  pretty?: boolean
 }
 
 export interface CompileResult {

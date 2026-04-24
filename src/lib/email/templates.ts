@@ -20,6 +20,14 @@ import {
   DEFAULT_IMAGE_PADDING,
 } from './styleUtils'
 
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
 // ─── Global style defaults ────────────────────────────────────────────────────
 
 export const DEFAULT_GLOBAL_STYLES: GlobalEmailStyles = {
@@ -46,7 +54,7 @@ export function makeTextBlock(overrides: Partial<TextBlock> = {}): TextBlock {
   return {
     id: nanoid(),
     type: 'text',
-    content: '<p>Edit this text</p>',
+    content: '<div>Edit this text</div>',
     styles: defaultStyles,
     ...overrides,
   }
@@ -54,7 +62,8 @@ export function makeTextBlock(overrides: Partial<TextBlock> = {}): TextBlock {
 
 export function makeHeadingBlock(text: string): TextBlock {
   return makeTextBlock({
-    content: `<h2 style="margin:0">${text}</h2>`,
+    // Use <div> not <h2> so markup stays valid if anything wraps the cell in <p> (e.g. tooling).
+    content: `<div style="margin:0;font-weight:700">${escapeHtml(text)}</div>`,
     styles: {
       fontFamily: 'Arial',
       fontSize: 28,
@@ -69,7 +78,7 @@ export function makeHeadingBlock(text: string): TextBlock {
 
 export function makeBodyBlock(text: string): TextBlock {
   return makeTextBlock({
-    content: `<p style="margin:0">${text}</p>`,
+    content: `<div style="margin:0">${escapeHtml(text)}</div>`,
     styles: {
       fontFamily: 'Arial',
       fontSize: 15,
