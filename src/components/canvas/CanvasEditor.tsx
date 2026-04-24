@@ -252,12 +252,27 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
       const savedJson = localStorage.getItem(storageKey)
       if (savedJson) {
         restoringRef.current = true
-        await c.loadFromJSON(savedJson)
-        c.renderAll()
-        restoringRef.current = false
-      } else {
+        try {
+          if (cancelled || fabricRef.current !== c) return
+          await c.loadFromJSON(savedJson)
+          if (cancelled || fabricRef.current !== c) return
+          c.renderAll()
+        } catch (err) {
+          console.warn('[CanvasEditor] Failed to restore draft from localStorage — starting fresh.', err)
+          localStorage.removeItem(storageKey)
+          if (!cancelled && fabricRef.current === c) {
+            await seedDefaultCreative(c, '/CoffeeInsta.png', 'Enjoy Coffee', initialPreset)
+            c.renderAll()
+          }
+        } finally {
+          restoringRef.current = false
+        }
+      } else if (!cancelled && fabricRef.current === c) {
         await seedDefaultCreative(c, '/CoffeeInsta.png', 'Enjoy Coffee', initialPreset)
       }
+
+      if (cancelled || fabricRef.current !== c) return
+
       resetHistory()
       saveSnapshot()
     })
