@@ -1,7 +1,7 @@
 # Engineering Plan — AI Creative Studio
 **Allyvate | Confidential | 20 April 2026**
 **Based on BRD v1.5 | POC Phase — 10 clients, 5,000 creatives**
-
+Email module superseded. See docs/email-builder-spec.md for current direction
 ---
 
 ## 0. Purpose of This Document
