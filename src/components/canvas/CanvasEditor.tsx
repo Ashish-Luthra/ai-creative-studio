@@ -17,6 +17,7 @@ import { ImageSelectionToolbar } from './ImageSelectionToolbar'
 import { ProjectsAssetsPanel } from './ProjectsAssetsPanel'
 import { VariantsPanel, type CanvasVariant } from './VariantsPanel'
 import { AIAssistPanel } from './AIAssistPanel'
+import { PublishPanel, type PublishResult } from './PublishPanel'
 
 // ── Toolbar state shape ──────────────────────────────────────
 interface TbState {
@@ -492,6 +493,36 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
     saveSnapshot()
   }, [saveSnapshot])
 
+  const handlePublish = useCallback(async (args: {
+    platform: 'instagram' | 'linkedin'
+    placement: string
+    caption: string
+  }): Promise<PublishResult> => {
+    const { copyText, imageUrl } = extractCreativeInputs()
+    const response = await fetch('/api/publish', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        briefId,
+        presetId: selectedPresetId,
+        platform: args.platform,
+        placement: args.placement,
+        caption: args.caption,
+        copyText,
+        imageUrl,
+      }),
+    })
+
+    const data = (await response.json()) as PublishResult
+    if (!response.ok) {
+      return {
+        status: 'failed',
+        message: data.message || 'Publish failed',
+      }
+    }
+    return data
+  }, [briefId, extractCreativeInputs, selectedPresetId])
+
   // Show FloatToolbar only when a text object is selected
   const isTextSelected =
     selectedLayer?.type === 'textbox' || selectedLayer?.type === 'i-text'
@@ -558,6 +589,8 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
                   onApplyCopy={handleApplyAICopy}
                   onSuggestLayout={handleSuggestLayout}
                 />
+              ) : activeTool === 'export' ? (
+                <PublishPanel onPublish={handlePublish} />
               ) : (
                 <RightStudioPanel
                   activeTool={activeTool}
