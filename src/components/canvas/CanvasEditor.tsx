@@ -15,6 +15,8 @@ import { ApprovedImagesPanel } from './ApprovedImagesPanel'
 import { RightStudioPanel } from './RightStudioPanel'
 import { ImageSelectionToolbar } from './ImageSelectionToolbar'
 import { ProjectsAssetsPanel } from './ProjectsAssetsPanel'
+import { VariantsPanel, type CanvasVariant } from './VariantsPanel'
+import { AIAssistPanel } from './AIAssistPanel'
 
 // ── Toolbar state shape ──────────────────────────────────────
 interface TbState {
@@ -58,6 +60,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
   const [activeTool, setActiveTool] = useState<RailTool | null>(null)
   const [showApprovedImages, setShowApprovedImages] = useState(false)
   const [generatedPresetIds, setGeneratedPresetIds] = useState<string[]>([])
+  const [variants, setVariants] = useState<CanvasVariant[]>([])
   const [campaign, setCampaign] = useState<CampaignMeta>({
     briefId,
     name: 'Creative Campaign',
@@ -79,6 +82,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
   const storageKey = `creative-canvas:${briefId}`
   const presetStorageKey = `${storageKey}:preset`
   const generatedKey = `${storageKey}:generated-presets`
+  const variantsKey = `${storageKey}:variants`
   const campaignKey = `${storageKey}:campaign`
   const recentCampaignsKey = 'creative-canvas:recent-campaigns'
 
@@ -216,6 +220,10 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
       if (generatedRaw) {
         setGeneratedPresetIds(JSON.parse(generatedRaw) as string[])
       }
+      const variantsRaw = localStorage.getItem(variantsKey)
+      if (variantsRaw) {
+        setVariants(JSON.parse(variantsRaw) as CanvasVariant[])
+      }
       const campaignRaw = localStorage.getItem(campaignKey)
       const recentsRaw = localStorage.getItem(recentCampaignsKey)
       if (recentsRaw) {
@@ -264,7 +272,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [briefId, campaignKey, generatedKey, initialPresetId, mode, recentCampaignsKey, resetHistory, saveSnapshot, selectedPresetId, setSelectedPresetId, storageKey, presetStorageKey, setSelectedLayer, setFabricCanvas, syncPos, syncToolbar])
+  }, [briefId, campaignKey, generatedKey, initialPresetId, mode, recentCampaignsKey, resetHistory, saveSnapshot, selectedPresetId, setSelectedPresetId, storageKey, presetStorageKey, setSelectedLayer, setFabricCanvas, syncPos, syncToolbar, variantsKey])
 
   // ── Delete selected object on Delete / Backspace ──────────
   // Only fires when mode==='canvas', an object is selected, and the
@@ -369,6 +377,60 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
     updateCampaignMeta({ activePresetId: selectedPresetId })
   }, [briefId, extractCreativeInputs, generatedKey, selectedPresetId, updateCampaignMeta])
 
+  const handleGenerateVariants = useCallback(() => {
+    const canvas = fabricRef.current
+    if (!canvas) return
+    const baseThumbnail = canvas.toDataURL({ format: 'png', multiplier: 0.35 })
+    const { copyText, imageUrl } = extractCreativeInputs()
+    const templates = [
+      { suffix: 'Urgency', text: `${copyText} — Limited Time` },
+      { suffix: 'Benefit', text: `Why choose us: ${copyText}` },
+      { suffix: 'Offer', text: `${copyText} | 30% OFF today` },
+      { suffix: 'Social', text: `${copyText} • Loved by 10k+ users` },
+      { suffix: 'Simple', text: copyText },
+    ]
+    const newVariants: CanvasVariant[] = templates.map((template, idx) => ({
+      id: `variant-${Date.now()}-${idx}`,
+      label: `${template.suffix} (${selectedPresetId})`,
+      presetId: selectedPresetId,
+      copyText: template.text,
+      imageUrl,
+      thumbnail: baseThumbnail,
+    }))
+    setVariants(newVariants)
+    localStorage.setItem(variantsKey, JSON.stringify(newVariants))
+  }, [extractCreativeInputs, selectedPresetId, variantsKey])
+
+  const handleApplyVariant = useCallback(async (variantId: string) => {
+    const variant = variants.find((item) => item.id === variantId)
+    if (!variant || !fabricRef.current) return
+    setSelectedPresetId(variant.presetId)
+    localStorage.setItem(presetStorageKey, variant.presetId)
+    restoringRef.current = true
+    fabricRef.current.clear()
+    await seedDefaultCreative(fabricRef.current, variant.imageUrl, variant.copyText, getPresetById(variant.presetId))
+    fabricRef.current.renderAll()
+    restoringRef.current = false
+    resetHistory()
+    saveSnapshot()
+    updateCampaignMeta({ activePresetId: variant.presetId })
+  }, [presetStorageKey, resetHistory, saveSnapshot, setSelectedPresetId, updateCampaignMeta, variants])
+
+  const handleExportVariant = useCallback(async (variantId: string) => {
+    const variant = variants.find((item) => item.id === variantId)
+    if (!variant) return
+    const { Canvas: FabricCanvas } = await import('fabric')
+    const tempEl = document.createElement('canvas')
+    const temp = new FabricCanvas(tempEl, { width: 1200, height: 1200, backgroundColor: '#FDFDFD' })
+    await seedDefaultCreative(temp, variant.imageUrl, variant.copyText, getPresetById(variant.presetId))
+    const url = temp.toDataURL({ format: 'png', multiplier: 2 })
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `${briefId}-${variant.id}.png`
+    link.click()
+    temp.dispose()
+  }, [briefId, variants])
+
   const handleToolAction = useCallback(async (tool: RailTool) => {
     setActiveTool(tool)
     const canvas = fabricRef.current
@@ -395,6 +457,40 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
     setShowApprovedImages(false)
     saveSnapshot()
   }, [selectedLayer, saveSnapshot])
+
+  const selectedText = selectedLayer && (selectedLayer.type === 'textbox' || selectedLayer.type === 'i-text')
+    ? String((selectedLayer as { text?: string }).text ?? '')
+    : null
+
+  const handleApplyAICopy = useCallback((text: string) => {
+    const canvas = fabricRef.current
+    if (!canvas || !selectedLayer) return
+    if (selectedLayer.type !== 'textbox' && selectedLayer.type !== 'i-text') return
+    ;(selectedLayer as { set: (payload: Record<string, unknown>) => void }).set({ text })
+    canvas.renderAll()
+    saveSnapshot()
+  }, [selectedLayer, saveSnapshot])
+
+  const handleSuggestLayout = useCallback(() => {
+    const canvas = fabricRef.current
+    if (!canvas) return
+    const objects = canvas.getObjects()
+    const textObj = objects.find((obj) => obj.type === 'textbox' || obj.type === 'i-text')
+    const imageObj = objects.find((obj) => obj.type === 'image')
+    if (textObj) {
+      const imgBounds = imageObj?.getBoundingRect()
+      const fallbackY = canvas.getHeight() * 0.72
+      const targetY = imgBounds ? imgBounds.top + imgBounds.height * 0.72 : fallbackY
+      textObj.set({
+        left: canvas.getWidth() * 0.15,
+        width: canvas.getWidth() * 0.7,
+        top: targetY,
+      })
+      canvas.setActiveObject(textObj)
+    }
+    canvas.renderAll()
+    saveSnapshot()
+  }, [saveSnapshot])
 
   // Show FloatToolbar only when a text object is selected
   const isTextSelected =
@@ -444,6 +540,23 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
                   onRecentCampaignOpen={(nextBriefId, presetId) => {
                     window.location.href = `/studio/${nextBriefId}/canvas?preset=${presetId}`
                   }}
+                />
+              ) : activeTool === 'variants' ? (
+                <VariantsPanel
+                  variants={variants}
+                  onGenerate={handleGenerateVariants}
+                  onApply={(variantId) => {
+                    void handleApplyVariant(variantId)
+                  }}
+                  onExport={(variantId) => {
+                    void handleExportVariant(variantId)
+                  }}
+                />
+              ) : activeTool === 'ai' ? (
+                <AIAssistPanel
+                  selectedText={selectedText}
+                  onApplyCopy={handleApplyAICopy}
+                  onSuggestLayout={handleSuggestLayout}
                 />
               ) : (
                 <RightStudioPanel

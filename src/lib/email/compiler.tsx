@@ -280,6 +280,21 @@ function BlockLogo({ block, global: g }: { block: LogoBlock; global: GlobalEmail
   const w    = block.meta.isGlobal ? (g.logo?.width ?? block.width) : block.width
   const href = block.meta.isGlobal ? (g.logo?.href ?? block.href) : block.href
 
+  // Don't render an <img> with an empty src — browser would re-fetch the page
+  if (!src) {
+    return (
+      <table role="presentation" cellPadding={0} cellSpacing={0} border={0}
+        style={{ width: '100%' }}
+      >
+        <tbody><tr>
+          <td align="center" style={{ padding: '16px 0', fontSize: '11px', color: '#9CA3AF', fontFamily: 'Arial, sans-serif' }}>
+            [ Logo — add URL in Styles ]
+          </td>
+        </tr></tbody>
+      </table>
+    )
+  }
+
   const imgEl = (
     <Img src={src} alt={alt} width={w}
       style={{ display: 'block', border: 'none', maxWidth: '100%' }}
