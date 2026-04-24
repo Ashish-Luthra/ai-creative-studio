@@ -223,12 +223,12 @@ export type CompilerErrorCode =
   | 'MISSING_UNSUBSCRIBE'    // unsubscribe block missing or malformed
   | 'INVALID_COLUMN_WIDTHS'  // column widths in a section do not sum to 100
   | 'EMPTY_BUTTON_HREF'      // ButtonBlock href is empty
-  | 'INVALID_IMAGE_SRC'      // ImageBlock src is empty
 
 export type CompilerWarningCode =
   | 'MISSING_ALT_TEXT'       // ImageBlock or LogoBlock has empty alt
   | 'MISSING_PREHEADER'      // EmailDocument.preheader is empty
   | 'EMPTY_SECTION'          // Section has no blocks in any column
+  | 'INVALID_IMAGE_SRC'      // ImageBlock src is empty — preview shows placeholder
 
 export interface CompilerError {
   code: CompilerErrorCode

@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import {
   Layers, LayoutGrid, Palette, Settings2,
   Monitor, Smartphone, RotateCcw, ChevronUp, ChevronDown, Trash2,
+  ChevronLeft, ChevronRight,
   Type, Image as ImageIcon, MousePointer2, Minus, AlignLeft,
   ChevronsUpDown, Star,
 } from 'lucide-react'
@@ -15,7 +16,9 @@ import {
   makeDividerBlock, makeLogoBlock,
   presetHero, presetImageText, presetTwoColumn, presetBodyText,
 } from '@/lib/email/templates'
-import type { SectionLayout } from '@/types/email'
+import type {
+  SectionLayout, EmailDocument, EmailBlock,
+} from '@/types/email'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -86,6 +89,49 @@ const BLOCK_TYPES = [
 // ─── Font options ──────────────────────────────────────────────────────────────
 
 const FONT_OPTIONS = ['Arial', 'Georgia', 'Helvetica', 'Tahoma', 'Trebuchet MS', 'Verdana']
+
+// ─── Block helper utilities ────────────────────────────────────────────────────
+
+function findBlockLocation(
+  doc: EmailDocument,
+  blockId: string,
+): { sectionId: string; columnId: string } | null {
+  for (const section of doc.sections) {
+    for (const col of section.columns) {
+      if (col.blocks.some((b) => b.id === blockId)) {
+        return { sectionId: section.id, columnId: col.id }
+      }
+    }
+  }
+  return null
+}
+
+function stripHtml(html: string): string {
+  return html.replace(/<[^>]+>/g, '').trim()
+}
+
+function blockPreview(block: EmailBlock): string {
+  switch (block.type) {
+    case 'text':        return stripHtml(block.content).slice(0, 42) || 'Empty text'
+    case 'image':       return block.src ? (block.alt || 'Image') : 'No image set'
+    case 'button':      return block.label || 'Button'
+    case 'divider':     return 'Divider'
+    case 'spacer':      return `Spacer ${block.height}px`
+    case 'logo':        return 'Logo'
+    case 'unsubscribe': return 'Unsubscribe'
+    default:            return (block as EmailBlock).type
+  }
+}
+
+const BLOCK_TYPE_ICON: Record<string, React.ReactNode> = {
+  text:        <Type size={10} />,
+  image:       <ImageIcon size={10} />,
+  button:      <MousePointer2 size={10} />,
+  divider:     <Minus size={10} />,
+  spacer:      <ChevronsUpDown size={10} />,
+  logo:        <Star size={10} />,
+  unsubscribe: <AlignLeft size={10} />,
+}
 
 // ─── Sub-panels ───────────────────────────────────────────────────────────────
 
@@ -418,17 +464,265 @@ function SettingsPanel() {
   )
 }
 
+// ─── Block editor (shown in right panel when a block is selected) ─────────────
+
+function BlockEditor({ block, onBack }: { block: EmailBlock; onBack: () => void }) {
+  const { document: doc, updateBlock, removeBlock } = useEmailStore()
+  const loc = useMemo(() => findBlockLocation(doc, block.id), [doc, block.id])
+
+  const patch = useCallback(
+    (p: Partial<EmailBlock>) => {
+      if (!loc) return
+      updateBlock({ sectionId: loc.sectionId, columnId: loc.columnId, blockId: block.id, patch: p })
+    },
+    [loc, block.id, updateBlock],
+  )
+
+  const handleDelete = useCallback(() => {
+    if (!loc) return
+    removeBlock(loc.sectionId, loc.columnId, block.id)
+    onBack()
+  }, [loc, block.id, removeBlock, onBack])
+
+  return (
+    <div className="flex flex-1 flex-col overflow-hidden">
+      {/* Back bar */}
+      <div className="flex h-8 shrink-0 items-center gap-1 border-b border-gray-100 px-3">
+        <button
+          onClick={onBack}
+          className="flex items-center gap-0.5 text-[10px] text-gray-400 hover:text-gray-700"
+        >
+          <ChevronLeft size={11} />
+          Section
+        </button>
+        <span className="ml-auto text-[10px] font-semibold capitalize text-gray-500">
+          {block.type}
+        </span>
+      </div>
+
+      <div className="flex-1 overflow-auto px-3 pb-3 pt-2">
+
+        {/* ── Text / Heading ── */}
+        {block.type === 'text' && (
+          <Field label="Content (HTML)">
+            <textarea
+              value={block.content}
+              onChange={(e) => patch({ content: e.target.value } as Partial<EmailBlock>)}
+              rows={7}
+              spellCheck={false}
+              className="w-full resize-y rounded-md border border-gray-200 bg-white px-2 py-1.5 font-mono text-[11px] leading-relaxed text-gray-700 placeholder-gray-300 focus:border-blue-400 focus:outline-none"
+            />
+            <p className="mt-1 text-[9px] text-gray-400">HTML tags supported — e.g. &lt;strong&gt;, &lt;em&gt;, &lt;a href="…"&gt;</p>
+          </Field>
+        )}
+
+        {/* ── Image ── */}
+        {block.type === 'image' && (
+          <>
+            <Field label="Image URL">
+              <input
+                type="text"
+                placeholder="https://…/image.jpg"
+                value={block.src}
+                onChange={(e) => patch({ src: e.target.value } as Partial<EmailBlock>)}
+                className="w-full rounded-md border border-gray-200 bg-white px-2 py-1.5 text-[12px] text-gray-700 placeholder-gray-300 focus:border-blue-400 focus:outline-none"
+              />
+            </Field>
+            <Field label="Alt Text">
+              <input
+                type="text"
+                placeholder="Describe the image…"
+                value={block.alt}
+                onChange={(e) => patch({ alt: e.target.value } as Partial<EmailBlock>)}
+                className="w-full rounded-md border border-gray-200 bg-white px-2 py-1.5 text-[12px] text-gray-700 placeholder-gray-300 focus:border-blue-400 focus:outline-none"
+              />
+            </Field>
+            <Field label="Link URL (optional)">
+              <input
+                type="text"
+                placeholder="https://…"
+                value={block.href ?? ''}
+                onChange={(e) => patch({ href: e.target.value || undefined } as Partial<EmailBlock>)}
+                className="w-full rounded-md border border-gray-200 bg-white px-2 py-1.5 text-[12px] text-gray-700 placeholder-gray-300 focus:border-blue-400 focus:outline-none"
+              />
+            </Field>
+          </>
+        )}
+
+        {/* ── Button ── */}
+        {block.type === 'button' && (
+          <>
+            <Field label="Button Label">
+              <input
+                type="text"
+                value={block.label}
+                onChange={(e) => patch({ label: e.target.value } as Partial<EmailBlock>)}
+                className="w-full rounded-md border border-gray-200 bg-white px-2 py-1.5 text-[12px] text-gray-700 focus:border-blue-400 focus:outline-none"
+              />
+            </Field>
+            <Field label="URL">
+              <input
+                type="text"
+                placeholder="https://…"
+                value={block.href}
+                onChange={(e) => patch({ href: e.target.value } as Partial<EmailBlock>)}
+                className="w-full rounded-md border border-gray-200 bg-white px-2 py-1.5 text-[12px] text-gray-700 placeholder-gray-300 focus:border-blue-400 focus:outline-none"
+              />
+            </Field>
+            <Field label="">
+              <label className="flex cursor-pointer items-center gap-2 text-[12px] text-gray-600">
+                <input
+                  type="checkbox"
+                  checked={block.newTab ?? true}
+                  onChange={(e) => patch({ newTab: e.target.checked } as Partial<EmailBlock>)}
+                  className="rounded"
+                />
+                Open in new tab
+              </label>
+            </Field>
+            <Field label="Button Colour">
+              <ColorRow
+                value={block.styles.backgroundColor}
+                onChange={(v) =>
+                  patch({ styles: { ...block.styles, backgroundColor: v } } as Partial<EmailBlock>)
+                }
+              />
+            </Field>
+            <Field label="Text Colour">
+              <ColorRow
+                value={block.styles.color}
+                onChange={(v) =>
+                  patch({ styles: { ...block.styles, color: v } } as Partial<EmailBlock>)
+                }
+              />
+            </Field>
+          </>
+        )}
+
+        {/* ── Spacer ── */}
+        {block.type === 'spacer' && (
+          <Field label={`Height: ${block.height}px`}>
+            <input
+              type="range"
+              min={4}
+              max={120}
+              value={block.height}
+              onChange={(e) => patch({ height: Number(e.target.value) } as Partial<EmailBlock>)}
+              className="w-full"
+            />
+          </Field>
+        )}
+
+        {/* ── Divider ── */}
+        {block.type === 'divider' && (
+          <Field label="Line Colour">
+            <ColorRow
+              value={block.styles.color}
+              onChange={(v) =>
+                patch({ styles: { ...block.styles, color: v } } as Partial<EmailBlock>)
+              }
+            />
+          </Field>
+        )}
+
+        {/* ── Logo (global) ── */}
+        {block.type === 'logo' && block.meta.isGlobal && (
+          <p className="rounded-lg bg-blue-50 px-3 py-2 text-[11px] leading-relaxed text-blue-600">
+            This logo pulls from the global logo URL. Edit it in the{' '}
+            <strong>Styles</strong> panel (left rail).
+          </p>
+        )}
+
+        {/* ── Logo (custom) ── */}
+        {block.type === 'logo' && !block.meta.isGlobal && (
+          <>
+            <Field label="Logo URL">
+              <input
+                type="text"
+                placeholder="https://…/logo.png"
+                value={block.src}
+                onChange={(e) => patch({ src: e.target.value } as Partial<EmailBlock>)}
+                className="w-full rounded-md border border-gray-200 bg-white px-2 py-1.5 text-[12px] text-gray-700 placeholder-gray-300 focus:border-blue-400 focus:outline-none"
+              />
+            </Field>
+            <Field label="Alt Text">
+              <input
+                type="text"
+                value={block.alt}
+                onChange={(e) => patch({ alt: e.target.value } as Partial<EmailBlock>)}
+                className="w-full rounded-md border border-gray-200 bg-white px-2 py-1.5 text-[12px] text-gray-700 focus:border-blue-400 focus:outline-none"
+              />
+            </Field>
+          </>
+        )}
+
+        {/* ── Unsubscribe (locked) ── */}
+        {block.type === 'unsubscribe' && (
+          <p className="rounded-lg bg-gray-50 px-3 py-2 text-[11px] leading-relaxed text-gray-400">
+            Unsubscribe block is locked and always appears last. Edit its text in{' '}
+            <strong>Settings</strong>.
+          </p>
+        )}
+
+        {/* Delete button */}
+        {block.type !== 'unsubscribe' && (
+          <button
+            onClick={handleDelete}
+            className="mt-4 flex w-full items-center justify-center gap-1.5 rounded-lg border border-red-200 py-2 text-[11px] text-red-400 transition-colors hover:bg-red-50 hover:text-red-500"
+          >
+            <Trash2 size={11} />
+            Remove block
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ─── Right: section properties panel ──────────────────────────────────────────
 
 function PropertiesPanel() {
-  const { document: doc, selectedSectionId, updateSectionStyles } = useEmailStore()
+  const {
+    document: doc,
+    selectedSectionId,
+    selectedBlockId,
+    setSelectedBlock,
+    updateSectionStyles,
+  } = useEmailStore()
+
   const section = doc.sections.find((s) => s.id === selectedSectionId)
+
+  // Resolve the selected block from anywhere in the document
+  const selectedBlock = useMemo<EmailBlock | null>(() => {
+    if (!selectedBlockId) return null
+    for (const sec of doc.sections) {
+      for (const col of sec.columns) {
+        const found = col.blocks.find((b) => b.id === selectedBlockId)
+        if (found) return found
+      }
+    }
+    if (doc.unsubscribe.id === selectedBlockId) return doc.unsubscribe
+    return null
+  }, [doc, selectedBlockId])
+
+  // All blocks in the currently-selected section (flattened across columns)
+  const sectionBlocks = useMemo<EmailBlock[]>(() => {
+    if (!section) return []
+    return section.columns.flatMap((col) => col.blocks)
+  }, [section])
+
+  const handleBack = useCallback(() => setSelectedBlock(null), [setSelectedBlock])
+
+  // If a block is selected, show the block editor
+  if (selectedBlock) {
+    return <BlockEditor block={selectedBlock} onBack={handleBack} />
+  }
 
   if (!section) {
     return (
       <div className="flex flex-1 items-center justify-center p-4">
         <p className="text-center text-[11px] leading-relaxed text-gray-400">
-          Select a section to edit its properties
+          Select a section to view its blocks and properties
         </p>
       </div>
     )
@@ -441,6 +735,39 @@ function PropertiesPanel() {
     <div className="flex flex-1 flex-col overflow-auto px-3 pb-3 pt-2">
       <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-gray-400">
         {section.label ?? section.layout}
+      </p>
+
+      {/* ── Block list ── */}
+      <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+        Blocks
+      </p>
+
+      {sectionBlocks.length === 0 ? (
+        <p className="mb-3 text-[10px] text-gray-400">No blocks yet — add some from the Blocks panel.</p>
+      ) : (
+        <div className="mb-3 flex flex-col gap-0.5">
+          {sectionBlocks.map((block) => (
+            <button
+              key={block.id}
+              onClick={() => setSelectedBlock(block.id)}
+              className="flex items-center gap-2 rounded-lg border border-gray-100 bg-white px-2 py-1.5 text-left transition-all hover:border-blue-300 hover:bg-blue-50"
+            >
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-gray-100 text-gray-400">
+                {BLOCK_TYPE_ICON[block.type] ?? <Type size={10} />}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-medium capitalize text-gray-600">{block.type}</p>
+                <p className="truncate text-[9px] text-gray-400">{blockPreview(block)}</p>
+              </div>
+              <ChevronRight size={10} className="shrink-0 text-gray-300" />
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* ── Section styles ── */}
+      <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+        Section
       </p>
 
       <Field label="Background">

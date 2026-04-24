@@ -64,9 +64,10 @@ function validate(doc: EmailDocument): {
         }
 
         if (block.type === 'image' && !(block as ImageBlock).src) {
-          errors.push({
+          // Demoted to warning — compiler renders a grey placeholder instead of blocking
+          warnings.push({
             code: 'INVALID_IMAGE_SRC',
-            message: `Image block "${block.id}" has no src.`,
+            message: `Image block "${block.id}" has no src — showing placeholder.`,
             sectionId: section.id,
             blockId: block.id,
           })
@@ -128,23 +129,30 @@ function BlockText({
   block, global: g,
 }: { block: TextBlock; global: GlobalEmailStyles }) {
   const { styles, content } = block
+  // Use raw <table><td> so content injects directly without react-email's
+  // <Text> wrapping everything in an extra <p>, which causes <p><p> nesting.
   return (
-    <Text
-      style={{
-        fontFamily: buildFontStack(styles.fontFamily, g.fontFamily),
-        fontSize: `${styles.fontSize}px`,
-        fontWeight: styles.fontWeight as React.CSSProperties['fontWeight'],
-        lineHeight: String(styles.lineHeight),
-        color: styles.color,
-        textAlign: styles.textAlign,
-        margin: '0',
-        paddingTop: `${styles.padding.top}px`,
-        paddingRight: `${styles.padding.right}px`,
-        paddingBottom: `${styles.padding.bottom}px`,
-        paddingLeft: `${styles.padding.left}px`,
-      }}
-      dangerouslySetInnerHTML={{ __html: content }}
-    />
+    <table role="presentation" cellPadding={0} cellSpacing={0} border={0}
+      style={{ width: '100%' }}
+    >
+      <tbody><tr>
+        <td
+          style={{
+            fontFamily: buildFontStack(styles.fontFamily, g.fontFamily),
+            fontSize: `${styles.fontSize}px`,
+            fontWeight: styles.fontWeight as React.CSSProperties['fontWeight'],
+            lineHeight: String(styles.lineHeight),
+            color: styles.color,
+            textAlign: styles.textAlign,
+            paddingTop: `${styles.padding.top}px`,
+            paddingRight: `${styles.padding.right}px`,
+            paddingBottom: `${styles.padding.bottom}px`,
+            paddingLeft: `${styles.padding.left}px`,
+          }}
+          dangerouslySetInnerHTML={{ __html: content }}
+        />
+      </tr></tbody>
+    </table>
   )
 }
 
@@ -153,6 +161,38 @@ function BlockImage({
 }: { block: ImageBlock; colPx: number }) {
   const { styles, src, alt, href } = block
   const w = styles.width === 'full' ? colPx : Math.min(styles.width, colPx)
+
+  // Empty src — render a grey placeholder so the preview doesn't break
+  if (!src) {
+    const placeholderH = Math.round((w * 3) / 4)
+    return (
+      <table role="presentation" cellPadding={0} cellSpacing={0} border={0}
+        style={{
+          width: '100%',
+          paddingTop: `${styles.padding.top}px`,
+          paddingRight: `${styles.padding.right}px`,
+          paddingBottom: `${styles.padding.bottom}px`,
+          paddingLeft: `${styles.padding.left}px`,
+        }}
+      >
+        <tbody><tr>
+          <td align="center" style={{
+            backgroundColor: '#F0F0F0',
+            width: `${w}px`,
+            height: `${placeholderH}px`,
+            fontFamily: 'Arial, sans-serif',
+            fontSize: '11px',
+            letterSpacing: '0.08em',
+            color: '#BBBBBB',
+            textAlign: 'center',
+            verticalAlign: 'middle',
+          }}>
+            IMAGE
+          </td>
+        </tr></tbody>
+      </table>
+    )
+  }
 
   const imgEl = (
     <Img
