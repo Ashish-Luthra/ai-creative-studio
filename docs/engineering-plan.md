@@ -1,6 +1,6 @@
 > [!WARNING]
 > **Scope notice:** This plan covers the Canvas Editor and Social Ads modules.
-> The Email Builder module documented here (MJML-based) has been superseded.
+> The Email Builder module documented here has been superseded.
 > For the current Email Builder direction, see [`docs/email-builder-spec.md`](./email-builder-spec.md).
 
 ---
