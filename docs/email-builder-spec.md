@@ -1,3 +1,4 @@
+This is the authoritative engineering spec for the Email Builder module. It supersedes the email sections in engineering-plan.md.
 Email Builder — Technical Specification
 For Claude Code Handoff
 
