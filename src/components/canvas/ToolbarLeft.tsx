@@ -1,11 +1,21 @@
 'use client'
 
-import { Layers, Library, Type, Circle, Sparkles, Settings } from 'lucide-react'
+import { Folder, Grid2X2, Image, Type, MousePointer2, Palette, Sparkles, Shuffle, Smartphone, Upload, Settings } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useCanvasStore } from '@/lib/canvas/canvasStore'
 import { useState } from 'react'
 
-type RailTool = 'layers' | 'assets' | 'text' | 'shapes' | 'generate' | 'settings'
+export type RailTool =
+  | 'projects'
+  | 'layout'
+  | 'media'
+  | 'copy'
+  | 'cta'
+  | 'style'
+  | 'ai'
+  | 'variants'
+  | 'preview'
+  | 'export'
+  | 'settings'
 
 interface RailButtonProps {
   icon: React.ReactNode
@@ -30,43 +40,44 @@ const RailButton: React.FC<RailButtonProps> = ({ icon, id, title, active, onClic
   </button>
 )
 
-export const ToolbarLeft: React.FC = () => {
-  const { mode } = useCanvasStore()
-  const [activeTool, setActiveTool] = useState<RailTool>('layers')
+interface ToolbarLeftProps {
+  onToolAction?: (tool: RailTool) => void
+}
 
-  // Email mode shows different tools
-  const canvasTools: { id: RailTool; icon: React.ReactNode; title: string }[] = [
-    { id: 'layers',   icon: <Layers size={15} />,   title: 'Layers'   },
-    { id: 'assets',   icon: <Library size={15} />,  title: 'Assets'   },
-    { id: 'text',     icon: <Type size={15} />,     title: 'Text'     },
-    { id: 'shapes',   icon: <Circle size={15} />,   title: 'Shapes'   },
-    { id: 'generate', icon: <Sparkles size={15} />, title: 'Generate' },
+export const ToolbarLeft: React.FC<ToolbarLeftProps> = ({ onToolAction }) => {
+  const [activeTool, setActiveTool] = useState<RailTool>('projects')
+
+  const tools: { id: RailTool; icon: React.ReactNode; title: string }[] = [
+    { id: 'projects', icon: <Folder size={15} />, title: 'Projects / Assets' },
+    { id: 'layout', icon: <Grid2X2 size={15} />, title: 'Layout / Template' },
+    { id: 'media', icon: <Image size={15} />, title: 'Media' },
+    { id: 'copy', icon: <Type size={15} />, title: 'Copy' },
+    { id: 'cta', icon: <MousePointer2 size={15} />, title: 'CTA / Action' },
+    { id: 'style', icon: <Palette size={15} />, title: 'Style / Brand' },
+    { id: 'ai', icon: <Sparkles size={15} />, title: 'AI Assist' },
+    { id: 'variants', icon: <Shuffle size={15} />, title: 'Variants' },
+    { id: 'preview', icon: <Smartphone size={15} />, title: 'Preview' },
+    { id: 'export', icon: <Upload size={15} />, title: 'Export / Publish' },
   ]
 
-  const emailTools: { id: RailTool; icon: React.ReactNode; title: string }[] = [
-    { id: 'layers',   icon: <Layers size={15} />,   title: 'Sections' },
-    { id: 'assets',   icon: <Library size={15} />,  title: 'Blocks'   },
-    { id: 'text',     icon: <Type size={15} />,     title: 'Text'     },
-    { id: 'shapes',   icon: <Circle size={15} />,   title: 'Image'    },
-    { id: 'generate', icon: <Sparkles size={15} />, title: 'Button'   },
-  ]
-
-  const tools = mode === 'email' ? emailTools : canvasTools
+  const handleToolClick = (tool: RailTool) => {
+    setActiveTool(tool)
+    onToolAction?.(tool)
+  }
 
   return (
     <aside className="flex w-12 shrink-0 flex-col items-center gap-0.5 border-r border-gray-200 bg-white py-2.5">
       {tools.map((tool, i) => (
         <div key={tool.id}>
-          {/* Divider between layers/assets and text/shapes/generate */}
-          {i === 2 && (
+          {i === 2 || i === 6 ? (
             <div className="my-1 h-px w-5 bg-gray-100" />
-          )}
+          ) : null}
           <RailButton
             icon={tool.icon}
             id={tool.id}
             title={tool.title}
             active={activeTool === tool.id}
-            onClick={setActiveTool}
+            onClick={handleToolClick}
           />
         </div>
       ))}
@@ -79,7 +90,7 @@ export const ToolbarLeft: React.FC = () => {
         id="settings"
         title="Settings"
         active={activeTool === 'settings'}
-        onClick={setActiveTool}
+        onClick={handleToolClick}
       />
     </aside>
   )

@@ -3,6 +3,7 @@
 import { Undo2, Redo2, Download } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useCanvasStore, type CanvasMode } from '@/lib/canvas/canvasStore'
+import { useEmailStore } from '@/lib/email/emailStore'
 
 const MODES: { id: CanvasMode; label: string }[] = [
   { id: 'canvas', label: 'Canvas' },
@@ -16,9 +17,44 @@ export interface TopBarProps {
 
 export const TopBar: React.FC<TopBarProps> = ({ onExport }) => {
   const { mode, setMode, undo, redo, undoStack, redoStack } = useCanvasStore()
+  const emailUndo = useEmailStore((s) => s.undo)
+  const emailRedo = useEmailStore((s) => s.redo)
+  const emailHistoryLength = useEmailStore((s) => s.history.length)
+  const emailFutureLength = useEmailStore((s) => s.future.length)
+  const compiledHtml = useEmailStore((s) => s.compiledHtml)
 
-  const canUndo = undoStack.length > 0
-  const canRedo = redoStack.length > 0
+  const canUndo = mode === 'email' ? emailHistoryLength > 0 : undoStack.length > 0
+  const canRedo = mode === 'email' ? emailFutureLength > 0 : redoStack.length > 0
+
+  const handleUndo = () => {
+    if (mode === 'email') {
+      emailUndo()
+      return
+    }
+    undo()
+  }
+
+  const handleRedo = () => {
+    if (mode === 'email') {
+      emailRedo()
+      return
+    }
+    redo()
+  }
+
+  const handleExport = () => {
+    if (mode === 'email') {
+      const blob = new Blob([compiledHtml], { type: 'text/html;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = 'email-export.html'
+      anchor.click()
+      URL.revokeObjectURL(url)
+      return
+    }
+    onExport?.()
+  }
 
   return (
     <header className="flex h-11 shrink-0 items-center justify-between border-b border-gray-200 bg-white px-3.5 z-40">
@@ -53,7 +89,7 @@ export const TopBar: React.FC<TopBarProps> = ({ onExport }) => {
       {/* Right — undo / redo / export */}
       <div className="flex items-center gap-1.5">
         <button
-          onClick={undo}
+          onClick={handleUndo}
           disabled={!canUndo}
           title="Undo"
           className="flex h-7 w-7 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 disabled:opacity-30"
@@ -61,7 +97,7 @@ export const TopBar: React.FC<TopBarProps> = ({ onExport }) => {
           <Undo2 size={13} />
         </button>
         <button
-          onClick={redo}
+          onClick={handleRedo}
           disabled={!canRedo}
           title="Redo"
           className="flex h-7 w-7 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 disabled:opacity-30"
@@ -72,7 +108,7 @@ export const TopBar: React.FC<TopBarProps> = ({ onExport }) => {
         <div className="mx-1.5 h-4 w-px bg-gray-200" />
 
         <button
-          onClick={onExport}
+          onClick={handleExport}
           className="flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-blue-700"
         >
           <Download size={11} />

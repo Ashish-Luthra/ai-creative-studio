@@ -1,6 +1,7 @@
 'use client'
 
 import dynamic from 'next/dynamic'
+import type { CanvasEditorProps } from './CanvasEditor'
 
 // Fabric.js is a client-only library — ssr: false must live in a 'use client' file
 export const CanvasEditorClient = dynamic(
@@ -14,3 +15,5 @@ export const CanvasEditorClient = dynamic(
     ),
   }
 )
+
+export type CanvasEditorClientProps = CanvasEditorProps

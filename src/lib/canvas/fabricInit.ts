@@ -2,6 +2,7 @@
 // Always import Fabric dynamically (client-side only, never SSR).
 
 import type { Canvas, FabricObject } from 'fabric'
+import type { CreativePreset } from './presets'
 
 // Tracks live Canvas instances by their host element so we can dispose before reinit.
 const canvasRegistry = new WeakMap<HTMLCanvasElement, Canvas>()
@@ -11,7 +12,7 @@ export interface FabricInitOptions {
   width: number
   height: number
   onSelect: (obj: FabricObject | null) => void
-  onModified: (snapshot: FabricObject[]) => void
+  onModified: () => void
 }
 
 export async function initFabricCanvas({
@@ -51,8 +52,7 @@ export async function initFabricCanvas({
   canvas.on('selection:cleared', () => onSelect(null))
 
   canvas.on('object:modified', () => {
-    const snapshot = canvas.getObjects() as FabricObject[]
-    onModified(snapshot)
+    onModified()
   })
 
   canvasRegistry.set(canvasEl, canvas)
@@ -81,22 +81,38 @@ export function disposeCanvas(canvas: Canvas, canvasEl?: HTMLCanvasElement) {
   }
 }
 
-// ── Seed the canvas with a 4:5 Instagram creative (image + editable text) ──
+function getFrameBounds(canvas: Canvas, preset: CreativePreset) {
+  const cw = canvas.getWidth()
+  const ch = canvas.getHeight()
+  const ratio = preset.width / preset.height
+  const maxW = cw * 0.62
+  const maxH = ch * 0.78
+
+  let frameW = maxW
+  let frameH = frameW / ratio
+  if (frameH > maxH) {
+    frameH = maxH
+    frameW = frameH * ratio
+  }
+
+  return {
+    width: frameW,
+    height: frameH,
+    left: (cw - frameW) / 2,
+    top: (ch - frameH) / 2,
+  }
+}
+
+// ── Seed the canvas with creative frame (image + editable text) ──
 export async function seedDefaultCreative(
   canvas: Canvas,
   imageUrl: string,
   copyText: string,
+  preset: CreativePreset,
 ) {
   const { FabricImage, Textbox, Rect, Shadow, Gradient } = await import('fabric')
 
-  const cw = canvas.getWidth()
-  const ch = canvas.getHeight()
-
-  // 4:5 frame centered on canvas
-  const FRAME_W = Math.min(cw * 0.62, 480)
-  const FRAME_H = FRAME_W * (5 / 4)
-  const fx = (cw - FRAME_W) / 2
-  const fy = (ch - FRAME_H) / 2
+  const { width: FRAME_W, height: FRAME_H, left: fx, top: fy } = getFrameBounds(canvas, preset)
 
   // ── Background frame (rounded rect) ─────────────────────
   const frame = new Rect({
@@ -139,6 +155,7 @@ export async function seedDefaultCreative(
       scaleX: scale,
       scaleY: scale,
       selectable: true,
+      data: { kind: 'creative-image' },
     })
     applySelectionStyle(img)
     canvas.add(img)
@@ -199,9 +216,85 @@ export async function seedDefaultCreative(
     shadow: new Shadow({ color: 'rgba(0,0,0,0.55)', blur: 10, offsetX: 0, offsetY: 2 }),
     editable: true,
     selectable: true,
+    data: { kind: 'creative-text' },
   })
   applySelectionStyle(txt)
   canvas.add(txt)
 
+  canvas.renderAll()
+}
+
+export async function addTextLayer(canvas: Canvas, text = 'Headline text') {
+  const { Textbox, Shadow } = await import('fabric')
+  const textbox = new Textbox(text, {
+    left: canvas.getWidth() * 0.25,
+    top: canvas.getHeight() * 0.2,
+    width: canvas.getWidth() * 0.5,
+    fontFamily: 'Inter',
+    fontSize: 48,
+    fontWeight: 'bold',
+    fill: '#FFFFFF',
+    textAlign: 'center',
+    shadow: new Shadow({ color: 'rgba(0,0,0,0.45)', blur: 8, offsetX: 0, offsetY: 1 }),
+    editable: true,
+    data: { kind: 'creative-text' },
+  })
+  applySelectionStyle(textbox)
+  canvas.add(textbox)
+  canvas.setActiveObject(textbox)
+  canvas.renderAll()
+}
+
+export async function addShapeLayer(canvas: Canvas) {
+  const { Rect } = await import('fabric')
+  const rect = new Rect({
+    left: canvas.getWidth() * 0.32,
+    top: canvas.getHeight() * 0.3,
+    width: 220,
+    height: 120,
+    fill: '#2563EB',
+    opacity: 0.85,
+    rx: 12,
+    ry: 12,
+    data: { kind: 'shape' },
+  })
+  applySelectionStyle(rect)
+  canvas.add(rect)
+  canvas.setActiveObject(rect)
+  canvas.renderAll()
+}
+
+export async function replaceOrAddImageLayer(canvas: Canvas, imageUrl: string, selected?: FabricObject | null) {
+  const { FabricImage } = await import('fabric')
+  const img = await FabricImage.fromURL(imageUrl, { crossOrigin: 'anonymous' })
+  const target = selected?.type === 'image' ? selected : null
+
+  if (target) {
+    const bounds = target.getBoundingRect()
+    const scale = Math.max(bounds.width / (img.width ?? 1), bounds.height / (img.height ?? 1))
+    img.set({
+      left: bounds.left + bounds.width / 2,
+      top: bounds.top + bounds.height / 2,
+      originX: 'center',
+      originY: 'center',
+      scaleX: scale,
+      scaleY: scale,
+      data: { kind: 'creative-image' },
+    })
+    canvas.remove(target)
+  } else {
+    const scale = Math.max((canvas.getWidth() * 0.4) / (img.width ?? 1), (canvas.getHeight() * 0.4) / (img.height ?? 1))
+    img.set({
+      left: canvas.getWidth() * 0.3,
+      top: canvas.getHeight() * 0.2,
+      scaleX: scale,
+      scaleY: scale,
+      data: { kind: 'creative-image' },
+    })
+  }
+
+  applySelectionStyle(img)
+  canvas.add(img)
+  canvas.setActiveObject(img)
   canvas.renderAll()
 }
