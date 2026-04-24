@@ -5,7 +5,7 @@
 
 ## 0. Project Overview
 
-**Product:**Ϡ AI Creative Studio
+**Product:**Ï  AI Creative Studio
 **Company::** Allyvate
 **Status:** Active Development -- POC Phase (up to 10 clients, 5,000 creatives)
 **BRD Version:** 1.5 (20 April 2026)
@@ -44,74 +44,74 @@
 ```
 ai-creative-studio
 /
-├── src/
-─   ├── app/                          # Next.js App Router
-─   ─   ├── (onboarding)/           # Brand setup, ingestion flow
-─    ─   ├── studio/                   # Main editor region
-─   ─   ─   ├── [briefId]/              # Session route
-��     ─   ─      ├── brief/               # Agent brief chat panel
-��     ─   ─      ├── canvas/              # Fabric.js editor
-��     ─   ─      ├── feeds/               # Variant tile grid
-─   ─   ├── settings/                # Brand settings, API connectors
-��     ├── api/                        # Next.js API routes
-��        ├── agent/                   # Proxy to LangGraph service
-─        ├── export/                  # Puppeteer export endpoint
-─         ├── assets/                  # Asset library CRTD| fetch
-─         └── rembg/                   # Proxy to FastAPI image service
-─   ├── components/
-─   ─   ├── agent/                   # Agent chat UI components
-��     ─   ├── BriefChat.tsx          # Conversational brief interface
-─   ─   ─   ├── ProposalCard.tsx       # Agent proposal at Gate 1
-─   ─   ─   └── IngestionSummary.tsx    # What the agent has learned
-─   ─   ├── canvas/                  # Fabric.js canvas components
-��     ─   ├── CanvasEditor.tsx       # Main canvas mount
-��     ─   ─   ├── ToolbarLeft.tsx        # Icon rail + generation panel
-─     ─   ─   ├── ToolbarRight.tsx       # AI tools + properties
-─   ─   ─   ├── TopBartsx              # Mode toggle, undo, export
-─     ─   ─   ├── ZoneLayer.tsx          # Zone locking overlay
-��     ─   ─   └── useCanvas.ts           # Fabric init + helpers hook
-��     ─   ├── feeds/                   # Variant tiles
-─   ─   ├── FeedsGrid.tsx           # Tile grid layout
-��     ─   └── VariantTile.tsx         # Single tile with actions
-─     ├── email/                    # Email block editor
-─   ─   ├── EmailEditor.tsx
-��     ─   └── EmailBlock.tsx
-─     ├── shared/                   # Cross-feature components
-─   ─   ├── AssetPicker.tsx
-��     ─   └── ExportModal.tsx
-─   ├── lib/
-��     ├── agent/                    # Agent client + session management
-─   ─   ├── sessionState.ts         # Session state types + Zzustand store
-─     ─   ├── agentClient.ts          # WebSocket/SSE connection to harness
-─   ─   └── briefStore.ts           # Zustand store for brief state
-─   ─   ├── canvas/                  # Fabric utils
-��     ─   ├── fabricInit.ts          # Canvas setup + default config
-��     ─   ├── zoneManager.ts          # Zone lock enforcement logic
-─     ─   ─   ├── layerTypes.ts          # Layer type definitions
-─     ─   └── canvasStore.ts          # Zustand store for canvas state
-─     ├── export/                   # Export utils
-─   ─   ├── exportPipeline.ts       # PNG, JPG, HTML, zip orchestration
-─     ─   ├── formatMap.ts            # Channel formats -- dimensions, DPI rules
-��     ─   └── puppeteerClient.ts      # Server-side export client
-��     ├── ingestion/                # Ingestion utils
-─   ─   ├── driveConnector.ts        # Google Drive connector
-─   ─   ├── figmaExtractor.ts        # Figma MCP extraction
-─     ─   └── assetTagger.ts          # AI auto-tagging on ingest
-��     ├── types/                    # Global TypeScript types
-��     ─   ├── session.ts              # SessionState, Brief, Variant types
-��     ─   ├── canvas.ts               # Zone, Layer, Template types
-─     ─   └── brand.ts                # BrandKit, Asset, Cluster types
-─     └── hooks/                    # Shared React hooks
-─         ├── useAgentStream.ts        # SSE hook for agent responses
-─         ├── useExport.ts            # Export flow hook
-��           └── useAssetLibrary.ts      # Asset library fetch + search
-├── services/                     # Python backend services (separate repo or monorepo package)
-��   ├── agent-harness/             # LangGraph agent harness
-─   ├── image-service/             # rembg + SAM2 FastAPI
-─   ├── ingestion-service/         # Ad DNA pipeline, embeddings
- �|    └── scoring-service/          # Predictive scoring
-├── public/
-└── package.json
+â”œâ”€â”€ src/
+â”€   â”œâ”€â”€ app/                          # Next.js App Router
+â”€   â”€   â”œâ”€â”€ (onboarding)/           # Brand setup, ingestion flow
+â”€    â”€   â”œâ”€â”€ studio/                   # Main editor region
+â”€   â”€   â”€   â”œâ”€â”€ [briefId]/              # Session route
+¸¥     â”€   â”€      â”œâ”€â”€ brief/               # Agent brief chat panel
+¸¥     â”€   â”€      â”œâ”€â”€ canvas/              # Fabric.js editor
+¸¥     â”€   â”€      â”œâ”€â”€ feeds/               # Variant tile grid
+â”€   â”€   â”œâ”€â”€ settings/                # Brand settings, API connectors
+¸¥     â”œâ”€â”€ api/                        # Next.js API routes
+¸¥        â”œâ”€â”€ agent/                   # Proxy to LangGraph service
+â”€        â”œâ”€â”€ export/                  # Puppeteer export endpoint
+â”€         â”œâ”€â”€ assets/                  # Asset library CRTD| fetch
+â”€         â””â”€â”€ rembg/                   # Proxy to FastAPI image service
+â”€   â”œâ”€â”€ components/
+â”€   â”€   â”œâ”€â”€ agent/                   # Agent chat UI components
+¸¥     â”€   â”œâ”€â”€ BriefChat.tsx          # Conversational brief interface
+â”€   â”€   â”€   â”œâ”€â”€ ProposalCard.tsx       # Agent proposal at Gate 1
+â”€   â”€   â”€   â””â”€â”€ IngestionSummary.tsx    # What the agent has learned
+â”€   â”€   â”œâ”€â”€ canvas/                  # Fabric.js canvas components
+¸¥     â”€   â”œâ”€â”€ CanvasEditor.tsx       # Main canvas mount
+¸¥     â”€   â”€   â”œâ”€â”€ ToolbarLeft.tsx        # Icon rail + generation panel
+â”€     â”€   â”€   â”œâ”€â”€ ToolbarRight.tsx       # AI tools + properties
+â”€   â”€   â”€   â”œâ”€â”€ TopBartsx              # Mode toggle, undo, export
+â”€     â”€   â”€   â”œâ”€â”€ ZoneLayer.tsx          # Zone locking overlay
+¸¥     â”€   â”€   â””â”€â”€ useCanvas.ts           # Fabric init + helpers hook
+¸¥     â”€   â”œâ”€â”€ feeds/                   # Variant tiles
+â”€   â”€   â”œâ”€â”€ FeedsGrid.tsx           # Tile grid layout
+¸¥     â”€   â””â”€â”€ VariantTile.tsx         # Single tile with actions
+â”€     â”œâ”€â”€ email/                    # Email block editor
+â”€   â”€   â”œâ”€â”€ EmailEditor.tsx
+¸¥     â”€   â””â”€â”€ EmailBlock.tsx
+â”€     â”œâ”€â”€ shared/                   # Cross-feature components
+â”€   â”€   â”œâ”€â”€ AssetPicker.tsx
+¸¥     â”€   â””â”€â”€ ExportModal.tsx
+â”€   â”œâ”€â”€ lib/
+¸¥     â”œâ”€â”€ agent/                    # Agent client + session management
+â”€   â”€   â”œâ”€â”€ sessionState.ts         # Session state types + Zzustand store
+â”€     â”€   â”œâ”€â”€ agentClient.ts          # WebSocket/SSE connection to harness
+â”€   â”€   â””â”€â”€ briefStore.ts           # Zustand store for brief state
+â”€   â”€   â”œâ”€â”€ canvas/                  # Fabric utils
+¸¥     â”€   â”œâ”€â”€ fabricInit.ts          # Canvas setup + default config
+¸¥     â”€   â”œâ”€â”€ zoneManager.ts          # Zone lock enforcement logic
+â”€     â”€   â”€   â”œâ”€â”€ layerTypes.ts          # Layer type definitions
+â”€     â”€   â””â”€â”€ canvasStore.ts          # Zustand store for canvas state
+â”€     â”œâ”€â”€ export/                   # Export utils
+â”€   â”€   â”œâ”€â”€ exportPipeline.ts       # PNG, JPG, HTML, zip orchestration
+â”€     â”€   â”œâ”€â”€ formatMap.ts            # Channel formats -- dimensions, DPI rules
+¸¥     â”€   â””â”€â”€ puppeteerClient.ts      # Server-side export client
+¸¥     â”œâ”€â”€ ingestion/                # Ingestion utils
+â”€   â”€   â”œâ”€â”€ driveConnector.ts        # Google Drive connector
+â”€   â”€   â”œâ”€â”€ figmaExtractor.ts        # Figma MCP extraction
+â”€     â”€   â””â”€â”€ assetTagger.ts          # AI auto-tagging on ingest
+¸¥     â”œâ”€â”€ types/                    # Global TypeScript types
+¸¥     â”€   â”œâ”€â”€ session.ts              # SessionState, Brief, Variant types
+¸¥     â”€   â”œâ”€â”€ canvas.ts               # Zone, Layer, Template types
+â”€     â”€   â””â”€â”€ brand.ts                # BrandKit, Asset, Cluster types
+â”€     â””â”€â”€ hooks/                    # Shared React hooks
+â”€         â”œâ”€â”€ useAgentStream.ts        # SSE hook for agent responses
+â”€         â”œâ”€â”€ useExport.ts            # Export flow hook
+¸¥           â””â”€â”€ useAssetLibrary.ts      # Asset library fetch + search
+â”œâ”€â”€ services/                     # Python backend services (separate repo or monorepo package)
+¸¥   â”œâ”€â”€ agent-harness/             # LangGraph agent harness
+â”€   â”œâ”€â”€ image-service/             # rembg + SAM2 FastAPI
+â”€   â”œâ”€â”€ ingestion-service/         # Ad DNA pipeline, embeddings
+  |    â””â”€â”€ scoring-service/          # Predictive scoring
+â”œâ”€â”€ public/
+â””â”€â”€ package.json
 ```
 
 ---
@@ -152,7 +152,7 @@ ai-creative-studio
 - Email is a separate rendering target -- not shared with the Fabric canvas.
 - Use `react-email` components for all email block rendering.
 - Live text must never be baked into exported images in email mode.
-
+- Full Email Builder spec (data model, block system, compiler, sections): docs/email-builder-spec.md — read before touching any email code.
 ---
 
 ## 4. Coding Standards
