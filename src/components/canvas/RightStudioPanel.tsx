@@ -67,7 +67,12 @@ export const RightStudioPanel: React.FC<RightStudioPanelProps> = ({
       {activeTool === 'cta' && <Placeholder title="CTA / Action" text="Separate CTA controls are planned for a later phase." />}
       {activeTool === 'style' && <Placeholder title="Style / Brand" text="Brand style automation is deferred; text styling works in the floating toolbar." />}
       {activeTool === 'ai' && <Placeholder title="AI Assist" text="AI generation tools are intentionally deferred in Phase 1." />}
-      {activeTool === 'variants' && <Placeholder title="Variants" text="Variant generation and comparison flows are scheduled for later phases." />}
+      {activeTool === 'variants' && (
+        <>
+          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Variants</h3>
+          <p className="text-sm text-gray-600">Use this tab to generate and compare variants from current creative state.</p>
+        </>
+      )}
       {activeTool === 'preview' && (
         <>
           <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Preview</h3>
