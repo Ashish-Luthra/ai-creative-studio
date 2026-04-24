@@ -524,9 +524,25 @@ export async function compileEmail(
 
   const width = opts.width ?? doc.globalStyles.contentWidth ?? 600
 
-  const html = await render(<EmailTemplate doc={doc} width={width} />, {
-    pretty: opts.mode !== 'html',
-  })
+  try {
+    const html = await render(<EmailTemplate doc={doc} width={width} />, {
+      // Prettier rejects some patterns email clients tolerate (e.g. adjacent table layout).
+      // Only opt in with opts.pretty === true (e.g. one-off export debugging).
+      pretty: opts.pretty === true,
+    })
 
-  return { html, errors: [], warnings }
+    return { html, errors: [], warnings }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    return {
+      html: '',
+      errors: [
+        {
+          code: 'RENDER_FAILED',
+          message: `Email render failed: ${message}`,
+        },
+      ],
+      warnings,
+    }
+  }
 }
