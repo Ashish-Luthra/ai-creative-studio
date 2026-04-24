@@ -7,18 +7,21 @@ interface CanvasState {
   mode: CanvasMode
   selectedLayer: FabricObject | null
   zoom: number
-  undoStack: FabricObject[][]
-  redoStack: FabricObject[][]
+  undoStack: string[]
+  redoStack: string[]
   fabricCanvas: Canvas | null
+  selectedPresetId: string
 
   // Actions
   setMode: (mode: CanvasMode) => void
   setSelectedLayer: (obj: FabricObject | null) => void
   setZoom: (zoom: number) => void
   setFabricCanvas: (canvas: Canvas | null) => void
-  pushUndo: (snapshot: FabricObject[]) => void
-  undo: () => void
-  redo: () => void
+  setSelectedPresetId: (presetId: string) => void
+  pushUndo: (snapshot: string) => void
+  resetHistory: () => void
+  undo: () => Promise<void>
+  redo: () => Promise<void>
 }
 
 export const useCanvasStore = create<CanvasState>((set, get) => ({
@@ -28,43 +31,44 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   undoStack: [],
   redoStack: [],
   fabricCanvas: null,
+  selectedPresetId: 'instagram-4-5',
 
   setMode: (mode) => set({ mode, selectedLayer: null }),
   setSelectedLayer: (obj) => set({ selectedLayer: obj }),
   setZoom: (zoom) => set({ zoom }),
   setFabricCanvas: (canvas) => set({ fabricCanvas: canvas }),
+  setSelectedPresetId: (presetId) => set({ selectedPresetId: presetId }),
 
   pushUndo: (snapshot) =>
     set((s) => ({
       undoStack: [...s.undoStack, snapshot].slice(-50),
       redoStack: [],
     })),
+  resetHistory: () => set({ undoStack: [], redoStack: [] }),
 
-  undo: () => {
+  undo: async () => {
     const { undoStack, redoStack, fabricCanvas } = get()
     if (!undoStack.length || !fabricCanvas) return
     const prev = undoStack[undoStack.length - 1]
-    const current = fabricCanvas.getObjects() as FabricObject[]
+    const current = JSON.stringify(fabricCanvas.toJSON())
     set({
       undoStack: undoStack.slice(0, -1),
       redoStack: [...redoStack, current],
     })
-    fabricCanvas.clear()
-    prev.forEach((obj) => fabricCanvas.add(obj))
+    await fabricCanvas.loadFromJSON(prev)
     fabricCanvas.renderAll()
   },
 
-  redo: () => {
+  redo: async () => {
     const { redoStack, undoStack, fabricCanvas } = get()
     if (!redoStack.length || !fabricCanvas) return
     const next = redoStack[redoStack.length - 1]
-    const current = fabricCanvas.getObjects() as FabricObject[]
+    const current = JSON.stringify(fabricCanvas.toJSON())
     set({
       redoStack: redoStack.slice(0, -1),
       undoStack: [...undoStack, current],
     })
-    fabricCanvas.clear()
-    next.forEach((obj) => fabricCanvas.add(obj))
+    await fabricCanvas.loadFromJSON(next)
     fabricCanvas.renderAll()
   },
 }))
