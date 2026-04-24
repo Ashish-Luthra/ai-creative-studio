@@ -1,3 +1,9 @@
+> [!NOTE]
+> **This is the authoritative spec for the Email Builder module.**
+> It supersedes all email-related sections in [`docs/engineering-plan.md`](./engineering-plan.md).
+> The compiler stack is **react-email**, not MJML.
+
+---
 This is the authoritative engineering spec for the Email Builder module. It supersedes the email sections in engineering-plan.md.
 Email Builder — Technical Specification
 For Claude Code Handoff
