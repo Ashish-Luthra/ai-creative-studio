@@ -9,32 +9,7 @@ import { ToolbarLeft } from './ToolbarLeft'
 import { AgentPill } from './AgentPill'
 import { FloatToolbar } from './FloatToolbar'
 import { FloatPropertiesCard } from './FloatPropertiesCard'
-import { FloatMjmlCard } from './FloatMjmlCard'
-
-// ── Email viewport placeholder (replace with react-email later) ──
-const EmailViewport: React.FC = () => (
-  <div className="absolute left-[46%] top-1/2 w-[420px] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-[0_8px_40px_rgba(0,0,0,0.12)]">
-    <div className="flex h-8 items-center gap-1.5 border-b border-gray-100 bg-gray-50 px-3">
-      <div className="h-2.5 w-2.5 rounded-full bg-red-300" />
-      <div className="h-2.5 w-2.5 rounded-full bg-yellow-300" />
-      <div className="h-2.5 w-2.5 rounded-full bg-green-300" />
-      <div className="mx-2 flex h-[14px] flex-1 items-center rounded bg-gray-100 px-2">
-        <span className="text-[9px] text-gray-400">Email Preview</span>
-      </div>
-    </div>
-    <div className="p-4">
-      <div className="mb-2.5 flex h-[90px] items-center justify-center rounded-lg bg-gradient-to-br from-purple-100 to-purple-200 text-[11px] font-semibold text-purple-700">
-        Hero Image Block
-      </div>
-      <div className="mb-2 h-2.5 w-4/5 rounded bg-gray-100" />
-      <div className="mb-2 h-2.5 w-2/3 rounded bg-gray-100" />
-      <div className="mb-2 h-2.5 w-3/4 rounded bg-gray-100" />
-      <div className="mt-3 flex h-8 items-center justify-center rounded-md bg-blue-600 text-[11px] font-semibold text-white">
-        Shop Now →
-      </div>
-    </div>
-  </div>
-)
+import { EmailEditorPanel } from '@/components/email/EmailEditorPanel'
 
 // ── Toolbar state shape ──────────────────────────────────────
 interface TbState {
@@ -219,10 +194,7 @@ export const CanvasEditor: React.FC = () => {
           />
 
           {mode === 'email' && (
-            <>
-              <EmailViewport />
-              <FloatMjmlCard />
-            </>
+            <EmailEditorPanel />
           )}
 
           {/* Typography toolbar — shown only when a text layer is selected */}
