@@ -1,3 +1,9 @@
+> [!WARNING]
+> **Scope notice:** This plan covers the Canvas Editor and Social Ads modules.
+> The Email Builder module documented here (MJML-based) has been superseded.
+> For the current Email Builder direction, see [`docs/email-builder-spec.md`](./email-builder-spec.md).
+
+---
 # Engineering Plan — AI Creative Studio
 **Allyvate | Confidential | 20 April 2026**
 **Based on BRD v1.5 | POC Phase — 10 clients, 5,000 creatives**
