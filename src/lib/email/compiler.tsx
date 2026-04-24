@@ -64,9 +64,11 @@ function validate(doc: EmailDocument): {
         }
 
         if (block.type === 'image' && !(block as ImageBlock).src) {
-          errors.push({
+          // Warning, not error — preview still renders with a grey placeholder
+          // so the layout is visible while the user fills in the src.
+          warnings.push({
             code: 'INVALID_IMAGE_SRC',
-            message: `Image block "${block.id}" has no src.`,
+            message: `Image block "${block.id}" has no src — showing placeholder in preview.`,
             sectionId: section.id,
             blockId: block.id,
           })
@@ -152,7 +154,41 @@ function BlockImage({
   block, colPx,
 }: { block: ImageBlock; colPx: number }) {
   const { styles, src, alt, href } = block
-  const w = styles.width === 'full' ? colPx : Math.min(styles.width, colPx)
+  const w = styles.width === 'full' ? colPx : Math.min(styles.width as number, colPx)
+
+  // No src — render a grey placeholder so the layout is visible while editing
+  if (!src) {
+    return (
+      <table role="presentation" cellPadding={0} cellSpacing={0} border={0}
+        style={{
+          width: '100%',
+          paddingTop: `${styles.padding.top}px`,
+          paddingRight: `${styles.padding.right}px`,
+          paddingBottom: `${styles.padding.bottom}px`,
+          paddingLeft: `${styles.padding.left}px`,
+        }}
+      >
+        <tbody><tr>
+          <td
+            align="center"
+            style={{
+              backgroundColor: '#F0F0F0',
+              width: `${w}px`,
+              height: '200px',
+              fontFamily: 'Arial, sans-serif',
+              fontSize: '12px',
+              color: '#AAAAAA',
+              textAlign: 'center',
+              verticalAlign: 'middle',
+              ...(styles.borderRadius ? { borderRadius: `${styles.borderRadius}px` } : {}),
+            }}
+          >
+            Image
+          </td>
+        </tr></tbody>
+      </table>
+    )
+  }
 
   const imgEl = (
     <Img

@@ -235,7 +235,7 @@ export function presetImageText(): EmailSection {
   return makeSection(
     'image-left',
     [
-      [makeImageBlock('/placeholder-image.png', 'Feature image')],
+      [makeImageBlock('', 'Feature image')],
       [
         makeSpacerBlock(16),
         makeHeadingBlock('Feature headline'),
@@ -252,12 +252,12 @@ export function presetTwoColumn(): EmailSection {
     'two-col',
     [
       [
-        makeImageBlock('/placeholder-image.png', 'Product A'),
+        makeImageBlock('', 'Product A'),
         makeBodyBlock('Product A'),
         makeButtonBlock('Buy Now', '#'),
       ],
       [
-        makeImageBlock('/placeholder-image.png', 'Product B'),
+        makeImageBlock('', 'Product B'),
         makeBodyBlock('Product B'),
         makeButtonBlock('Buy Now', '#'),
       ],

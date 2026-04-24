@@ -229,6 +229,7 @@ export type CompilerWarningCode =
   | 'MISSING_ALT_TEXT'       // ImageBlock or LogoBlock has empty alt
   | 'MISSING_PREHEADER'      // EmailDocument.preheader is empty
   | 'EMPTY_SECTION'          // Section has no blocks in any column
+  | 'INVALID_IMAGE_SRC'      // ImageBlock src is empty — preview shows placeholder
 
 export interface CompilerError {
   code: CompilerErrorCode
