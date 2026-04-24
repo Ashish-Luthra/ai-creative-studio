@@ -254,6 +254,15 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
         restoringRef.current = true
         try {
           if (cancelled || fabricRef.current !== c) return
+          // Fabric’s loadFromJSON calls clear() which needs a live 2D context — wait two frames so
+          // layout + GPU context are ready (avoids clearRect on undefined on some Safari/Turbo setups).
+          await new Promise<void>((r) => {
+            requestAnimationFrame(() => requestAnimationFrame(() => r()))
+          })
+          if (cancelled || fabricRef.current !== c) return
+          if (!c.getContext()) {
+            throw new Error('Canvas 2D context not ready')
+          }
           await c.loadFromJSON(savedJson)
           if (cancelled || fabricRef.current !== c) return
           c.renderAll()
@@ -281,7 +290,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
       cancelled = true
       cancelAnimationFrame(rafId)
       if (fabricRef.current) {
-        disposeCanvas(fabricRef.current)
+        disposeCanvas(fabricRef.current, canvasElRef.current ?? undefined)
         fabricRef.current = null
         setFabricCanvas(null)
         setSelectedLayer(null)

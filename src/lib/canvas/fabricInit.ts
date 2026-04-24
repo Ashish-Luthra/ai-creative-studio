@@ -72,7 +72,12 @@ export function applySelectionStyle(obj: FabricObject) {
 }
 
 export function disposeCanvas(canvas: Canvas, canvasEl?: HTMLCanvasElement) {
-  if (canvasEl) canvasRegistry.delete(canvasEl)
+  if (canvasEl) {
+    canvasRegistry.delete(canvasEl)
+  } else {
+    const el = (canvas as unknown as { getElement?: () => HTMLCanvasElement }).getElement?.()
+    if (el) canvasRegistry.delete(el)
+  }
   try {
     canvas.dispose()
   } catch {
