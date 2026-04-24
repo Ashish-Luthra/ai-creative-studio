@@ -3,13 +3,18 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import type { Canvas, FabricObject } from 'fabric'
 import { useCanvasStore } from '@/lib/canvas/canvasStore'
-import { initFabricCanvas, disposeCanvas, seedDefaultCreative } from '@/lib/canvas/fabricInit'
+import { addShapeLayer, addTextLayer, disposeCanvas, initFabricCanvas, replaceOrAddImageLayer, seedDefaultCreative } from '@/lib/canvas/fabricInit'
+import { CREATIVE_PRESETS, getPresetById, isPresetId } from '@/lib/canvas/presets'
 import { TopBar } from './TopBar'
-import { ToolbarLeft } from './ToolbarLeft'
+import { ToolbarLeft, type RailTool } from './ToolbarLeft'
 import { AgentPill } from './AgentPill'
 import { FloatToolbar } from './FloatToolbar'
 import { FloatPropertiesCard } from './FloatPropertiesCard'
 import { EmailEditorPanel } from '@/components/email/EmailEditorPanel'
+import { ApprovedImagesPanel } from './ApprovedImagesPanel'
+import { RightStudioPanel } from './RightStudioPanel'
+import { ImageSelectionToolbar } from './ImageSelectionToolbar'
+import { ProjectsAssetsPanel } from './ProjectsAssetsPanel'
 
 // ── Toolbar state shape ──────────────────────────────────────
 interface TbState {
@@ -20,6 +25,13 @@ interface TbState {
   isUnderline: boolean
   textAlign: 'left' | 'center' | 'right'
   color: string
+}
+
+interface CampaignMeta {
+  briefId: string
+  name: string
+  updatedAt: string | null
+  activePresetId: string
 }
 
 const DEFAULT_TB: TbState = {
@@ -33,20 +45,77 @@ const DEFAULT_TB: TbState = {
 }
 
 // ── Main component ──────────────────────────────────────────
-export const CanvasEditor: React.FC = () => {
+export interface CanvasEditorProps {
+  briefId?: string
+  initialPresetId?: string
+}
+
+export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-session', initialPresetId }) => {
   const canvasElRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const fabricRef = useRef<Canvas | null>(null)
+  const restoringRef = useRef(false)
+  const [activeTool, setActiveTool] = useState<RailTool | null>(null)
+  const [showApprovedImages, setShowApprovedImages] = useState(false)
+  const [generatedPresetIds, setGeneratedPresetIds] = useState<string[]>([])
+  const [campaign, setCampaign] = useState<CampaignMeta>({
+    briefId,
+    name: 'Creative Campaign',
+    updatedAt: null,
+    activePresetId: 'instagram-4-5',
+  })
+  const [recentCampaigns, setRecentCampaigns] = useState<CampaignMeta[]>([])
 
   const {
-    mode, selectedLayer,
-    setSelectedLayer, setFabricCanvas, pushUndo,
+    mode, selectedLayer, selectedPresetId,
+    setSelectedLayer, setFabricCanvas, setSelectedPresetId, pushUndo, resetHistory,
   } = useCanvasStore()
 
   const [toolbarPos, setToolbarPos] = useState({ x: 0, y: 0 })
   const [tbState, setTbState] = useState<TbState>(DEFAULT_TB)
   const tbStateRef = useRef<TbState>(DEFAULT_TB)
   tbStateRef.current = tbState
+
+  const storageKey = `creative-canvas:${briefId}`
+  const presetStorageKey = `${storageKey}:preset`
+  const generatedKey = `${storageKey}:generated-presets`
+  const campaignKey = `${storageKey}:campaign`
+  const recentCampaignsKey = 'creative-canvas:recent-campaigns'
+
+  const saveSnapshot = useCallback(() => {
+    const fc = fabricRef.current
+    if (!fc || restoringRef.current) return
+    pushUndo(JSON.stringify(fc.toJSON()))
+    localStorage.setItem(storageKey, JSON.stringify(fc.toJSON()))
+  }, [pushUndo, storageKey])
+
+  const updateCampaignMeta = useCallback((patch: Partial<CampaignMeta> = {}) => {
+    const next: CampaignMeta = {
+      ...campaign,
+      ...patch,
+      updatedAt: new Date().toLocaleString(),
+    }
+    setCampaign(next)
+    localStorage.setItem(campaignKey, JSON.stringify(next))
+    const currentRecentsRaw = localStorage.getItem(recentCampaignsKey)
+    const currentRecents = (currentRecentsRaw ? JSON.parse(currentRecentsRaw) : []) as CampaignMeta[]
+    const nextRecents = [next, ...currentRecents.filter((item) => item.briefId !== next.briefId)].slice(0, 8)
+    setRecentCampaigns(nextRecents)
+    localStorage.setItem(recentCampaignsKey, JSON.stringify(nextRecents))
+  }, [campaign, campaignKey, recentCampaignsKey])
+
+  const extractCreativeInputs = useCallback(() => {
+    const canvas = fabricRef.current
+    if (!canvas) {
+      return { copyText: 'Enjoy Coffee', imageUrl: '/CoffeeInsta.png' }
+    }
+    const objects = canvas.getObjects()
+    const textObject = objects.find((obj) => obj.type === 'textbox') as FabricObject | undefined
+    const imageObject = objects.find((obj) => obj.type === 'image') as FabricObject | undefined
+    const copyText = String((textObject as { text?: string } | undefined)?.text ?? 'Enjoy Coffee')
+    const imageUrl = String((imageObject as { getSrc?: () => string } | undefined)?.getSrc?.() ?? '/CoffeeInsta.png')
+    return { copyText, imageUrl }
+  }, [])
 
   // Read fabric text properties into toolbar state
   const syncToolbar = useCallback((obj: FabricObject | null) => {
@@ -90,9 +159,9 @@ export const CanvasEditor: React.FC = () => {
       if ('textAlign' in changes) t.set({ textAlign: changes.textAlign })
       if ('color' in changes) t.set({ fill: changes.color })
       fc.renderAll()
-      pushUndo(fc.getObjects() as FabricObject[])
+      saveSnapshot()
     }
-  }, [selectedLayer, pushUndo])
+  }, [selectedLayer, saveSnapshot])
 
   // ── Init Fabric (canvas mode only) ─────────────────────────
   // Uses rAF so layout is complete before we read container dimensions.
@@ -123,7 +192,7 @@ export const CanvasEditor: React.FC = () => {
           setSelectedLayer(obj)
           if (obj) { syncPos(obj); syncToolbar(obj) }
         },
-        onModified: (snapshot) => pushUndo(snapshot),
+        onModified: () => saveSnapshot(),
       })
 
       if (cancelled) { disposeCanvas(c); return }
@@ -134,7 +203,54 @@ export const CanvasEditor: React.FC = () => {
       c.on('object:moving', (e) => { if (e.target) syncPos(e.target) })
       c.on('object:scaling', (e) => { if (e.target) syncPos(e.target) })
 
-      seedDefaultCreative(c, '/CoffeeInsta.png', 'Enjoy Coffee')
+      const storedPresetId = localStorage.getItem(presetStorageKey)
+      const resolvedPresetId =
+        (initialPresetId && isPresetId(initialPresetId) ? initialPresetId : null)
+        ?? storedPresetId
+        ?? selectedPresetId
+      const initialPreset = getPresetById(resolvedPresetId)
+      setSelectedPresetId(resolvedPresetId)
+      localStorage.setItem(presetStorageKey, resolvedPresetId)
+
+      const generatedRaw = localStorage.getItem(generatedKey)
+      if (generatedRaw) {
+        setGeneratedPresetIds(JSON.parse(generatedRaw) as string[])
+      }
+      const campaignRaw = localStorage.getItem(campaignKey)
+      const recentsRaw = localStorage.getItem(recentCampaignsKey)
+      if (recentsRaw) {
+        setRecentCampaigns(JSON.parse(recentsRaw) as CampaignMeta[])
+      }
+      if (campaignRaw) {
+        const parsed = JSON.parse(campaignRaw) as CampaignMeta
+        setCampaign(parsed)
+      } else {
+        const initialCampaign: CampaignMeta = {
+          briefId,
+          name: `Campaign ${briefId}`,
+          updatedAt: new Date().toLocaleString(),
+          activePresetId: resolvedPresetId,
+        }
+        setCampaign(initialCampaign)
+        localStorage.setItem(campaignKey, JSON.stringify(initialCampaign))
+        const currentRecentsRaw = localStorage.getItem(recentCampaignsKey)
+        const currentRecents = (currentRecentsRaw ? JSON.parse(currentRecentsRaw) : []) as CampaignMeta[]
+        const nextRecents = [initialCampaign, ...currentRecents.filter((item) => item.briefId !== initialCampaign.briefId)].slice(0, 8)
+        setRecentCampaigns(nextRecents)
+        localStorage.setItem(recentCampaignsKey, JSON.stringify(nextRecents))
+      }
+
+      const savedJson = localStorage.getItem(storageKey)
+      if (savedJson) {
+        restoringRef.current = true
+        await c.loadFromJSON(savedJson)
+        c.renderAll()
+        restoringRef.current = false
+      } else {
+        await seedDefaultCreative(c, '/CoffeeInsta.png', 'Enjoy Coffee', initialPreset)
+      }
+      resetHistory()
+      saveSnapshot()
     })
 
     return () => {
@@ -148,7 +264,42 @@ export const CanvasEditor: React.FC = () => {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode])
+  }, [briefId, campaignKey, generatedKey, initialPresetId, mode, recentCampaignsKey, resetHistory, saveSnapshot, selectedPresetId, setSelectedPresetId, storageKey, presetStorageKey, setSelectedLayer, setFabricCanvas, syncPos, syncToolbar])
+
+  // ── Delete selected object on Delete / Backspace ──────────
+  // Only fires when mode==='canvas', an object is selected, and the
+  // Textbox is NOT in active-editing mode (cursor inside the box).
+  useEffect(() => {
+    if (mode !== 'canvas') return
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Delete' && e.key !== 'Backspace') return
+
+      // If focus is inside an <input>, <textarea>, or contenteditable,
+      // let the browser handle it normally — don't delete the layer.
+      const tag = (e.target as HTMLElement)?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable) return
+
+      const canvas = fabricRef.current
+      if (!canvas) return
+
+      const active = canvas.getActiveObject()
+      if (!active) return
+
+      // Textbox in text-editing mode — Fabric handles character deletion
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if ((active as any).isEditing) return
+
+      canvas.remove(active)
+      canvas.discardActiveObject()
+      canvas.renderAll()
+      setSelectedLayer(null)
+      saveSnapshot()
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [mode, saveSnapshot, setSelectedLayer])
 
   // ── Resize observer ────────────────────────────────────────
   useEffect(() => {
@@ -165,16 +316,97 @@ export const CanvasEditor: React.FC = () => {
     console.log('[AgentPill] command:', cmd)
   }, [])
 
+  const handleCanvasExport = useCallback(() => {
+    const canvas = fabricRef.current
+    if (!canvas) return
+    const url = canvas.toDataURL({ format: 'png', multiplier: 2 })
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `${briefId}-${selectedPresetId}.png`
+    link.click()
+  }, [briefId, selectedPresetId])
+
+  const handlePresetChange = useCallback(async (presetId: string) => {
+    const canvas = fabricRef.current
+    if (!canvas) return
+    setSelectedPresetId(presetId)
+    localStorage.setItem(presetStorageKey, presetId)
+    restoringRef.current = true
+    canvas.clear()
+    const { copyText, imageUrl } = extractCreativeInputs()
+    await seedDefaultCreative(canvas, imageUrl, copyText, getPresetById(presetId))
+    canvas.renderAll()
+    restoringRef.current = false
+    resetHistory()
+    saveSnapshot()
+    setGeneratedPresetIds((prev) => {
+      const next = Array.from(new Set([...prev, presetId]))
+      localStorage.setItem(generatedKey, JSON.stringify(next))
+      return next
+    })
+    updateCampaignMeta({ activePresetId: presetId })
+  }, [extractCreativeInputs, generatedKey, presetStorageKey, resetHistory, saveSnapshot, setSelectedPresetId, updateCampaignMeta])
+
+  const handleConvertToAll = useCallback(async () => {
+    const { copyText, imageUrl } = extractCreativeInputs()
+    const { Canvas: FabricCanvas } = await import('fabric')
+
+    for (const preset of CREATIVE_PRESETS) {
+      const tempEl = document.createElement('canvas')
+      const temp = new FabricCanvas(tempEl, { width: 1200, height: 1200, backgroundColor: '#FDFDFD' })
+      await seedDefaultCreative(temp, imageUrl, copyText, preset)
+      const url = temp.toDataURL({ format: 'png', multiplier: 2 })
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `${briefId}-${preset.id}.png`
+      link.click()
+      temp.dispose()
+    }
+
+    const allIds = CREATIVE_PRESETS.map((preset) => preset.id)
+    setGeneratedPresetIds(allIds)
+    localStorage.setItem(generatedKey, JSON.stringify(allIds))
+    updateCampaignMeta({ activePresetId: selectedPresetId })
+  }, [briefId, extractCreativeInputs, generatedKey, selectedPresetId, updateCampaignMeta])
+
+  const handleToolAction = useCallback(async (tool: RailTool) => {
+    setActiveTool(tool)
+    const canvas = fabricRef.current
+    if (mode !== 'canvas' || !canvas) return
+
+    if (tool === 'copy') {
+      await addTextLayer(canvas, 'Add your headline')
+      saveSnapshot()
+    } else if (tool === 'media') {
+      setShowApprovedImages(true)
+    } else if (tool === 'preview' || tool === 'layout') {
+      // open right panel only
+    } else if (tool === 'export') {
+      handleCanvasExport()
+    } else if (tool === 'projects') {
+      // projects panel view
+    }
+  }, [mode, saveSnapshot, handleCanvasExport])
+
+  const handleImageSelect = useCallback(async (src: string) => {
+    const canvas = fabricRef.current
+    if (!canvas) return
+    await replaceOrAddImageLayer(canvas, src, selectedLayer)
+    setShowApprovedImages(false)
+    saveSnapshot()
+  }, [selectedLayer, saveSnapshot])
+
   // Show FloatToolbar only when a text object is selected
   const isTextSelected =
     selectedLayer?.type === 'textbox' || selectedLayer?.type === 'i-text'
+  const isImageSelected = selectedLayer?.type === 'image'
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-[#FDFDFD]">
-      <TopBar />
+      <TopBar onExport={handleCanvasExport} />
 
       <div className="flex flex-1 overflow-hidden">
-        <ToolbarLeft />
+        <ToolbarLeft onToolAction={handleToolAction} />
 
         {/* ── Canvas surface ───────────────────────────────── */}
         <main
@@ -197,6 +429,49 @@ export const CanvasEditor: React.FC = () => {
             <EmailEditorPanel />
           )}
 
+          {mode === 'canvas' && (
+            <>
+              {activeTool === 'projects' ? (
+                <ProjectsAssetsPanel
+                  generatedPresetIds={generatedPresetIds}
+                  selectedPresetId={selectedPresetId}
+                  campaign={campaign}
+                  recentCampaigns={recentCampaigns}
+                  onCampaignRename={(nextName) => updateCampaignMeta({ name: nextName })}
+                  onPresetOpen={(presetId) => {
+                    void handlePresetChange(presetId)
+                  }}
+                  onRecentCampaignOpen={(nextBriefId, presetId) => {
+                    window.location.href = `/studio/${nextBriefId}/canvas?preset=${presetId}`
+                  }}
+                />
+              ) : (
+                <RightStudioPanel
+                  activeTool={activeTool}
+                  selectedPresetId={selectedPresetId}
+                  onPresetChange={handlePresetChange}
+                  onAddText={() => {
+                    if (!fabricRef.current) return
+                    void addTextLayer(fabricRef.current).then(saveSnapshot)
+                  }}
+                  onAddShape={() => {
+                    if (!fabricRef.current) return
+                    void addShapeLayer(fabricRef.current).then(saveSnapshot)
+                  }}
+                  onOpenMedia={() => setShowApprovedImages(true)}
+                />
+              )}
+            </>
+          )}
+
+          <ApprovedImagesPanel
+            open={showApprovedImages}
+            onClose={() => setShowApprovedImages(false)}
+            onSelect={(src) => {
+              void handleImageSelect(src)
+            }}
+          />
+
           {/* Typography toolbar — shown only when a text layer is selected */}
           {mode === 'canvas' && isTextSelected && (
             <FloatToolbar
@@ -215,6 +490,20 @@ export const CanvasEditor: React.FC = () => {
               onUnderlineToggle={() => applyToLayer({ isUnderline: !tbState.isUnderline })}
               onAlignChange={(a) => applyToLayer({ textAlign: a })}
               onColorChange={(c) => applyToLayer({ color: c })}
+            />
+          )}
+
+          {mode === 'canvas' && isImageSelected && selectedLayer && (
+            <ImageSelectionToolbar
+              position={toolbarPos}
+              selectedPresetId={selectedPresetId}
+              onPresetChange={(presetId) => {
+                void handlePresetChange(presetId)
+              }}
+              onOpenMedia={() => setShowApprovedImages(true)}
+              onConvertToAll={() => {
+                void handleConvertToAll()
+              }}
             />
           )}
 
