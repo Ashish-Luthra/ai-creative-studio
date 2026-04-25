@@ -2,7 +2,8 @@
 
 import React, { useState, useCallback } from 'react'
 import {
-  Monitor, Smartphone,
+  Layers, LayoutGrid, Palette, FileText,
+  Monitor, Smartphone, ChevronUp, ChevronDown, Trash2,
   Type, Plus, X, MousePointer2, ChevronsUpDown,
   Star, Link2, Share2, MapPin, Mail, Layout,
 } from 'lucide-react'
@@ -15,6 +16,8 @@ import { FloatingTextToolbar } from './FloatingTextToolbar'
 import { TextEditPanel } from './TextEditPanel'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+
+type EmailTab = 'tree' | 'sections' | 'text' | 'content' | 'style'
 
 interface CanvasBlock {
   id: string
@@ -58,6 +61,9 @@ const BLOCK_LABEL: Record<string, string> = {
   'image-top-text-bottom': 'Image Top, Text Bottom',
   'testimonial':           'Testimonial',
 }
+
+// Font options
+const FONT_OPTIONS = ['Arial', 'Georgia', 'Helvetica', 'Tahoma', 'Trebuchet MS', 'Verdana']
 
 // ─── Default canvas (email content flow) ─────────────────────────────────────
 
@@ -106,6 +112,264 @@ function BlockInserter({
   )
 }
 
+// ─── Tree / Layer Panel ───────────────────────────────────────────────────────
+
+interface TreePanelProps {
+  blocks: CanvasBlock[]
+  selectedId: string | null
+  onSelect: (id: string) => void
+  onMoveUp: (id: string) => void
+  onMoveDown: (id: string) => void
+  onDelete: (id: string) => void
+}
+
+function TreePanel({ blocks, selectedId, onSelect, onMoveUp, onMoveDown, onDelete }: TreePanelProps) {
+  const getIcon = (type: string) => {
+    const found = CANVAS_BLOCK_TYPES.find((b) => b.id === type)
+    if (found) {
+      const { Icon } = found
+      return <Icon size={10} />
+    }
+    return <Layout size={10} />
+  }
+
+  return (
+    <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex h-9 shrink-0 items-center border-b border-gray-100 px-3">
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+          Layer Tree
+        </span>
+      </div>
+
+      <div className="flex-1 overflow-auto py-1">
+        {blocks.length === 0 ? (
+          <div className="px-3 py-6 text-center">
+            <p className="text-[11px] text-gray-400">No blocks yet.</p>
+            <p className="text-[10px] text-gray-300 mt-1">Add from Sections or Right Nav.</p>
+          </div>
+        ) : (
+          blocks.map((block, i) => (
+            <div
+              key={block.id}
+              onClick={() => onSelect(block.id)}
+              className={cn(
+                'group flex items-center gap-1.5 px-2 py-1.5 cursor-pointer transition-colors',
+                selectedId === block.id ? 'bg-blue-50' : 'hover:bg-gray-50',
+              )}
+            >
+              <span
+                className={cn(
+                  'flex h-5 w-5 shrink-0 items-center justify-center rounded',
+                  selectedId === block.id
+                    ? 'bg-blue-100 text-blue-600'
+                    : 'bg-gray-100 text-gray-400',
+                )}
+              >
+                {getIcon(block.type)}
+              </span>
+              <span
+                className={cn(
+                  'flex-1 truncate text-[11px] capitalize',
+                  selectedId === block.id
+                    ? 'font-medium text-blue-700'
+                    : 'text-gray-600',
+                )}
+              >
+                {BLOCK_LABEL[block.type] ?? block.type}
+              </span>
+              <div
+                className={cn(
+                  'flex items-center gap-0.5 transition-opacity',
+                  selectedId === block.id
+                    ? 'opacity-100'
+                    : 'opacity-0 group-hover:opacity-100',
+                )}
+              >
+                <button
+                  onClick={(e) => { e.stopPropagation(); onMoveUp(block.id) }}
+                  disabled={i === 0}
+                  className="flex h-4 w-4 items-center justify-center rounded text-gray-300 hover:bg-gray-200 hover:text-gray-600 disabled:opacity-20"
+                >
+                  <ChevronUp size={9} />
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); onMoveDown(block.id) }}
+                  disabled={i === blocks.length - 1}
+                  className="flex h-4 w-4 items-center justify-center rounded text-gray-300 hover:bg-gray-200 hover:text-gray-600 disabled:opacity-20"
+                >
+                  <ChevronDown size={9} />
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); onDelete(block.id) }}
+                  className="flex h-4 w-4 items-center justify-center rounded text-gray-300 hover:bg-red-50 hover:text-red-400"
+                >
+                  <Trash2 size={9} />
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── Sections Panel ───────────────────────────────────────────────────────────
+
+function SectionsPanel({ onInsert }: { onInsert: (type: string) => void }) {
+  return (
+    <div className="flex flex-1 flex-col overflow-auto">
+      <div className="px-3 pb-3 pt-2">
+        <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+          Email Blocks
+        </p>
+        <p className="mb-3 text-[10px] text-gray-400 leading-relaxed">
+          Click a block to insert it after the selected block in the canvas.
+        </p>
+        <div className="grid grid-cols-3 gap-1.5">
+          {CANVAS_BLOCK_TYPES.map(({ id, label, Icon }) => (
+            <button
+              key={id}
+              onClick={() => onInsert(id)}
+              className="flex flex-col items-center gap-1.5 rounded-lg border border-gray-200 bg-white p-2.5 text-center transition-all hover:border-blue-400 hover:bg-blue-50 hover:shadow-sm active:scale-95"
+            >
+              <div className="flex h-7 w-7 items-center justify-center rounded-md bg-gray-100 text-gray-500">
+                <Icon size={13} />
+              </div>
+              <span className="text-[9px] font-medium leading-tight text-gray-500">{label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Text Blocks Panel ────────────────────────────────────────────────────────
+
+function TextBlocksPanel({ onInsert }: { onInsert: (type: string) => void }) {
+  const TEXT_STYLES = [
+    { id: 'h1',      label: 'Heading 1',  preview: 'Heading 1',   cls: 'text-xl font-bold' },
+    { id: 'h2',      label: 'Heading 2',  preview: 'Heading 2',   cls: 'text-lg font-semibold' },
+    { id: 'h3',      label: 'Heading 3',  preview: 'Heading 3',   cls: 'text-base font-medium' },
+    { id: 'body',    label: 'Body Text',  preview: 'Body copy',   cls: 'text-sm' },
+    { id: 'caption', label: 'Caption',    preview: 'Caption text', cls: 'text-xs text-gray-500 italic' },
+  ]
+
+  return (
+    <div className="flex flex-1 flex-col overflow-auto px-3 pb-3 pt-2">
+      <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+        Text Styles
+      </p>
+      <div className="flex flex-col gap-1.5">
+        {TEXT_STYLES.map(({ id, label, preview, cls }) => (
+          <button
+            key={id}
+            onClick={() => onInsert('text')}
+            className="flex items-center gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-left transition-all hover:border-blue-400 hover:bg-blue-50 active:scale-[0.99]"
+          >
+            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-gray-100 text-gray-400 shrink-0">
+              <Type size={11} />
+            </div>
+            <div className="min-w-0">
+              <p className={cn('text-gray-700 leading-tight truncate', cls)}>{preview}</p>
+              <p className="text-[9px] text-gray-400 mt-0.5">{label}</p>
+            </div>
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ─── Content Panel (replaces Settings) ───────────────────────────────────────
+
+function ContentPanel({
+  selectedBlock,
+  onBlockColorChange,
+}: {
+  selectedBlock: CanvasBlock | null
+  onBlockColorChange: (id: string, color: string) => void
+}) {
+  const { document: doc, updateSubject, updatePreheader, updateGlobalStyles } = useEmailStore()
+
+  return (
+    <div className="flex flex-1 flex-col overflow-auto px-3 pb-3 pt-2">
+      {selectedBlock ? (
+        <>
+          {/* Selected block badge */}
+          <div className="mb-3 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2.5">
+            <p className="text-[9px] font-semibold uppercase tracking-wider text-blue-400">Selected Block</p>
+            <p className="mt-0.5 text-[12px] font-medium capitalize text-blue-800">
+              {BLOCK_LABEL[selectedBlock.type] ?? selectedBlock.type}
+            </p>
+          </div>
+
+          {/* Block background colour */}
+          <Field label="Block Background">
+            <div className="flex items-center gap-2">
+              <ColorRow
+                value={selectedBlock.backgroundColor ?? '#ffffff'}
+                onChange={(v) => onBlockColorChange(selectedBlock.id, v)}
+              />
+              {selectedBlock.backgroundColor && selectedBlock.backgroundColor !== '#ffffff' && (
+                <button
+                  onClick={() => onBlockColorChange(selectedBlock.id, '#ffffff')}
+                  title="Reset to white"
+                  className="shrink-0 rounded border border-gray-200 px-2 py-1.5 text-[10px] text-gray-400 hover:border-gray-300 hover:text-gray-600"
+                >
+                  Reset
+                </button>
+              )}
+            </div>
+            <p className="mt-1 text-[10px] text-gray-400">
+              Pick a colour to change this block&apos;s background
+            </p>
+          </Field>
+
+          <div className="mb-3 h-px bg-gray-100" />
+        </>
+      ) : (
+        <div className="mb-3 rounded-lg border border-gray-100 bg-gray-50 px-3 py-3 text-center">
+          <p className="text-[11px] text-gray-400">Click a block on the canvas to style it</p>
+        </div>
+      )}
+
+      <Field label="Subject Line">
+        <input
+          type="text"
+          value={doc.subject}
+          onChange={(e) => updateSubject(e.target.value)}
+          placeholder="Your email subject…"
+          className="w-full rounded-md border border-gray-200 bg-white px-2 py-1.5 text-[12px] text-gray-700 placeholder-gray-300 focus:border-blue-400 focus:outline-none"
+        />
+      </Field>
+
+      <Field label="Preheader Text">
+        <textarea
+          value={doc.preheader}
+          onChange={(e) => updatePreheader(e.target.value)}
+          placeholder="Preview text shown in inbox…"
+          rows={2}
+          className="w-full resize-none rounded-md border border-gray-200 bg-white px-2 py-1.5 text-[12px] text-gray-700 placeholder-gray-300 focus:border-blue-400 focus:outline-none"
+        />
+        <p className="mt-1 text-[10px] text-gray-400">Shown after subject line in most clients</p>
+      </Field>
+
+      <Field label="Unsubscribe Text">
+        <textarea
+          value={doc.globalStyles.unsubscribeText}
+          onChange={(e) => updateGlobalStyles({ unsubscribeText: e.target.value })}
+          rows={2}
+          className="w-full resize-none rounded-md border border-gray-200 bg-white px-2 py-1.5 text-[12px] text-gray-700 placeholder-gray-300 focus:border-blue-400 focus:outline-none"
+        />
+        <p className="mt-1 text-[10px] text-gray-400">
+          Use <code className="text-[10px]">[[unsubscribe]]</code> for the link
+        </p>
+      </Field>
+    </div>
+  )
+}
 
 // ─── Block Properties Panel (Right Nav — shown when a block is selected) ─────
 
@@ -212,6 +476,70 @@ function BlockPropertiesPanel({ block, onColorChange, onBack }: BlockPropertiesP
   )
 }
 
+// ─── Style Panel ──────────────────────────────────────────────────────────────
+
+function StylePanel() {
+  const { document: doc, updateGlobalStyles } = useEmailStore()
+  const g = doc.globalStyles
+
+  return (
+    <div className="flex flex-1 flex-col overflow-auto px-3 pb-3 pt-2">
+      <Field label="Email Background">
+        <ColorRow value={g.backgroundColor} onChange={(v) => updateGlobalStyles({ backgroundColor: v })} />
+      </Field>
+
+      <Field label="Body Font">
+        <select
+          value={g.fontFamily}
+          onChange={(e) => updateGlobalStyles({ fontFamily: e.target.value })}
+          className="w-full rounded-md border border-gray-200 bg-white px-2 py-1.5 text-[12px] text-gray-700 focus:border-blue-400 focus:outline-none"
+        >
+          {FONT_OPTIONS.map((f) => (
+            <option key={f} value={f}>{f}</option>
+          ))}
+        </select>
+      </Field>
+
+      <Field label="Link Colour">
+        <ColorRow value={g.linkColor} onChange={(v) => updateGlobalStyles({ linkColor: v })} />
+      </Field>
+
+      <Field label="Content Width">
+        <div className="flex gap-1.5">
+          {[600, 640].map((w) => (
+            <button
+              key={w}
+              onClick={() => updateGlobalStyles({ contentWidth: w })}
+              className={cn(
+                'flex-1 rounded-md border py-1.5 text-[11px] font-medium transition-colors',
+                g.contentWidth === w
+                  ? 'border-blue-400 bg-blue-50 text-blue-700'
+                  : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300',
+              )}
+            >
+              {w}px
+            </button>
+          ))}
+        </div>
+      </Field>
+
+      <Field label="Logo URL">
+        <input
+          type="text"
+          placeholder="https://…/logo.png"
+          value={g.logo?.src ?? ''}
+          onChange={(e) =>
+            updateGlobalStyles({
+              logo: { src: e.target.value, alt: g.logo?.alt ?? 'Logo', width: g.logo?.width ?? 120 },
+            })
+          }
+          className="w-full rounded-md border border-gray-200 bg-white px-2 py-1.5 text-[12px] text-gray-700 placeholder-gray-300 focus:border-blue-400 focus:outline-none"
+        />
+      </Field>
+    </div>
+  )
+}
+
 // ─── Shared micro-components ──────────────────────────────────────────────────
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -240,6 +568,31 @@ function ColorRow({ value, onChange }: { value: string; onChange: (v: string) =>
         maxLength={7}
       />
     </div>
+  )
+}
+
+// ─── Rail button ──────────────────────────────────────────────────────────────
+
+function RailBtn({
+  icon, label, active, onClick,
+}: {
+  icon: React.ReactNode
+  label: string
+  active: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      title={label}
+      onClick={onClick}
+      className={cn(
+        'flex w-full flex-col items-center gap-0.5 rounded-lg px-1 py-2 text-[9px] font-medium transition-colors',
+        active ? 'bg-blue-50 text-blue-600' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600',
+      )}
+    >
+      {icon}
+      <span className="leading-none">{label}</span>
+    </button>
   )
 }
 
@@ -551,6 +904,9 @@ function BlockContent({
 // ─── Main EmailEditorPanel ────────────────────────────────────────────────────
 
 export const EmailEditorPanel: React.FC = () => {
+  const [activeTab, setActiveTab] = useState<EmailTab>('sections')
+  const [panelOpen, setPanelOpen] = useState(true)
+
   // Canvas state
   const [canvasBlocks, setCanvasBlocks] = useState<CanvasBlock[]>(makeDefaultBlocks)
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -559,6 +915,19 @@ export const EmailEditorPanel: React.FC = () => {
   const [textToolbarPosition, setTextToolbarPosition] = useState<{ top: number; left: number } | undefined>()
 
   const { document: doc, previewMode, setPreviewMode } = useEmailStore()
+
+  const handleTabClick = (tab: EmailTab) => {
+    if (activeTab === tab) setPanelOpen((o) => !o)
+    else { setActiveTab(tab); setPanelOpen(true) }
+  }
+
+  const RAIL_ITEMS: { id: EmailTab; icon: React.ReactNode; label: string }[] = [
+    { id: 'tree',     icon: <Layers size={14} />,     label: 'Tree' },
+    { id: 'sections', icon: <LayoutGrid size={14} />, label: 'Sections' },
+    { id: 'text',     icon: <Type size={14} />,       label: 'Text' },
+    { id: 'content',  icon: <FileText size={14} />,   label: 'Content' },
+    { id: 'style',    icon: <Palette size={14} />,    label: 'Style' },
+  ]
 
   // ── Canvas block actions ────────────────────────────────────────────────────
 
@@ -652,6 +1021,46 @@ export const EmailEditorPanel: React.FC = () => {
 
   return (
     <div className="absolute inset-0 flex overflow-hidden">
+
+      {/* ── Icon Rail ────────────────────────────────────── */}
+      <aside className="flex w-[52px] shrink-0 flex-col items-center gap-0.5 border-r border-gray-200 bg-white py-2 px-1">
+        {RAIL_ITEMS.map((item) => (
+          <RailBtn
+            key={item.id}
+            icon={item.icon}
+            label={item.label}
+            active={activeTab === item.id && panelOpen}
+            onClick={() => handleTabClick(item.id)}
+          />
+        ))}
+      </aside>
+
+      {/* ── Slide-out Sub-panel ──────────────────────────── */}
+      <aside
+        className={cn(
+          'flex shrink-0 flex-col border-r border-gray-200 bg-white transition-all duration-200',
+          panelOpen ? 'w-[216px]' : 'w-0 overflow-hidden',
+        )}
+      >
+        {panelOpen && (
+          <>
+            {activeTab === 'tree'     && (
+              <TreePanel
+                blocks={canvasBlocks}
+                selectedId={selectedId}
+                onSelect={setSelectedId}
+                onMoveUp={handleMoveUp}
+                onMoveDown={handleMoveDown}
+                onDelete={handleDelete}
+              />
+            )}
+            {activeTab === 'sections' && <SectionsPanel onInsert={handleAppendInsert} />}
+            {activeTab === 'text'     && <TextBlocksPanel onInsert={handleAppendInsert} />}
+            {activeTab === 'content'  && <ContentPanel selectedBlock={selectedBlock} onBlockColorChange={handleBlockColorChange} />}
+            {activeTab === 'style'    && <StylePanel />}
+          </>
+        )}
+      </aside>
 
       {/* ── Centre: Interactive Canvas ───────────────────── */}
       <div className="relative flex flex-1 flex-col overflow-hidden bg-[#F3F4F6]">
