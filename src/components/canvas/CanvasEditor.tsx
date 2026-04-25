@@ -207,6 +207,15 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
 
       c.on('object:moving', (e) => { if (e.target) syncPos(e.target) })
       c.on('object:scaling', (e) => { if (e.target) syncPos(e.target) })
+      c.on('mouse:dblclick', (event) => {
+        const target = event.target
+        if (!target || target.type !== 'image') return
+        c.setActiveObject(target)
+        setSelectedLayer(target)
+        syncPos(target)
+        setActiveTool('media')
+        setShowApprovedImages(true)
+      })
 
       const storedPresetId = localStorage.getItem(presetStorageKey)
       const resolvedPresetId =
