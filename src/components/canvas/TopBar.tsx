@@ -1,6 +1,6 @@
 'use client'
 
-import { Undo2, Redo2, Download } from 'lucide-react'
+import { Undo2, Redo2, Download, Minus, Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useCanvasStore, type CanvasMode } from '@/lib/canvas/canvasStore'
 import { useEmailStore } from '@/lib/email/emailStore'
@@ -13,9 +13,12 @@ const MODES: { id: CanvasMode; label: string }[] = [
 
 export interface TopBarProps {
   onExport?: () => void
+  zoomPercent?: number
+  onZoomIn?: () => void
+  onZoomOut?: () => void
 }
 
-export const TopBar: React.FC<TopBarProps> = ({ onExport }) => {
+export const TopBar: React.FC<TopBarProps> = ({ onExport, zoomPercent = 100, onZoomIn, onZoomOut }) => {
   const { mode, setMode, undo, redo, undoStack, redoStack } = useCanvasStore()
   const emailUndo = useEmailStore((s) => s.undo)
   const emailRedo = useEmailStore((s) => s.redo)
@@ -88,6 +91,30 @@ export const TopBar: React.FC<TopBarProps> = ({ onExport }) => {
 
       {/* Right — undo / redo / export */}
       <div className="flex items-center gap-1.5">
+        {mode === 'canvas' && (
+          <>
+            <div className="mr-1 flex items-center gap-1 rounded-md border border-gray-200 bg-white p-0.5">
+              <button
+                onClick={onZoomOut}
+                title="Zoom out"
+                className="flex h-6 w-6 items-center justify-center rounded text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
+              >
+                <Minus size={12} />
+              </button>
+              <span className="min-w-[48px] text-center text-[11px] font-semibold text-gray-700">
+                {zoomPercent}%
+              </span>
+              <button
+                onClick={onZoomIn}
+                title="Zoom in"
+                className="flex h-6 w-6 items-center justify-center rounded text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
+              >
+                <Plus size={12} />
+              </button>
+            </div>
+            <div className="mx-1.5 h-4 w-px bg-gray-200" />
+          </>
+        )}
         <button
           onClick={handleUndo}
           disabled={!canUndo}

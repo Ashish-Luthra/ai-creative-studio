@@ -7,12 +7,98 @@ import type { CreativePreset } from './presets'
 // Tracks live Canvas instances by their host element so we can dispose before reinit.
 const canvasRegistry = new WeakMap<HTMLCanvasElement, Canvas>()
 
+interface CreativeFrame {
+  left: number
+  top: number
+  width: number
+  height: number
+  rx?: number
+  ry?: number
+}
+
+type CreativeRole = 'frame' | 'image' | 'scrim' | 'text'
+
+interface CreativeData {
+  kind: 'creative-frame' | 'creative-image' | 'creative-scrim' | 'creative-text'
+  creativeId: string
+  role: CreativeRole
+  frame?: CreativeFrame
+  cropPending?: boolean
+}
+
 export interface FabricInitOptions {
   canvasEl: HTMLCanvasElement
   width: number
   height: number
   onSelect: (obj: FabricObject | null) => void
-  onModified: () => void
+  onModified: (target?: FabricObject) => void
+}
+
+const createCreativeId = () => `creative-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+
+const asCreativeData = (obj: FabricObject): CreativeData | undefined =>
+  (obj as FabricObject & { data?: CreativeData }).data
+
+export const getCreativeIdFromObject = (obj?: FabricObject | null) => asCreativeData(obj ?? undefined as never)?.creativeId
+
+export const getCreativeObjects = (canvas: Canvas, creativeId: string) =>
+  canvas.getObjects().filter((obj) => asCreativeData(obj)?.creativeId === creativeId)
+
+const updateImageFrameState = (obj: FabricObject, frame: CreativeFrame) => {
+  const image = obj as FabricObject & { clipPath?: FabricObject & { left?: number; top?: number; width?: number; height?: number; rx?: number; ry?: number } }
+  if (image.clipPath) {
+    image.clipPath.set({
+      left: frame.left,
+      top: frame.top,
+      width: frame.width,
+      height: frame.height,
+      rx: frame.rx ?? 12,
+      ry: frame.ry ?? 12,
+    })
+  }
+  const data = asCreativeData(obj)
+  if (data?.kind === 'creative-image') {
+    ;(obj as FabricObject & { data?: CreativeData }).data = {
+      ...data,
+      frame,
+    }
+  }
+}
+
+export const moveCreativeBlock = (
+  canvas: Canvas,
+  creativeId: string,
+  dx: number,
+  dy: number,
+  exclude?: FabricObject | null,
+) => {
+  if (!dx && !dy) return
+  const group = getCreativeObjects(canvas, creativeId)
+  for (const obj of group) {
+    if (exclude && obj === exclude) {
+      const data = asCreativeData(obj)
+      if (data?.kind === 'creative-image' && data.frame) {
+        updateImageFrameState(obj, {
+          ...data.frame,
+          left: data.frame.left + dx,
+          top: data.frame.top + dy,
+        })
+      }
+      continue
+    }
+    obj.set({
+      left: (obj.left ?? 0) + dx,
+      top: (obj.top ?? 0) + dy,
+    })
+    const data = asCreativeData(obj)
+    if (data?.kind === 'creative-image' && data.frame) {
+      updateImageFrameState(obj, {
+        ...data.frame,
+        left: data.frame.left + dx,
+        top: data.frame.top + dy,
+      })
+    }
+  }
 }
 
 export async function initFabricCanvas({
@@ -51,8 +137,8 @@ export async function initFabricCanvas({
   })
   canvas.on('selection:cleared', () => onSelect(null))
 
-  canvas.on('object:modified', () => {
-    onModified()
+  canvas.on('object:modified', (e) => {
+    onModified(e.target as FabricObject | undefined)
   })
 
   canvasRegistry.set(canvasEl, canvas)
@@ -118,6 +204,8 @@ export async function seedDefaultCreative(
   const { FabricImage, Textbox, Rect, Shadow, Gradient } = await import('fabric')
 
   const { width: FRAME_W, height: FRAME_H, left: fx, top: fy } = getFrameBounds(canvas, preset)
+  const creativeId = createCreativeId()
+  const frameState: CreativeFrame = { left: fx, top: fy, width: FRAME_W, height: FRAME_H, rx: 12, ry: 12 }
 
   // ── Background frame (rounded rect) ─────────────────────
   const frame = new Rect({
@@ -131,6 +219,7 @@ export async function seedDefaultCreative(
     selectable: false,
     evented: false,
     hoverCursor: 'default',
+    data: { kind: 'creative-frame', creativeId, role: 'frame' } satisfies CreativeData,
   })
   canvas.add(frame)
 
@@ -160,7 +249,13 @@ export async function seedDefaultCreative(
       scaleX: scale,
       scaleY: scale,
       selectable: true,
-      data: { kind: 'creative-image' },
+      data: {
+        kind: 'creative-image',
+        creativeId,
+        role: 'image',
+        frame: frameState,
+        cropPending: false,
+      } satisfies CreativeData,
     })
     applySelectionStyle(img)
     canvas.add(img)
@@ -205,6 +300,7 @@ export async function seedDefaultCreative(
       ry: 12,
       absolutePositioned: true,
     }),
+    data: { kind: 'creative-scrim', creativeId, role: 'scrim' } satisfies CreativeData,
   })
   canvas.add(scrim)
 
@@ -221,7 +317,7 @@ export async function seedDefaultCreative(
     shadow: new Shadow({ color: 'rgba(0,0,0,0.55)', blur: 10, offsetX: 0, offsetY: 2 }),
     editable: true,
     selectable: true,
-    data: { kind: 'creative-text' },
+    data: { kind: 'creative-text', creativeId, role: 'text' } satisfies CreativeData,
   })
   applySelectionStyle(txt)
   canvas.add(txt)
@@ -270,31 +366,114 @@ export async function addShapeLayer(canvas: Canvas) {
 }
 
 export async function replaceOrAddImageLayer(canvas: Canvas, imageUrl: string, selected?: FabricObject | null) {
-  const { FabricImage } = await import('fabric')
+  const { FabricImage, Rect } = await import('fabric')
   const img = await FabricImage.fromURL(imageUrl, { crossOrigin: 'anonymous' })
   const target = selected?.type === 'image' ? selected : null
 
+  const fallbackFrame = (): CreativeFrame => {
+    const frameObj = canvas
+      .getObjects()
+      .find((obj) => (obj as { data?: { kind?: string } }).data?.kind === 'creative-frame')
+    if (!frameObj) {
+      return {
+        left: canvas.getWidth() * 0.2,
+        top: canvas.getHeight() * 0.12,
+        width: canvas.getWidth() * 0.6,
+        height: canvas.getHeight() * 0.76,
+        rx: 12,
+        ry: 12,
+      }
+    }
+    const frameBounds = frameObj.getBoundingRect()
+    return {
+      left: frameBounds.left,
+      top: frameBounds.top,
+      width: frameBounds.width,
+      height: frameBounds.height,
+      rx: 12,
+      ry: 12,
+    }
+  }
+
+  const getFrameFromImage = (object: FabricObject) => {
+    const data = (object as { data?: { frame?: CreativeFrame } }).data
+    if (data?.frame) {
+      return {
+        left: data.frame.left,
+        top: data.frame.top,
+        width: data.frame.width,
+        height: data.frame.height,
+        rx: data.frame.rx ?? 12,
+        ry: data.frame.ry ?? 12,
+      }
+    }
+    const clip = (object as { clipPath?: { left?: number; top?: number; width?: number; height?: number; rx?: number; ry?: number } }).clipPath
+    if (clip?.left != null && clip?.top != null && clip?.width != null && clip?.height != null) {
+      return {
+        left: clip.left,
+        top: clip.top,
+        width: clip.width,
+        height: clip.height,
+        rx: clip.rx ?? 12,
+        ry: clip.ry ?? 12,
+      }
+    }
+    return fallbackFrame()
+  }
+
+  const resolveCreativeId = () => {
+    const selectedId = getCreativeIdFromObject(target ?? undefined)
+    if (selectedId) return selectedId
+    const existing = canvas
+      .getObjects()
+      .find((obj) => (asCreativeData(obj)?.kind === 'creative-frame' || asCreativeData(obj)?.kind === 'creative-image'))
+    return getCreativeIdFromObject(existing) ?? createCreativeId()
+  }
+
   if (target) {
-    const bounds = target.getBoundingRect()
-    const scale = Math.max(bounds.width / (img.width ?? 1), bounds.height / (img.height ?? 1))
+    const frame = getFrameFromImage(target)
+    const creativeId = resolveCreativeId()
+    const scale = Math.max(frame.width / (img.width ?? 1), frame.height / (img.height ?? 1))
+    img.clipPath = new Rect({
+      left: frame.left,
+      top: frame.top,
+      width: frame.width,
+      height: frame.height,
+      rx: frame.rx,
+      ry: frame.ry,
+      absolutePositioned: true,
+    })
     img.set({
-      left: bounds.left + bounds.width / 2,
-      top: bounds.top + bounds.height / 2,
+      left: frame.left + frame.width / 2,
+      top: frame.top + frame.height / 2,
       originX: 'center',
       originY: 'center',
       scaleX: scale,
       scaleY: scale,
-      data: { kind: 'creative-image' },
+      data: { kind: 'creative-image', creativeId, role: 'image', frame, cropPending: false } satisfies CreativeData,
     })
     canvas.remove(target)
   } else {
-    const scale = Math.max((canvas.getWidth() * 0.4) / (img.width ?? 1), (canvas.getHeight() * 0.4) / (img.height ?? 1))
+    const frame = fallbackFrame()
+    const creativeId = resolveCreativeId()
+    const scale = Math.max(frame.width / (img.width ?? 1), frame.height / (img.height ?? 1))
+    img.clipPath = new Rect({
+      left: frame.left,
+      top: frame.top,
+      width: frame.width,
+      height: frame.height,
+      rx: frame.rx,
+      ry: frame.ry,
+      absolutePositioned: true,
+    })
     img.set({
-      left: canvas.getWidth() * 0.3,
-      top: canvas.getHeight() * 0.2,
+      left: frame.left + frame.width / 2,
+      top: frame.top + frame.height / 2,
+      originX: 'center',
+      originY: 'center',
       scaleX: scale,
       scaleY: scale,
-      data: { kind: 'creative-image' },
+      data: { kind: 'creative-image', creativeId, role: 'image', frame, cropPending: false } satisfies CreativeData,
     })
   }
 

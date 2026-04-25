@@ -64,6 +64,12 @@ export const RightStudioPanel: React.FC<RightStudioPanelProps> = ({
         </>
       )}
 
+      {activeTool === 'hand' && (
+        <Placeholder
+          title="Hand Move"
+          text="Drag the image or frame to move the whole creative block. In Hand mode, any layer in the block drags the full creative."
+        />
+      )}
       {activeTool === 'cta' && <Placeholder title="CTA / Action" text="Separate CTA controls are planned for a later phase." />}
       {activeTool === 'style' && <Placeholder title="Style / Brand" text="Brand style automation is deferred; text styling works in the floating toolbar." />}
       {activeTool === 'ai' && <Placeholder title="AI Assist" text="AI generation tools are intentionally deferred in Phase 1." />}

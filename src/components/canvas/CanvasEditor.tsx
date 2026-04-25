@@ -3,7 +3,16 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import type { Canvas, FabricObject } from 'fabric'
 import { useCanvasStore } from '@/lib/canvas/canvasStore'
-import { addShapeLayer, addTextLayer, disposeCanvas, initFabricCanvas, replaceOrAddImageLayer, seedDefaultCreative } from '@/lib/canvas/fabricInit'
+import {
+  addShapeLayer,
+  addTextLayer,
+  disposeCanvas,
+  getCreativeIdFromObject,
+  initFabricCanvas,
+  moveCreativeBlock,
+  replaceOrAddImageLayer,
+  seedDefaultCreative,
+} from '@/lib/canvas/fabricInit'
 import { CREATIVE_PRESETS, getPresetById, isPresetId } from '@/lib/canvas/presets'
 import { TopBar } from './TopBar'
 import { ToolbarLeft, type RailTool } from './ToolbarLeft'
@@ -46,6 +55,9 @@ const DEFAULT_TB: TbState = {
   textAlign: 'center',
   color: '#FFFFFF',
 }
+const ZOOM_MIN = 0.25
+const ZOOM_MAX = 4
+const ZOOM_STEP = 0.1
 
 // ── Main component ──────────────────────────────────────────
 export interface CanvasEditorProps {
@@ -71,14 +83,27 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
   const [recentCampaigns, setRecentCampaigns] = useState<CampaignMeta[]>([])
 
   const {
-    mode, selectedLayer, selectedPresetId,
-    setSelectedLayer, setFabricCanvas, setSelectedPresetId, pushUndo, resetHistory,
+    mode, selectedLayer, selectedPresetId, zoom,
+    setSelectedLayer, setFabricCanvas, setSelectedPresetId, setZoom, pushUndo, resetHistory,
   } = useCanvasStore()
 
   const [toolbarPos, setToolbarPos] = useState({ x: 0, y: 0 })
   const [tbState, setTbState] = useState<TbState>(DEFAULT_TB)
   const tbStateRef = useRef<TbState>(DEFAULT_TB)
   tbStateRef.current = tbState
+  const activeToolRef = useRef<RailTool | null>(null)
+  activeToolRef.current = activeTool
+  const groupMoveRef = useRef<{
+    creativeId: string | null
+    lastLeft: number
+    lastTop: number
+    moved: boolean
+  }>({
+    creativeId: null,
+    lastLeft: 0,
+    lastTop: 0,
+    moved: false,
+  })
 
   const storageKey = `creative-canvas:${briefId}`
   const presetStorageKey = `${storageKey}:preset`
@@ -197,7 +222,27 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
           setSelectedLayer(obj)
           if (obj) { syncPos(obj); syncToolbar(obj) }
         },
-        onModified: () => saveSnapshot(),
+        onModified: (target) => {
+          const targetData = (
+            target as { data?: { kind?: string; cropPending?: boolean; creativeId?: string } } | undefined
+          )?.data
+          const isGroupMoveTarget =
+            Boolean(groupMoveRef.current.moved) &&
+            Boolean(groupMoveRef.current.creativeId) &&
+            groupMoveRef.current.creativeId === targetData?.creativeId
+
+          if (isGroupMoveTarget) return
+
+          if (targetData?.kind === 'creative-image') {
+            ;(target as { data?: { kind?: string; cropPending?: boolean } }).data = {
+              ...targetData,
+              cropPending: true,
+            }
+            c.renderAll()
+            return
+          }
+          saveSnapshot()
+        },
       })
 
       if (cancelled) { disposeCanvas(c); return }
@@ -205,8 +250,68 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
       fabricRef.current = c
       setFabricCanvas(c)
 
-      c.on('object:moving', (e) => { if (e.target) syncPos(e.target) })
       c.on('object:scaling', (e) => { if (e.target) syncPos(e.target) })
+      c.on('mouse:down', (event) => {
+        const target = event.target
+        if (!target) return
+        const creativeId = getCreativeIdFromObject(target)
+        if (!creativeId) return
+        const data = (target as FabricObject & { data?: { kind?: string } }).data
+        const handMode = activeToolRef.current === 'hand'
+        const directMoveEnabled = data?.kind === 'creative-image' || data?.kind === 'creative-frame'
+        if (!handMode && !directMoveEnabled) return
+
+        groupMoveRef.current = {
+          creativeId,
+          lastLeft: target.left ?? 0,
+          lastTop: target.top ?? 0,
+          moved: false,
+        }
+      })
+      c.on('object:moving', (event) => {
+        const target = event.target
+        if (!target) return
+        const creativeId = getCreativeIdFromObject(target)
+        if (!creativeId) return
+
+        const data = (target as FabricObject & { data?: { kind?: string } }).data
+        const handMode = activeToolRef.current === 'hand'
+        const directMoveEnabled = data?.kind === 'creative-image' || data?.kind === 'creative-frame'
+        if (!handMode && !directMoveEnabled) return
+
+        if (groupMoveRef.current.creativeId !== creativeId) {
+          groupMoveRef.current = {
+            creativeId,
+            lastLeft: target.left ?? 0,
+            lastTop: target.top ?? 0,
+            moved: false,
+          }
+          return
+        }
+
+        const nextLeft = target.left ?? 0
+        const nextTop = target.top ?? 0
+        const dx = nextLeft - groupMoveRef.current.lastLeft
+        const dy = nextTop - groupMoveRef.current.lastTop
+        if (!dx && !dy) return
+
+        moveCreativeBlock(c, creativeId, dx, dy, target)
+        groupMoveRef.current.lastLeft = nextLeft
+        groupMoveRef.current.lastTop = nextTop
+        groupMoveRef.current.moved = true
+        syncPos(target)
+      })
+      c.on('mouse:up', () => {
+        if (groupMoveRef.current.creativeId && groupMoveRef.current.moved) {
+          saveSnapshot()
+        }
+        groupMoveRef.current = {
+          creativeId: null,
+          lastLeft: 0,
+          lastTop: 0,
+          moved: false,
+        }
+      })
       c.on('mouse:dblclick', (event) => {
         const target = event.target
         if (!target || target.type !== 'image') return
@@ -354,6 +459,28 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
     return () => ro.disconnect()
   }, [])
 
+  // Keep Fabric viewport zoom synced with store value.
+  useEffect(() => {
+    if (mode !== 'canvas') return
+    const canvas = fabricRef.current
+    if (!canvas) return
+    const clamped = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zoom))
+    if (clamped !== zoom) {
+      setZoom(clamped)
+      return
+    }
+    canvas.setZoom(clamped)
+    canvas.renderAll()
+  }, [mode, zoom, setZoom])
+
+  const handleZoomIn = useCallback(() => {
+    setZoom(Math.min(ZOOM_MAX, zoom + ZOOM_STEP))
+  }, [zoom, setZoom])
+
+  const handleZoomOut = useCallback(() => {
+    setZoom(Math.max(ZOOM_MIN, zoom - ZOOM_STEP))
+  }, [zoom, setZoom])
+
   const handleAgentSubmit = useCallback((cmd: string) => {
     console.log('[AgentPill] command:', cmd)
   }, [])
@@ -492,6 +619,29 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
     saveSnapshot()
   }, [selectedLayer, saveSnapshot])
 
+  const handleSaveImageCrop = useCallback(() => {
+    const canvas = fabricRef.current
+    if (!canvas || !selectedLayer || selectedLayer.type !== 'image') return
+    const imageLayer = selectedLayer as FabricObject & {
+      data?: { kind?: string; cropPending?: boolean; frame?: unknown }
+    }
+    imageLayer.data = {
+      ...imageLayer.data,
+      kind: 'creative-image',
+      cropPending: false,
+    }
+    canvas.renderAll()
+    saveSnapshot()
+  }, [selectedLayer, saveSnapshot])
+
+  const imageCropPending =
+    selectedLayer?.type === 'image'
+      ? Boolean(
+          (selectedLayer as FabricObject & { data?: { cropPending?: boolean } }).data
+            ?.cropPending
+        )
+      : false
+
   const selectedText = selectedLayer && (selectedLayer.type === 'textbox' || selectedLayer.type === 'i-text')
     ? String((selectedLayer as { text?: string }).text ?? '')
     : null
@@ -563,7 +713,12 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-[#FDFDFD]">
-      <TopBar onExport={handleCanvasExport} />
+      <TopBar
+        onExport={handleCanvasExport}
+        zoomPercent={Math.round(zoom * 100)}
+        onZoomIn={handleZoomIn}
+        onZoomOut={handleZoomOut}
+      />
 
       <div className="flex flex-1 overflow-hidden">
         <ToolbarLeft onToolAction={handleToolAction} />
@@ -683,6 +838,8 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
               onConvertToAll={() => {
                 void handleConvertToAll()
               }}
+              onSaveCrop={handleSaveImageCrop}
+              cropPending={imageCropPending}
             />
           )}
 

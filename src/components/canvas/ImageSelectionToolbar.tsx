@@ -10,6 +10,8 @@ interface ImageSelectionToolbarProps {
   onPresetChange: (presetId: string) => void
   onOpenMedia: () => void
   onConvertToAll: () => void
+  onSaveCrop: () => void
+  cropPending: boolean
 }
 
 export const ImageSelectionToolbar: React.FC<ImageSelectionToolbarProps> = ({
@@ -18,6 +20,8 @@ export const ImageSelectionToolbar: React.FC<ImageSelectionToolbarProps> = ({
   onPresetChange,
   onOpenMedia,
   onConvertToAll,
+  onSaveCrop,
+  cropPending,
 }) => {
   const style: CSSProperties = {
     position: 'absolute',
@@ -51,6 +55,12 @@ export const ImageSelectionToolbar: React.FC<ImageSelectionToolbarProps> = ({
       </div>
       <button onClick={onConvertToAll} className="rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-700">
         Convert all
+      </button>
+      <button
+        onClick={onSaveCrop}
+        className="rounded-md bg-blue-600 px-2 py-1 text-xs font-semibold text-white transition-colors hover:bg-blue-700"
+      >
+        {cropPending ? 'Save' : 'Saved'}
       </button>
     </div>
   )

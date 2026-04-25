@@ -24,7 +24,17 @@ export const FloatPropertiesCard: React.FC<FloatPropertiesCardProps> = ({
   const fontSize    = (obj.fontSize    as number)   ?? 16
   const fontWeight  = (obj.fontWeight  as string | number) ?? 400
   const lineHeight  = (obj.lineHeight  as number)   ?? 1.2
-  const fill        = (obj.fill        as string)   ?? '#111827'
+  const fillRaw     = obj.fill
+  const fillHex     = typeof fillRaw === 'string' ? fillRaw : null
+  const fillGradient = isGradientFill(fillRaw) ? fillRaw : null
+  const gradientType = fillGradient?.type ?? null
+  const gradientStops = fillGradient?.colorStops?.length ?? 0
+  const fillLabel   =
+    typeof fillRaw === 'string'
+      ? fillRaw
+      : fillRaw == null
+        ? '#111827'
+        : `${capitalize(gradientType ?? 'gradient')} gradient`
   const left        = Math.round((obj.left  as number) ?? 0)
   const top         = Math.round((obj.top   as number) ?? 0)
 
@@ -59,12 +69,17 @@ export const FloatPropertiesCard: React.FC<FloatPropertiesCardProps> = ({
               style={{ background: hex }}
               className={cn(
                 'h-5 w-5 cursor-pointer rounded-[4px] border-2 transition-transform hover:scale-110',
-                fill === hex ? 'border-blue-500' : 'border-transparent'
+                fillHex === hex ? 'border-blue-500' : 'border-transparent'
               )}
             />
           ))}
         </div>
-        <p className="text-[10px] text-gray-400">{fill}</p>
+        <p className="text-[10px] text-gray-400">{fillLabel}</p>
+        {fillGradient && (
+          <p className="text-[10px] text-gray-400">
+            {capitalize(gradientType ?? 'gradient')} • {gradientStops} stops
+          </p>
+        )}
       </Section>
 
       {/* Position */}
@@ -123,3 +138,21 @@ const AiBtn: React.FC<{
     {children}
   </button>
 )
+
+interface GradientStop {
+  offset: number
+  color: string
+}
+
+interface GradientFillShape {
+  type: string
+  colorStops: GradientStop[]
+}
+
+const isGradientFill = (value: unknown): value is GradientFillShape => {
+  if (!value || typeof value !== 'object') return false
+  const candidate = value as Record<string, unknown>
+  return typeof candidate.type === 'string' && Array.isArray(candidate.colorStops)
+}
+
+const capitalize = (value: string) => value.charAt(0).toUpperCase() + value.slice(1)
