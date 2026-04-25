@@ -7,6 +7,17 @@ import { cn } from '@/lib/utils'
 
 const SWATCHES = ['#111827', '#2563EB', '#7C3AED', '#DC2626', '#16A34A', '#D97706']
 
+/** Fabric `fill` may be a string, Gradient, Pattern, etc. — only strings are valid React text. */
+function fabricFillToDisplay(fill: unknown): string {
+  if (typeof fill === 'string') return fill
+  if (fill && typeof fill === 'object' && 'type' in fill) {
+    const t = String((fill as { type?: string }).type)
+    if (t === 'linear' || t === 'radial') return 'Gradient'
+    return 'Fill'
+  }
+  return '—'
+}
+
 export interface FloatPropertiesCardProps {
   selectedLayer: FabricObject
   onClose?: () => void
@@ -25,7 +36,9 @@ export const FloatPropertiesCard: React.FC<FloatPropertiesCardProps> = ({
   const fontSize    = (obj.fontSize    as number)   ?? DEFAULT_TEXT_FONT_SIZE
   const fontWeight  = (obj.fontWeight  as string | number) ?? 400
   const lineHeight  = (obj.lineHeight  as number)   ?? 1.2
-  const fill        = (obj.fill        as string)   ?? '#111827'
+  const fillRaw = obj.fill
+  const fillDisplay = fabricFillToDisplay(fillRaw)
+  const fillForSwatch = typeof fillRaw === 'string' ? fillRaw : null
   const left        = Math.round((obj.left  as number) ?? 0)
   const top         = Math.round((obj.top   as number) ?? 0)
 
@@ -60,12 +73,12 @@ export const FloatPropertiesCard: React.FC<FloatPropertiesCardProps> = ({
               style={{ background: hex }}
               className={cn(
                 'h-5 w-5 cursor-pointer rounded-[4px] border-2 transition-transform hover:scale-110',
-                fill === hex ? 'border-blue-500' : 'border-transparent'
+                fillForSwatch === hex ? 'border-blue-500' : 'border-transparent'
               )}
             />
           ))}
         </div>
-        <p className="text-[10px] text-gray-400">{fill}</p>
+        <p className="text-[10px] text-gray-400">{fillDisplay}</p>
       </Section>
 
       {/* Position */}

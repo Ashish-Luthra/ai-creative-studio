@@ -63,6 +63,8 @@ const DEFAULT_TB: TbState = {
 const INSERT_FRAME_SCALE = 0.36
 const INSERT_GRID_PADDING = 40
 const INSERT_GRID_GAP = 24
+/** Space between existing creative(s) and the first replicated frame / grid origin. */
+const REPLICATE_ANCHOR_GAP = 48
 const ZOOM_MIN = 0.25
 const ZOOM_MAX = 4
 
@@ -77,16 +79,74 @@ function maxPresetCellForInsertGrid(canvas: Canvas, frameScale: number) {
   return { cellW: maxW, cellH: maxH }
 }
 
-function getInsertFrameTopLeft(canvas: Canvas, preset: CreativePreset, frameIndex: number, frameScale: number) {
+function getCreativeFrameBoundingRects(canvas: Canvas) {
+  return canvas
+    .getObjects()
+    .filter((obj) => (obj as { data?: { kind?: string } }).data?.kind === 'creative-frame')
+    .map((obj) => obj.getBoundingRect())
+}
+
+function unionBoundingRects(rects: { left: number; top: number; width: number; height: number }[]) {
+  if (rects.length === 0) return null
+  let minL = Infinity
+  let minT = Infinity
+  let maxR = -Infinity
+  let maxB = -Infinity
+  for (const r of rects) {
+    const right = r.left + r.width
+    const bottom = r.top + r.height
+    minL = Math.min(minL, r.left)
+    minT = Math.min(minT, r.top)
+    maxR = Math.max(maxR, right)
+    maxB = Math.max(maxB, bottom)
+  }
+  return { left: minL, top: minT, width: maxR - minL, height: maxB - minT }
+}
+
+type InsertPlacement =
+  | { mode: 'paddingGrid' }
+  | { mode: 'fromAnchor'; anchor: { left: number; top: number; width: number; height: number } }
+
+/**
+ * Non-overlapping slot for a new creative. `localSlotIndex` is 0-based within this insert batch
+ * (or padding grid when there is no anchor). Anchor mode places the grid origin to the right of
+ * existing work (or below if there is no horizontal room) using {@link REPLICATE_ANCHOR_GAP}.
+ */
+function getInsertFrameTopLeft(
+  canvas: Canvas,
+  preset: CreativePreset,
+  localSlotIndex: number,
+  frameScale: number,
+  placement: InsertPlacement,
+) {
   const cw = canvas.getWidth()
   const { cellW, cellH } = maxPresetCellForInsertGrid(canvas, frameScale)
-  const colWidth = cellW + INSERT_GRID_GAP
-  const rowHeight = cellH + INSERT_GRID_GAP
-  const cols = Math.max(1, Math.floor((cw - 2 * INSERT_GRID_PADDING + INSERT_GRID_GAP) / colWidth))
-  const col = frameIndex % cols
-  const row = Math.floor(frameIndex / cols)
-  const cellLeft = INSERT_GRID_PADDING + col * colWidth
-  const cellTop = INSERT_GRID_PADDING + row * rowHeight
+  const gap = INSERT_GRID_GAP
+  const colW = cellW + gap
+  const rowH = cellH + gap
+
+  let originLeft: number
+  let originTop: number
+
+  if (placement.mode === 'fromAnchor') {
+    const a = placement.anchor
+    originLeft = a.left + a.width + REPLICATE_ANCHOR_GAP
+    originTop = a.top
+    if (originLeft + cellW > cw - INSERT_GRID_PADDING) {
+      originLeft = INSERT_GRID_PADDING
+      originTop = a.top + a.height + REPLICATE_ANCHOR_GAP
+    }
+  } else {
+    originLeft = INSERT_GRID_PADDING
+    originTop = INSERT_GRID_PADDING
+  }
+
+  const cols = Math.max(1, Math.floor((cw - INSERT_GRID_PADDING - originLeft + gap) / colW))
+  const col = localSlotIndex % cols
+  const row = Math.floor(localSlotIndex / cols)
+  const cellLeft = originLeft + col * colW
+  const cellTop = originTop + row * rowH
+
   const { width: fw, height: fh } = getCreativeFrameBounds(canvas, preset, { frameScale })
   return {
     left: cellLeft + (cellW - fw) / 2,
@@ -467,10 +527,18 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
       if (!canvas) return
 
       const { copyText, imageUrl } = extractCreativeInputs()
-      const frameCount = canvas
-        .getObjects()
-        .filter((obj) => (obj as { data?: { kind?: string } }).data?.kind === 'creative-frame').length
-      const { left, top } = getInsertFrameTopLeft(canvas, getPresetById(presetId), frameCount, INSERT_FRAME_SCALE)
+      const rects = getCreativeFrameBoundingRects(canvas)
+      const anchor = unionBoundingRects(rects)
+      const placement: InsertPlacement =
+        anchor && rects.length > 0 ? { mode: 'fromAnchor', anchor } : { mode: 'paddingGrid' }
+      const slotIndex = placement.mode === 'fromAnchor' ? 0 : rects.length
+      const { left, top } = getInsertFrameTopLeft(
+        canvas,
+        getPresetById(presetId),
+        slotIndex,
+        INSERT_FRAME_SCALE,
+        placement,
+      )
 
       await seedDefaultCreative(canvas, imageUrl, copyText, getPresetById(presetId), {
         frameLeft: left,
@@ -497,11 +565,14 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
 
     const { copyText, imageUrl } = extractCreativeInputs()
 
-    for (const preset of CREATIVE_PRESETS) {
-      const frameCount = canvas
-        .getObjects()
-        .filter((obj) => (obj as { data?: { kind?: string } }).data?.kind === 'creative-frame').length
-      const { left, top } = getInsertFrameTopLeft(canvas, preset, frameCount, INSERT_FRAME_SCALE)
+    const rectsBefore = getCreativeFrameBoundingRects(canvas)
+    const anchor = unionBoundingRects(rectsBefore)
+    const placement: InsertPlacement =
+      anchor && rectsBefore.length > 0 ? { mode: 'fromAnchor', anchor } : { mode: 'paddingGrid' }
+
+    for (let i = 0; i < CREATIVE_PRESETS.length; i++) {
+      const preset = CREATIVE_PRESETS[i]
+      const { left, top } = getInsertFrameTopLeft(canvas, preset, i, INSERT_FRAME_SCALE, placement)
       await seedDefaultCreative(canvas, imageUrl, copyText, preset, {
         frameLeft: left,
         frameTop: top,
