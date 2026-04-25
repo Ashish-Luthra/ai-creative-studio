@@ -1036,6 +1036,9 @@ export const EmailEditorPanel: React.FC = () => {
                         onClick={() => {
                           setSelectedId(block.id)
                           setInsertState(null)
+                          // Auto-open Content tab so colour picker is immediately visible
+                          setActiveTab('content')
+                          setPanelOpen(true)
                         }}
                       >
                         <BlockContent
@@ -1082,6 +1085,8 @@ export const EmailEditorPanel: React.FC = () => {
                           onMoveDown={() => handleMoveDown(block.id)}
                           onDuplicate={() => handleDuplicate(block.id)}
                           onDelete={() => handleDelete(block.id)}
+                          currentColor={block.backgroundColor ?? '#ffffff'}
+                          onColorChange={(color) => handleBlockColorChange(block.id, color)}
                         />
                       </div>
                     )}
