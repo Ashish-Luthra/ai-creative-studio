@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback } from 'react'
 import {
   Layers, LayoutGrid, Palette, Settings2,
   Monitor, Smartphone, RotateCcw, ChevronUp, ChevronDown, Trash2,
@@ -8,9 +8,13 @@ import {
   Type, Image as ImageIcon, MousePointer2, Minus, AlignLeft,
   ChevronsUpDown, Star,
 } from 'lucide-react'
+import { nanoid } from 'nanoid'
 import { cn } from '@/lib/utils'
 import { useEmailStore } from '@/lib/email/emailStore'
 import { BlockLibrary } from './BlockLibrary'
+import { FloatingActionBar } from './FloatingActionBar'
+import { FloatingTextToolbar } from './FloatingTextToolbar'
+import { TextEditPanel } from './TextEditPanel'
 import {
   makeTextBlock, makeHeadingBlock, makeBodyBlock,
   makeButtonBlock, makeImageBlock, makeSpacerBlock,
@@ -18,12 +22,17 @@ import {
   presetHero, presetImageText, presetTwoColumn, presetBodyText,
 } from '@/lib/email/templates'
 import type {
-  SectionLayout, EmailDocument, EmailBlock,
+  SectionLayout,
 } from '@/types/email'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type EmailTab = 'structure' | 'sections' | 'blocks' | 'styles' | 'settings'
+
+interface CanvasBlock {
+  id: string
+  type: string
+}
 
 // ─── Layout visual preview cards ──────────────────────────────────────────────
 
@@ -49,7 +58,6 @@ function LayoutCard({
       onClick={onClick}
       className="group flex flex-col items-center gap-1.5 rounded-lg border border-gray-200 bg-white p-2 transition-all hover:border-blue-400 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
     >
-      {/* Column preview */}
       <div className="flex h-8 w-full items-stretch gap-0.5 overflow-hidden rounded">
         {layout.cols.map((w, i) => (
           <div
@@ -91,49 +99,6 @@ const BLOCK_TYPES = [
 
 const FONT_OPTIONS = ['Arial', 'Georgia', 'Helvetica', 'Tahoma', 'Trebuchet MS', 'Verdana']
 
-// ─── Block helper utilities ────────────────────────────────────────────────────
-
-function findBlockLocation(
-  doc: EmailDocument,
-  blockId: string,
-): { sectionId: string; columnId: string } | null {
-  for (const section of doc.sections) {
-    for (const col of section.columns) {
-      if (col.blocks.some((b) => b.id === blockId)) {
-        return { sectionId: section.id, columnId: col.id }
-      }
-    }
-  }
-  return null
-}
-
-function stripHtml(html: string): string {
-  return html.replace(/<[^>]+>/g, '').trim()
-}
-
-function blockPreview(block: EmailBlock): string {
-  switch (block.type) {
-    case 'text':        return stripHtml(block.content).slice(0, 42) || 'Empty text'
-    case 'image':       return block.src ? (block.alt || 'Image') : 'No image set'
-    case 'button':      return block.label || 'Button'
-    case 'divider':     return 'Divider'
-    case 'spacer':      return `Spacer ${block.height}px`
-    case 'logo':        return 'Logo'
-    case 'unsubscribe': return 'Unsubscribe'
-    default:            return (block as EmailBlock).type
-  }
-}
-
-const BLOCK_TYPE_ICON: Record<string, React.ReactNode> = {
-  text:        <Type size={10} />,
-  image:       <ImageIcon size={10} />,
-  button:      <MousePointer2 size={10} />,
-  divider:     <Minus size={10} />,
-  spacer:      <ChevronsUpDown size={10} />,
-  logo:        <Star size={10} />,
-  unsubscribe: <AlignLeft size={10} />,
-}
-
 // ─── Sub-panels ───────────────────────────────────────────────────────────────
 
 function StructurePanel() {
@@ -164,11 +129,9 @@ function StructurePanel() {
               selectedSectionId === section.id ? 'bg-blue-50' : 'hover:bg-gray-50',
             )}
           >
-            {/* Numbered badge */}
             <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded bg-gray-100 text-[9px] font-semibold text-gray-400">
               {i + 1}
             </span>
-            {/* Label */}
             <button
               onClick={() => setSelectedSection(section.id)}
               className={cn(
@@ -178,7 +141,6 @@ function StructurePanel() {
             >
               {section.label ?? section.layout}
             </button>
-            {/* Actions — visible on hover or when selected */}
             <div className={cn(
               'flex items-center gap-0.5 transition-opacity',
               selectedSectionId === section.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
@@ -207,7 +169,6 @@ function StructurePanel() {
           </div>
         ))}
 
-        {/* Unsubscribe — locked */}
         <div className="flex items-center gap-1.5 px-2 py-1.5">
           <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded bg-gray-50 text-[9px] text-gray-300">
             🔒
@@ -239,7 +200,6 @@ function SectionsPanel() {
 
   return (
     <div className="flex flex-1 flex-col overflow-auto">
-      {/* Layout presets */}
       <div className="border-b border-gray-100 px-3 pb-3 pt-2">
         <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-gray-400">
           Layout
@@ -254,7 +214,6 @@ function SectionsPanel() {
         </p>
       </div>
 
-      {/* Preset sections */}
       <div className="px-3 pb-3 pt-2">
         <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-gray-400">
           Presets
@@ -312,7 +271,6 @@ function BlocksPanel() {
 
   return (
     <div className="flex flex-1 flex-col overflow-auto px-3 pb-3 pt-2">
-      {/* Target indicator */}
       <div className={cn(
         'mb-3 rounded-lg border px-3 py-2 text-[11px]',
         hasTarget
@@ -355,7 +313,6 @@ function StylesPanel() {
 
   return (
     <div className="flex flex-1 flex-col overflow-auto px-3 pb-3 pt-2">
-      {/* Background */}
       <Field label="Email Background">
         <ColorRow
           value={g.backgroundColor}
@@ -363,7 +320,6 @@ function StylesPanel() {
         />
       </Field>
 
-      {/* Font family */}
       <Field label="Body Font">
         <select
           value={g.fontFamily}
@@ -376,7 +332,6 @@ function StylesPanel() {
         </select>
       </Field>
 
-      {/* Link colour */}
       <Field label="Link Colour">
         <ColorRow
           value={g.linkColor}
@@ -384,7 +339,6 @@ function StylesPanel() {
         />
       </Field>
 
-      {/* Content width */}
       <Field label="Content Width">
         <div className="flex gap-1.5">
           {[600, 640].map((w) => (
@@ -404,7 +358,6 @@ function StylesPanel() {
         </div>
       </Field>
 
-      {/* Logo */}
       <Field label="Logo URL">
         <input
           type="text"
@@ -461,354 +414,6 @@ function SettingsPanel() {
           Use <code className="text-[10px]">[[unsubscribe]]</code> for the link
         </p>
       </Field>
-    </div>
-  )
-}
-
-// ─── Block editor (shown in right panel when a block is selected) ─────────────
-
-function BlockEditor({ block, onBack }: { block: EmailBlock; onBack: () => void }) {
-  const { document: doc, updateBlock, removeBlock } = useEmailStore()
-  const loc = useMemo(() => findBlockLocation(doc, block.id), [doc, block.id])
-
-  const patch = useCallback(
-    (p: Partial<EmailBlock>) => {
-      if (!loc) return
-      updateBlock({ sectionId: loc.sectionId, columnId: loc.columnId, blockId: block.id, patch: p })
-    },
-    [loc, block.id, updateBlock],
-  )
-
-  const handleDelete = useCallback(() => {
-    if (!loc) return
-    removeBlock(loc.sectionId, loc.columnId, block.id)
-    onBack()
-  }, [loc, block.id, removeBlock, onBack])
-
-  return (
-    <div className="flex flex-1 flex-col overflow-hidden">
-      {/* Back bar */}
-      <div className="flex h-8 shrink-0 items-center gap-1 border-b border-gray-100 px-3">
-        <button
-          onClick={onBack}
-          className="flex items-center gap-0.5 text-[10px] text-gray-400 hover:text-gray-700"
-        >
-          <ChevronLeft size={11} />
-          Section
-        </button>
-        <span className="ml-auto text-[10px] font-semibold capitalize text-gray-500">
-          {block.type}
-        </span>
-      </div>
-
-      <div className="flex-1 overflow-auto px-3 pb-3 pt-2">
-
-        {/* ── Text / Heading ── */}
-        {block.type === 'text' && (
-          <Field label="Content (HTML)">
-            <textarea
-              value={block.content}
-              onChange={(e) => patch({ content: e.target.value } as Partial<EmailBlock>)}
-              rows={7}
-              spellCheck={false}
-              className="w-full resize-y rounded-md border border-gray-200 bg-white px-2 py-1.5 font-mono text-[11px] leading-relaxed text-gray-700 placeholder-gray-300 focus:border-blue-400 focus:outline-none"
-            />
-            <p className="mt-1 text-[9px] text-gray-400">HTML tags supported — e.g. &lt;strong&gt;, &lt;em&gt;, &lt;a href="…"&gt;</p>
-          </Field>
-        )}
-
-        {/* ── Image ── */}
-        {block.type === 'image' && (
-          <>
-            <Field label="Image URL">
-              <input
-                type="text"
-                placeholder="https://…/image.jpg"
-                value={block.src}
-                onChange={(e) => patch({ src: e.target.value } as Partial<EmailBlock>)}
-                className="w-full rounded-md border border-gray-200 bg-white px-2 py-1.5 text-[12px] text-gray-700 placeholder-gray-300 focus:border-blue-400 focus:outline-none"
-              />
-            </Field>
-            <Field label="Alt Text">
-              <input
-                type="text"
-                placeholder="Describe the image…"
-                value={block.alt}
-                onChange={(e) => patch({ alt: e.target.value } as Partial<EmailBlock>)}
-                className="w-full rounded-md border border-gray-200 bg-white px-2 py-1.5 text-[12px] text-gray-700 placeholder-gray-300 focus:border-blue-400 focus:outline-none"
-              />
-            </Field>
-            <Field label="Link URL (optional)">
-              <input
-                type="text"
-                placeholder="https://…"
-                value={block.href ?? ''}
-                onChange={(e) => patch({ href: e.target.value || undefined } as Partial<EmailBlock>)}
-                className="w-full rounded-md border border-gray-200 bg-white px-2 py-1.5 text-[12px] text-gray-700 placeholder-gray-300 focus:border-blue-400 focus:outline-none"
-              />
-            </Field>
-          </>
-        )}
-
-        {/* ── Button ── */}
-        {block.type === 'button' && (
-          <>
-            <Field label="Button Label">
-              <input
-                type="text"
-                value={block.label}
-                onChange={(e) => patch({ label: e.target.value } as Partial<EmailBlock>)}
-                className="w-full rounded-md border border-gray-200 bg-white px-2 py-1.5 text-[12px] text-gray-700 focus:border-blue-400 focus:outline-none"
-              />
-            </Field>
-            <Field label="URL">
-              <input
-                type="text"
-                placeholder="https://…"
-                value={block.href}
-                onChange={(e) => patch({ href: e.target.value } as Partial<EmailBlock>)}
-                className="w-full rounded-md border border-gray-200 bg-white px-2 py-1.5 text-[12px] text-gray-700 placeholder-gray-300 focus:border-blue-400 focus:outline-none"
-              />
-            </Field>
-            <Field label="">
-              <label className="flex cursor-pointer items-center gap-2 text-[12px] text-gray-600">
-                <input
-                  type="checkbox"
-                  checked={block.newTab ?? true}
-                  onChange={(e) => patch({ newTab: e.target.checked } as Partial<EmailBlock>)}
-                  className="rounded"
-                />
-                Open in new tab
-              </label>
-            </Field>
-            <Field label="Button Colour">
-              <ColorRow
-                value={block.styles.backgroundColor}
-                onChange={(v) =>
-                  patch({ styles: { ...block.styles, backgroundColor: v } } as Partial<EmailBlock>)
-                }
-              />
-            </Field>
-            <Field label="Text Colour">
-              <ColorRow
-                value={block.styles.color}
-                onChange={(v) =>
-                  patch({ styles: { ...block.styles, color: v } } as Partial<EmailBlock>)
-                }
-              />
-            </Field>
-          </>
-        )}
-
-        {/* ── Spacer ── */}
-        {block.type === 'spacer' && (
-          <Field label={`Height: ${block.height}px`}>
-            <input
-              type="range"
-              min={4}
-              max={120}
-              value={block.height}
-              onChange={(e) => patch({ height: Number(e.target.value) } as Partial<EmailBlock>)}
-              className="w-full"
-            />
-          </Field>
-        )}
-
-        {/* ── Divider ── */}
-        {block.type === 'divider' && (
-          <Field label="Line Colour">
-            <ColorRow
-              value={block.styles.color}
-              onChange={(v) =>
-                patch({ styles: { ...block.styles, color: v } } as Partial<EmailBlock>)
-              }
-            />
-          </Field>
-        )}
-
-        {/* ── Logo (global) ── */}
-        {block.type === 'logo' && block.meta.isGlobal && (
-          <p className="rounded-lg bg-blue-50 px-3 py-2 text-[11px] leading-relaxed text-blue-600">
-            This logo pulls from the global logo URL. Edit it in the{' '}
-            <strong>Styles</strong> panel (left rail).
-          </p>
-        )}
-
-        {/* ── Logo (custom) ── */}
-        {block.type === 'logo' && !block.meta.isGlobal && (
-          <>
-            <Field label="Logo URL">
-              <input
-                type="text"
-                placeholder="https://…/logo.png"
-                value={block.src}
-                onChange={(e) => patch({ src: e.target.value } as Partial<EmailBlock>)}
-                className="w-full rounded-md border border-gray-200 bg-white px-2 py-1.5 text-[12px] text-gray-700 placeholder-gray-300 focus:border-blue-400 focus:outline-none"
-              />
-            </Field>
-            <Field label="Alt Text">
-              <input
-                type="text"
-                value={block.alt}
-                onChange={(e) => patch({ alt: e.target.value } as Partial<EmailBlock>)}
-                className="w-full rounded-md border border-gray-200 bg-white px-2 py-1.5 text-[12px] text-gray-700 focus:border-blue-400 focus:outline-none"
-              />
-            </Field>
-          </>
-        )}
-
-        {/* ── Unsubscribe (locked) ── */}
-        {block.type === 'unsubscribe' && (
-          <p className="rounded-lg bg-gray-50 px-3 py-2 text-[11px] leading-relaxed text-gray-400">
-            Unsubscribe block is locked and always appears last. Edit its text in{' '}
-            <strong>Settings</strong>.
-          </p>
-        )}
-
-        {/* Delete button */}
-        {block.type !== 'unsubscribe' && (
-          <button
-            onClick={handleDelete}
-            className="mt-4 flex w-full items-center justify-center gap-1.5 rounded-lg border border-red-200 py-2 text-[11px] text-red-400 transition-colors hover:bg-red-50 hover:text-red-500"
-          >
-            <Trash2 size={11} />
-            Remove block
-          </button>
-        )}
-      </div>
-    </div>
-  )
-}
-
-// ─── Right: section properties panel ──────────────────────────────────────────
-
-function PropertiesPanel() {
-  const {
-    document: doc,
-    selectedSectionId,
-    selectedBlockId,
-    setSelectedBlock,
-    setSelectedSection,
-    updateSectionStyles,
-  } = useEmailStore()
-
-  const section = doc.sections.find((s) => s.id === selectedSectionId)
-
-  // Resolve the selected block from anywhere in the document
-  const selectedBlock = useMemo<EmailBlock | null>(() => {
-    if (!selectedBlockId) return null
-    for (const sec of doc.sections) {
-      for (const col of sec.columns) {
-        const found = col.blocks.find((b) => b.id === selectedBlockId)
-        if (found) return found
-      }
-    }
-    if (doc.unsubscribe.id === selectedBlockId) return doc.unsubscribe
-    return null
-  }, [doc, selectedBlockId])
-
-  // All blocks in the currently-selected section (flattened across columns)
-  const sectionBlocks = useMemo<EmailBlock[]>(() => {
-    if (!section) return []
-    return section.columns.flatMap((col) => col.blocks)
-  }, [section])
-
-  const handleBack = useCallback(() => setSelectedBlock(null), [setSelectedBlock])
-  const handleBackToLibrary = useCallback(() => {
-    setSelectedBlock(null)
-    setSelectedSection(null)
-  }, [setSelectedBlock, setSelectedSection])
-
-  // If a block is selected, show the block editor
-  if (selectedBlock) {
-    return <BlockEditor block={selectedBlock} onBack={handleBack} />
-  }
-
-  if (!section) return null
-
-  const s = section.styles
-  const p = s.padding
-
-  return (
-    <div className="flex flex-1 flex-col overflow-hidden">
-      {/* Back to library */}
-      <div className="flex h-9 shrink-0 items-center gap-1.5 border-b border-gray-100 px-3">
-        <button
-          onClick={handleBackToLibrary}
-          className="flex items-center gap-1 text-[10px] text-gray-400 hover:text-gray-700"
-        >
-          <ChevronLeft size={11} />
-          Design Blocks
-        </button>
-        <span className="ml-auto text-[10px] font-semibold text-gray-500">
-          {section.label ?? section.layout}
-        </span>
-      </div>
-
-    <div className="flex-1 overflow-auto px-3 pb-3 pt-2">
-      {/* ── Block list ── */}
-      <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400">
-        Blocks
-      </p>
-
-      {sectionBlocks.length === 0 ? (
-        <p className="mb-3 text-[10px] text-gray-400">No blocks yet — add some from the Blocks panel.</p>
-      ) : (
-        <div className="mb-3 flex flex-col gap-0.5">
-          {sectionBlocks.map((block) => (
-            <button
-              key={block.id}
-              onClick={() => setSelectedBlock(block.id)}
-              className="flex items-center gap-2 rounded-lg border border-gray-100 bg-white px-2 py-1.5 text-left transition-all hover:border-blue-300 hover:bg-blue-50"
-            >
-              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-gray-100 text-gray-400">
-                {BLOCK_TYPE_ICON[block.type] ?? <Type size={10} />}
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-medium capitalize text-gray-600">{block.type}</p>
-                <p className="truncate text-[9px] text-gray-400">{blockPreview(block)}</p>
-              </div>
-              <ChevronRight size={10} className="shrink-0 text-gray-300" />
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* ── Section styles ── */}
-      <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400">
-        Section
-      </p>
-
-      <Field label="Background">
-        <ColorRow
-          value={s.backgroundColor}
-          onChange={(v) => updateSectionStyles(section.id, { backgroundColor: v })}
-        />
-      </Field>
-
-      <Field label="Padding">
-        <div className="grid grid-cols-2 gap-1.5">
-          {(['top', 'right', 'bottom', 'left'] as const).map((side) => (
-            <div key={side} className="flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-2 py-1">
-              <span className="w-5 text-[9px] uppercase text-gray-400">{side[0]}</span>
-              <input
-                type="number"
-                min={0}
-                max={80}
-                value={p[side]}
-                onChange={(e) =>
-                  updateSectionStyles(section.id, {
-                    padding: { ...p, [side]: Number(e.target.value) },
-                  })
-                }
-                className="w-full text-[12px] text-gray-700 focus:outline-none"
-              />
-              <span className="text-[9px] text-gray-300">px</span>
-            </div>
-          ))}
-        </div>
-      </Field>
-    </div>
     </div>
   )
 }
@@ -871,23 +476,183 @@ function RailBtn({
   )
 }
 
+// ─── BlockContent: full-size interactive block renderer ───────────────────────
+
+function BlockContent({
+  type,
+  onTextClick,
+}: {
+  type: string
+  onTextClick: (e: React.MouseEvent) => void
+}) {
+  const editableProps = {
+    contentEditable: true as const,
+    suppressContentEditableWarning: true,
+    onClick: onTextClick,
+    className: 'cursor-text outline-none border-2 border-transparent hover:border-blue-200 rounded px-1',
+  }
+
+  switch (type) {
+    case 'image-left-text-right':
+      return (
+        <div className="flex min-h-[300px]">
+          <div className="w-1/2">
+            <img
+              src="https://images.unsplash.com/photo-1523381210434-271e8be1f52b?w=400&h=500&fit=crop"
+              alt="Fashion"
+              className="w-full h-full object-cover"
+            />
+          </div>
+          <div className="w-1/2 flex flex-col items-center justify-center p-12 gap-4">
+            <p {...editableProps} className={`${editableProps.className} italic text-sm text-gray-500`}>
+              From The &apos;Gram
+            </p>
+            <h2 {...editableProps} className={`${editableProps.className} text-3xl text-center font-serif`}>
+              The Post That Got Everyone Talking
+            </h2>
+            <div className="w-16 h-px bg-gray-400" />
+            <button className="text-xs bg-gray-200 px-6 py-2">SEE IT</button>
+          </div>
+        </div>
+      )
+
+    case 'centered-content':
+      return (
+        <div className="bg-gray-100 p-12 text-center">
+          <div className="bg-white p-8 inline-block rounded shadow-sm">
+            <div {...editableProps} className={`${editableProps.className} text-5xl font-serif text-gray-600`}>
+              6
+            </div>
+            <h3 {...editableProps} className={`${editableProps.className} text-2xl font-serif mt-2`}>
+              Tips to Photograph Food
+            </h3>
+            <p {...editableProps} className={`${editableProps.className} text-sm text-gray-600 max-w-xs mt-3`}>
+              I remember my first try at food photography. I created this guide to help you get started without making all the mistakes I did.
+            </p>
+            <div className="flex items-center justify-center gap-3 mt-4">
+              <span className="text-sm text-gray-400">001</span>
+              <button className="text-xs bg-gray-800 text-white px-6 py-2">READ IT</button>
+            </div>
+          </div>
+        </div>
+      )
+
+    case 'text-over-image':
+      return (
+        <div className="bg-white">
+          <div className="p-12 text-center">
+            <div className="w-16 h-px bg-black mb-4 mx-auto" />
+            <h3 {...editableProps} className={`${editableProps.className} text-2xl font-bold tracking-widest uppercase`}>
+              A Little Gift of Thanks for Joining the List.
+            </h3>
+            <div className="w-16 h-px bg-black mt-4 mx-auto" />
+          </div>
+          <div
+            className="h-64 bg-cover bg-center"
+            style={{ backgroundImage: 'url(https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=680&h=400&fit=crop)' }}
+          />
+        </div>
+      )
+
+    case 'text-left-image-right':
+      return (
+        <div className="flex min-h-[300px]">
+          <div className="w-1/3 p-12 flex items-center justify-center">
+            <h3 {...editableProps} className={`${editableProps.className} text-4xl font-bold leading-tight`}>
+              WEL—COME
+            </h3>
+          </div>
+          <div
+            className="w-2/3 bg-cover bg-center min-h-[300px]"
+            style={{ backgroundImage: 'url(https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=500&h=400&fit=crop)' }}
+          />
+        </div>
+      )
+
+    case 'recipe-card':
+      return (
+        <div className="flex bg-white p-8 gap-8 min-h-[280px]">
+          <div
+            className="w-1/2 bg-cover bg-center rounded"
+            style={{ backgroundImage: 'url(https://images.unsplash.com/photo-1547592166-23ac45744acd?w=400&h=400&fit=crop)' }}
+          />
+          <div className="w-1/2 flex flex-col justify-center gap-3 px-4">
+            <p {...editableProps} className={`${editableProps.className} italic text-gray-500 text-sm`}>
+              One
+            </p>
+            <h3 {...editableProps} className={`${editableProps.className} text-xl font-serif`}>
+              Click here for my creamy butternut squash soup
+            </h3>
+            <p {...editableProps} className={`${editableProps.className} italic text-gray-500 text-sm`}>
+              A warming recipe perfect for fall evenings.
+            </p>
+          </div>
+        </div>
+      )
+
+    case 'image-top-text-bottom':
+      return (
+        <div className="bg-white">
+          <div
+            className="h-96 bg-cover bg-center"
+            style={{ backgroundImage: 'url(https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=680&h=400&fit=crop)' }}
+          />
+          <div className="bg-gray-100 p-12 text-center">
+            <h3 {...editableProps} className={`${editableProps.className} text-2xl font-serif mb-3`}>
+              Get 25% off when you book my services
+            </h3>
+            <p {...editableProps} className={`${editableProps.className} italic text-gray-500`}>
+              for the next 24 hours only.
+            </p>
+          </div>
+        </div>
+      )
+
+    case 'testimonial':
+      return (
+        <div className="flex bg-gray-50 p-12 gap-8 min-h-[200px]">
+          <div
+            className="w-32 h-32 bg-cover bg-center rounded shrink-0"
+            style={{ backgroundImage: 'url(https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&h=200&fit=crop)' }}
+          />
+          <div className="flex-1 flex flex-col justify-center gap-3">
+            <h4 {...editableProps} className={`${editableProps.className} font-bold tracking-widest text-sm`}>
+              TESTIMONIAL NAME
+            </h4>
+            <p {...editableProps} className={`${editableProps.className} text-gray-600 text-sm leading-relaxed`}>
+              Since joining, my email list has grown 4x and I&apos;ve finally found a system that works for my creative business.
+            </p>
+            <div className="text-xl text-yellow-400">★★★★☆</div>
+          </div>
+        </div>
+      )
+
+    default:
+      return (
+        <div className="h-32 flex items-center justify-center text-gray-400 text-sm">
+          Unknown block type: {type}
+        </div>
+      )
+  }
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export const EmailEditorPanel: React.FC = () => {
   const [activeTab, setActiveTab] = useState<EmailTab>('sections')
   const [panelOpen, setPanelOpen] = useState(true)
 
+  // Canvas state
+  const [canvasBlocks, setCanvasBlocks] = useState<CanvasBlock[]>([])
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [showTextEdit, setShowTextEdit] = useState(false)
+  const [textToolbarPosition, setTextToolbarPosition] = useState<{ top: number; left: number } | undefined>(undefined)
+
   const {
     document: doc,
-    compiledHtml,
-    compileErrors,
     previewMode,
     setPreviewMode,
-    selectedSectionId,
-    selectedBlockId,
   } = useEmailStore()
-
-  const previewWidth = previewMode === 'desktop' ? 600 : 375
 
   const handleTabClick = (tab: EmailTab) => {
     if (activeTab === tab) {
@@ -905,6 +670,61 @@ export const EmailEditorPanel: React.FC = () => {
     { id: 'styles',    icon: <Palette size={14} />,   label: 'Styles' },
     { id: 'settings',  icon: <Settings2 size={14} />, label: 'Settings' },
   ]
+
+  // Canvas block actions
+  const handleMoveUp = useCallback((id: string) => {
+    setCanvasBlocks((prev) => {
+      const idx = prev.findIndex((b) => b.id === id)
+      if (idx <= 0) return prev
+      const next = [...prev]
+      ;[next[idx - 1], next[idx]] = [next[idx], next[idx - 1]]
+      return next
+    })
+  }, [])
+
+  const handleMoveDown = useCallback((id: string) => {
+    setCanvasBlocks((prev) => {
+      const idx = prev.findIndex((b) => b.id === id)
+      if (idx < 0 || idx >= prev.length - 1) return prev
+      const next = [...prev]
+      ;[next[idx], next[idx + 1]] = [next[idx + 1], next[idx]]
+      return next
+    })
+  }, [])
+
+  const handleDuplicate = useCallback((id: string) => {
+    setCanvasBlocks((prev) => {
+      const idx = prev.findIndex((b) => b.id === id)
+      if (idx < 0) return prev
+      const copy: CanvasBlock = { id: nanoid(), type: prev[idx].type }
+      const next = [...prev]
+      next.splice(idx + 1, 0, copy)
+      return next
+    })
+  }, [])
+
+  const handleDelete = useCallback((id: string) => {
+    setCanvasBlocks((prev) => prev.filter((b) => b.id !== id))
+    setSelectedId((prev) => (prev === id ? null : prev))
+  }, [])
+
+  const handleBlockSelect = useCallback((blockType: string) => {
+    const newBlock: CanvasBlock = { id: nanoid(), type: blockType }
+    setCanvasBlocks((prev) => [...prev, newBlock])
+    setSelectedId(newBlock.id)
+  }, [])
+
+  const handleTextClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation()
+    setTextToolbarPosition({ top: e.clientY - 50, left: e.clientX - 60 })
+    setShowTextEdit(true)
+  }, [])
+
+  const handleCanvasClick = useCallback(() => {
+    setSelectedId(null)
+    setTextToolbarPosition(undefined)
+    setShowTextEdit(false)
+  }, [])
 
   return (
     <div className="absolute inset-0 flex overflow-hidden">
@@ -940,8 +760,8 @@ export const EmailEditorPanel: React.FC = () => {
         )}
       </aside>
 
-      {/* ── Centre: Live Preview ──────────────────────────── */}
-      <div className="relative flex flex-1 flex-col bg-[#F3F4F6]">
+      {/* ── Centre: Canvas ────────────────────────────────── */}
+      <div className="relative flex flex-1 flex-col overflow-hidden bg-[#F3F4F6]">
 
         {/* Toolbar strip */}
         <div className="flex h-10 shrink-0 items-center justify-between border-b border-gray-200 bg-white px-4">
@@ -972,47 +792,65 @@ export const EmailEditorPanel: React.FC = () => {
           </div>
         </div>
 
-        {/* Compile errors */}
-        {compileErrors.length > 0 && (
-          <div className="shrink-0 border-b border-red-200 bg-red-50 px-4 py-2">
-            {compileErrors.map((e, i) => (
-              <p key={i} className="text-[11px] text-red-600">⚠ {e}</p>
-            ))}
-          </div>
-        )}
-
-        {/* Preview iframe */}
-        <div className="flex flex-1 items-start justify-center overflow-auto py-8">
-          <div
-            className="rounded-xl shadow-[0_8px_30px_rgba(0,0,0,0.1)] transition-all duration-300"
-            style={{ width: previewWidth }}
-          >
-            {compiledHtml ? (
-              <iframe
-                title="Email Preview"
-                srcDoc={compiledHtml}
-                className="block w-full rounded-xl border-0 bg-white"
-                style={{ minHeight: 480 }}
-                onLoad={(e) => {
-                  const h = e.currentTarget.contentDocument?.documentElement?.scrollHeight
-                  if (h) e.currentTarget.style.height = `${h}px`
-                }}
-              />
-            ) : (
-              <div className="flex h-48 items-center justify-center rounded-xl bg-white text-[12px] text-gray-400">
-                {compileErrors.length ? 'Fix errors to preview' : 'Compiling…'}
+        {/* Scrollable canvas area */}
+        <div
+          className="flex flex-1 items-start justify-center overflow-auto py-8"
+          onClick={handleCanvasClick}
+        >
+          <div className="max-w-[680px] w-full px-4">
+            {canvasBlocks.length === 0 ? (
+              <div className="flex items-center justify-center rounded-xl bg-white border-2 border-dashed border-gray-300 py-24">
+                <div className="text-center">
+                  <p className="text-[13px] text-gray-400 font-medium">Select a block from the right panel to get started</p>
+                  <p className="text-[11px] text-gray-300 mt-1">Your email blocks will appear here</p>
+                </div>
               </div>
+            ) : (
+              canvasBlocks.map((block) => (
+                <div
+                  key={block.id}
+                  className="flex items-start gap-3 mb-4"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {/* Block content */}
+                  <div
+                    className={cn(
+                      'flex-1 border-2 rounded cursor-pointer overflow-hidden',
+                      selectedId === block.id ? 'border-blue-500' : 'border-transparent',
+                    )}
+                    onClick={() => setSelectedId(block.id)}
+                  >
+                    <BlockContent type={block.type} onTextClick={handleTextClick} />
+                  </div>
+
+                  {/* Floating action bar — only when selected */}
+                  {selectedId === block.id && (
+                    <FloatingActionBar
+                      onMoveUp={() => handleMoveUp(block.id)}
+                      onMoveDown={() => handleMoveDown(block.id)}
+                      onDuplicate={() => handleDuplicate(block.id)}
+                      onDelete={() => handleDelete(block.id)}
+                    />
+                  )}
+                </div>
+              ))
             )}
           </div>
         </div>
+
+        {/* Floating text toolbar */}
+        <FloatingTextToolbar position={textToolbarPosition} />
       </div>
 
-      {/* ── Right: Block Library / Properties ────────────── */}
-      <aside className="flex w-[272px] shrink-0 flex-col border-l border-gray-200 bg-white">
-        {(selectedSectionId || selectedBlockId) ? (
-          <PropertiesPanel />
+      {/* ── Right: Block Library / Text Edit Panel ────────── */}
+      <aside className="flex w-[320px] shrink-0 flex-col border-l border-gray-200 bg-white">
+        {showTextEdit ? (
+          <TextEditPanel onClose={() => { setShowTextEdit(false); setTextToolbarPosition(undefined) }} />
         ) : (
-          <BlockLibrary />
+          <BlockLibrary
+            selectedBlock={selectedId ? canvasBlocks.find((b) => b.id === selectedId)?.type : undefined}
+            onBlockSelect={handleBlockSelect}
+          />
         )}
       </aside>
 
