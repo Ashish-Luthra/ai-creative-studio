@@ -22,6 +22,7 @@ type EmailTab = 'tree' | 'sections' | 'text' | 'content' | 'style'
 interface CanvasBlock {
   id: string
   type: string
+  backgroundColor?: string
 }
 
 // afterId: null = insert at very top; string = insert after that block id
@@ -283,17 +284,54 @@ function TextBlocksPanel({ onInsert }: { onInsert: (type: string) => void }) {
 
 // ─── Content Panel (replaces Settings) ───────────────────────────────────────
 
-function ContentPanel({ selectedBlock }: { selectedBlock: CanvasBlock | null }) {
+function ContentPanel({
+  selectedBlock,
+  onBlockColorChange,
+}: {
+  selectedBlock: CanvasBlock | null
+  onBlockColorChange: (id: string, color: string) => void
+}) {
   const { document: doc, updateSubject, updatePreheader, updateGlobalStyles } = useEmailStore()
 
   return (
     <div className="flex flex-1 flex-col overflow-auto px-3 pb-3 pt-2">
-      {selectedBlock && (
-        <div className="mb-3 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2.5">
-          <p className="text-[9px] font-semibold uppercase tracking-wider text-blue-400">Selected</p>
-          <p className="mt-0.5 text-[12px] font-medium capitalize text-blue-800">
-            {BLOCK_LABEL[selectedBlock.type] ?? selectedBlock.type}
-          </p>
+      {selectedBlock ? (
+        <>
+          {/* Selected block badge */}
+          <div className="mb-3 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2.5">
+            <p className="text-[9px] font-semibold uppercase tracking-wider text-blue-400">Selected Block</p>
+            <p className="mt-0.5 text-[12px] font-medium capitalize text-blue-800">
+              {BLOCK_LABEL[selectedBlock.type] ?? selectedBlock.type}
+            </p>
+          </div>
+
+          {/* Block background colour */}
+          <Field label="Block Background">
+            <div className="flex items-center gap-2">
+              <ColorRow
+                value={selectedBlock.backgroundColor ?? '#ffffff'}
+                onChange={(v) => onBlockColorChange(selectedBlock.id, v)}
+              />
+              {selectedBlock.backgroundColor && selectedBlock.backgroundColor !== '#ffffff' && (
+                <button
+                  onClick={() => onBlockColorChange(selectedBlock.id, '#ffffff')}
+                  title="Reset to white"
+                  className="shrink-0 rounded border border-gray-200 px-2 py-1.5 text-[10px] text-gray-400 hover:border-gray-300 hover:text-gray-600"
+                >
+                  Reset
+                </button>
+              )}
+            </div>
+            <p className="mt-1 text-[10px] text-gray-400">
+              Pick a colour to change this block&apos;s background
+            </p>
+          </Field>
+
+          <div className="mb-3 h-px bg-gray-100" />
+        </>
+      ) : (
+        <div className="mb-3 rounded-lg border border-gray-100 bg-gray-50 px-3 py-3 text-center">
+          <p className="text-[11px] text-gray-400">Click a block on the canvas to style it</p>
         </div>
       )}
 
@@ -457,9 +495,11 @@ function RailBtn({
 
 function BlockContent({
   type,
+  backgroundColor,
   onTextClick,
 }: {
   type: string
+  backgroundColor?: string
   onTextClick: (e: React.MouseEvent) => void
 }) {
   const editable = {
@@ -470,11 +510,14 @@ function BlockContent({
       'outline-none cursor-text border-2 border-transparent hover:border-blue-200 rounded px-1 transition-colors',
   }
 
+  // Inline bg style — overrides Tailwind bg-* classes on the outermost element
+  const bg = backgroundColor ? { backgroundColor } : {}
+
   // ── Structural blocks ──────────────────────────────────────────────────────
 
   if (type === 'logo') {
     return (
-      <div className="flex items-center justify-center bg-white py-6">
+      <div className="flex items-center justify-center bg-white py-6" style={bg}>
         <div className="flex h-14 w-40 items-center justify-center rounded-md border-2 border-dashed border-gray-200 bg-gray-50 text-[10px] font-semibold uppercase tracking-widest text-gray-300">
           YOUR LOGO
         </div>
@@ -484,7 +527,7 @@ function BlockContent({
 
   if (type === 'link-bar') {
     return (
-      <div className="flex items-center justify-center gap-6 border-b border-gray-100 bg-white px-8 py-3">
+      <div className="flex items-center justify-center gap-6 border-b border-gray-100 bg-white px-8 py-3" style={bg}>
         {['Home', 'About', 'Products', 'Contact'].map((link) => (
           <span
             key={link}
@@ -500,7 +543,7 @@ function BlockContent({
 
   if (type === 'content') {
     return (
-      <div className="flex min-h-[160px] items-center justify-center border-2 border-dashed border-gray-200 bg-gray-50 p-8">
+      <div className="flex min-h-[160px] items-center justify-center border-2 border-dashed border-gray-200 bg-gray-50 p-8" style={bg}>
         <div className="text-center">
           <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-gray-200">
             <Layout size={16} className="text-gray-400" />
@@ -514,7 +557,7 @@ function BlockContent({
 
   if (type === 'text') {
     return (
-      <div className="bg-white px-12 py-8">
+      <div className="bg-white px-12 py-8" style={bg}>
         <p
           {...editable}
           className={`${editable.className} text-sm leading-relaxed text-gray-700`}
@@ -527,7 +570,7 @@ function BlockContent({
 
   if (type === 'button') {
     return (
-      <div className="flex items-center justify-center bg-white py-8">
+      <div className="flex items-center justify-center bg-white py-8" style={bg}>
         <div
           {...editable}
           className={`${editable.className} bg-gray-900 px-10 py-3 text-sm font-semibold tracking-widest text-white`}
@@ -540,7 +583,7 @@ function BlockContent({
 
   if (type === 'social') {
     return (
-      <div className="flex items-center justify-center gap-4 bg-white py-6">
+      <div className="flex items-center justify-center gap-4 bg-white py-6" style={bg}>
         {[
           { label: 'IG', color: '#E1306C' },
           { label: 'FB', color: '#1877F2' },
@@ -562,7 +605,7 @@ function BlockContent({
 
   if (type === 'address') {
     return (
-      <div className="bg-white px-12 py-4 text-center">
+      <div className="bg-white px-12 py-4 text-center" style={bg}>
         <p
           {...editable}
           className={`${editable.className} text-[11px] leading-relaxed text-gray-500`}
@@ -575,7 +618,7 @@ function BlockContent({
 
   if (type === 'footer') {
     return (
-      <div className="bg-gray-50 px-12 py-6 text-center">
+      <div className="bg-gray-50 px-12 py-6 text-center" style={bg}>
         <div className="mb-3 flex items-center justify-center gap-4 text-[11px] text-gray-500">
           {['Privacy Policy', 'Unsubscribe', 'View in Browser', 'Contact Us'].map((link, i, arr) => (
             <React.Fragment key={link}>
@@ -596,7 +639,7 @@ function BlockContent({
 
   if (type === 'spacer') {
     return (
-      <div className="flex h-16 items-center justify-center border-y border-dashed border-gray-200 bg-white">
+      <div className="flex h-16 items-center justify-center border-y border-dashed border-gray-200 bg-white" style={bg}>
         <span className="text-[9px] font-medium uppercase tracking-widest text-gray-300">
           Spacer
         </span>
@@ -608,7 +651,7 @@ function BlockContent({
 
   if (type === 'image-left-text-right') {
     return (
-      <div className="flex min-h-[300px]">
+      <div className="flex min-h-[300px]" style={bg}>
         <div className="w-1/2">
           <img
             src="https://images.unsplash.com/photo-1523381210434-271e8be1f52b?w=400&h=500&fit=crop"
@@ -632,7 +675,7 @@ function BlockContent({
 
   if (type === 'centered-content') {
     return (
-      <div className="bg-gray-100 p-12 text-center">
+      <div className="bg-gray-100 p-12 text-center" style={bg}>
         <div className="inline-block rounded bg-white p-8 shadow-sm">
           <div {...editable} className={`${editable.className} font-serif text-5xl text-gray-600`}>
             6
@@ -654,7 +697,7 @@ function BlockContent({
 
   if (type === 'text-over-image') {
     return (
-      <div className="bg-white">
+      <div className="bg-white" style={bg}>
         <div className="p-12 text-center">
           <div className="mx-auto mb-4 h-px w-16 bg-black" />
           <h3 {...editable} className={`${editable.className} text-2xl font-bold uppercase tracking-widest`}>
@@ -672,7 +715,7 @@ function BlockContent({
 
   if (type === 'text-left-image-right') {
     return (
-      <div className="flex min-h-[300px]">
+      <div className="flex min-h-[300px]" style={bg}>
         <div className="flex w-1/3 items-center justify-center p-12">
           <h3 {...editable} className={`${editable.className} text-4xl font-bold leading-tight`}>
             WEL—COME
@@ -688,7 +731,7 @@ function BlockContent({
 
   if (type === 'recipe-card') {
     return (
-      <div className="flex min-h-[280px] gap-8 bg-white p-8">
+      <div className="flex min-h-[280px] gap-8 bg-white p-8" style={bg}>
         <div
           className="w-1/2 rounded bg-cover bg-center"
           style={{ backgroundImage: 'url(https://images.unsplash.com/photo-1547592166-23ac45744acd?w=400&h=400&fit=crop)' }}
@@ -708,7 +751,7 @@ function BlockContent({
 
   if (type === 'image-top-text-bottom') {
     return (
-      <div className="bg-white">
+      <div className="bg-white" style={bg}>
         <div
           className="h-96 bg-cover bg-center"
           style={{ backgroundImage: 'url(https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=680&h=400&fit=crop)' }}
@@ -727,7 +770,7 @@ function BlockContent({
 
   if (type === 'testimonial') {
     return (
-      <div className="flex min-h-[200px] gap-8 bg-gray-50 p-12">
+      <div className="flex min-h-[200px] gap-8 bg-gray-50 p-12" style={bg}>
         <div
           className="h-32 w-32 shrink-0 rounded bg-cover bg-center"
           style={{ backgroundImage: 'url(https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&h=200&fit=crop)' }}
@@ -820,6 +863,12 @@ export const EmailEditorPanel: React.FC = () => {
     setInsertState(null)
   }, [])
 
+  const handleBlockColorChange = useCallback((id: string, color: string) => {
+    setCanvasBlocks((prev) =>
+      prev.map((b) => (b.id === id ? { ...b, backgroundColor: color } : b)),
+    )
+  }, [])
+
   // Insert a block inline (from "+" button)
   const handleInlineInsert = useCallback((type: string, afterId: string | null) => {
     const newBlock: CanvasBlock = { id: nanoid(), type }
@@ -902,7 +951,7 @@ export const EmailEditorPanel: React.FC = () => {
             )}
             {activeTab === 'sections' && <SectionsPanel onInsert={handleAppendInsert} />}
             {activeTab === 'text'     && <TextBlocksPanel onInsert={handleAppendInsert} />}
-            {activeTab === 'content'  && <ContentPanel selectedBlock={selectedBlock} />}
+            {activeTab === 'content'  && <ContentPanel selectedBlock={selectedBlock} onBlockColorChange={handleBlockColorChange} />}
             {activeTab === 'style'    && <StylePanel />}
           </>
         )}
@@ -989,7 +1038,11 @@ export const EmailEditorPanel: React.FC = () => {
                           setInsertState(null)
                         }}
                       >
-                        <BlockContent type={block.type} onTextClick={handleTextClick} />
+                        <BlockContent
+                          type={block.type}
+                          backgroundColor={block.backgroundColor}
+                          onTextClick={handleTextClick}
+                        />
                       </div>
 
                       {/* ± Insert above (top center of outline) */}
