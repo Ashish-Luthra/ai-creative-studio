@@ -286,6 +286,57 @@ export function presetBodyText(): EmailSection {
   )
 }
 
+export function presetTextOverImage(): EmailSection {
+  // Headline text block above a full-width image
+  const heading = makeTextBlock({
+    content: `<p style="margin:0;font-size:18px;font-weight:bold;color:#111111;line-height:1.3;letter-spacing:0.06em;font-family:Arial,sans-serif;text-align:center">A LITTLE GIFT OF THANKS<br/>FOR JOINING THE LIST.</p>`,
+    styles: {
+      fontFamily: 'Arial',
+      fontSize: 18,
+      fontWeight: 'bold',
+      lineHeight: 1.3,
+      color: '#111111',
+      textAlign: 'center',
+      padding: { top: 32, right: 24, bottom: 32, left: 24 },
+    },
+  })
+  return makeSection(
+    'full',
+    [[heading, makeImageBlock('', 'Feature image')]],
+    {
+      label: 'Text + Image',
+      styles: { backgroundColor: '#FFFFFF', padding: { top: 0, right: 0, bottom: 0, left: 0 } },
+    },
+  )
+}
+
+export function presetTextLeftImageRight(): EmailSection {
+  // Bold welcome text on left, image on right
+  const heading = makeTextBlock({
+    content: `<p style="margin:0;font-size:28px;font-weight:bold;color:#111111;line-height:1.1;font-family:Arial,sans-serif">WEL—<br/>COME</p>`,
+    styles: {
+      fontFamily: 'Arial',
+      fontSize: 28,
+      fontWeight: 'bold',
+      lineHeight: 1.1,
+      color: '#111111',
+      textAlign: 'left',
+      padding: { top: 0, right: 0, bottom: 0, left: 0 },
+    },
+  })
+  return makeSection(
+    'image-right',
+    [
+      [makeSpacerBlock(16), heading, makeSpacerBlock(16)],
+      [makeImageBlock('', 'Welcome image')],
+    ],
+    {
+      label: 'Text Left + Image Right',
+      styles: { backgroundColor: '#FFFFFF', padding: { top: 24, right: 24, bottom: 24, left: 24 } },
+    },
+  )
+}
+
 // ─── Default document ─────────────────────────────────────────────────────────
 
 export function createDefaultDocument(): EmailDocument {

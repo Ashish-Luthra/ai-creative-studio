@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useEmailStore } from '@/lib/email/emailStore'
+import { BlockLibrary } from './BlockLibrary'
 import {
   makeTextBlock, makeHeadingBlock, makeBodyBlock,
   makeButtonBlock, makeImageBlock, makeSpacerBlock,
@@ -687,6 +688,7 @@ function PropertiesPanel() {
     selectedSectionId,
     selectedBlockId,
     setSelectedBlock,
+    setSelectedSection,
     updateSectionStyles,
   } = useEmailStore()
 
@@ -712,31 +714,38 @@ function PropertiesPanel() {
   }, [section])
 
   const handleBack = useCallback(() => setSelectedBlock(null), [setSelectedBlock])
+  const handleBackToLibrary = useCallback(() => {
+    setSelectedBlock(null)
+    setSelectedSection(null)
+  }, [setSelectedBlock, setSelectedSection])
 
   // If a block is selected, show the block editor
   if (selectedBlock) {
     return <BlockEditor block={selectedBlock} onBack={handleBack} />
   }
 
-  if (!section) {
-    return (
-      <div className="flex flex-1 items-center justify-center p-4">
-        <p className="text-center text-[11px] leading-relaxed text-gray-400">
-          Select a section to view its blocks and properties
-        </p>
-      </div>
-    )
-  }
+  if (!section) return null
 
   const s = section.styles
   const p = s.padding
 
   return (
-    <div className="flex flex-1 flex-col overflow-auto px-3 pb-3 pt-2">
-      <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-gray-400">
-        {section.label ?? section.layout}
-      </p>
+    <div className="flex flex-1 flex-col overflow-hidden">
+      {/* Back to library */}
+      <div className="flex h-9 shrink-0 items-center gap-1.5 border-b border-gray-100 px-3">
+        <button
+          onClick={handleBackToLibrary}
+          className="flex items-center gap-1 text-[10px] text-gray-400 hover:text-gray-700"
+        >
+          <ChevronLeft size={11} />
+          Design Blocks
+        </button>
+        <span className="ml-auto text-[10px] font-semibold text-gray-500">
+          {section.label ?? section.layout}
+        </span>
+      </div>
 
+    <div className="flex-1 overflow-auto px-3 pb-3 pt-2">
       {/* ── Block list ── */}
       <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400">
         Blocks
@@ -799,6 +808,7 @@ function PropertiesPanel() {
           ))}
         </div>
       </Field>
+    </div>
     </div>
   )
 }
@@ -873,6 +883,8 @@ export const EmailEditorPanel: React.FC = () => {
     compileErrors,
     previewMode,
     setPreviewMode,
+    selectedSectionId,
+    selectedBlockId,
   } = useEmailStore()
 
   const previewWidth = previewMode === 'desktop' ? 600 : 375
@@ -995,14 +1007,13 @@ export const EmailEditorPanel: React.FC = () => {
         </div>
       </div>
 
-      {/* ── Right: Properties ─────────────────────────────── */}
-      <aside className="flex w-[220px] shrink-0 flex-col border-l border-gray-200 bg-white">
-        <div className="flex h-10 shrink-0 items-center border-b border-gray-100 px-3">
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">
-            Properties
-          </span>
-        </div>
-        <PropertiesPanel />
+      {/* ── Right: Block Library / Properties ────────────── */}
+      <aside className="flex w-[272px] shrink-0 flex-col border-l border-gray-200 bg-white">
+        {(selectedSectionId || selectedBlockId) ? (
+          <PropertiesPanel />
+        ) : (
+          <BlockLibrary />
+        )}
       </aside>
 
     </div>
