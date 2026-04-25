@@ -1,12 +1,14 @@
 'use client'
 
+import { useState } from 'react'
 import type { RailTool } from './ToolbarLeft'
 import { CREATIVE_PRESETS } from '@/lib/canvas/presets'
 
 interface RightStudioPanelProps {
   activeTool: RailTool | null
   selectedPresetId: string
-  onPresetChange: (presetId: string) => void
+  onPresetChange: (presetId: string) => void | Promise<void>
+  onInsertAllTemplatesFromCurrentCreative?: () => void | Promise<void>
   onAddText: () => void
   onAddShape: () => void
   onOpenMedia: () => void
@@ -16,10 +18,13 @@ export const RightStudioPanel: React.FC<RightStudioPanelProps> = ({
   activeTool,
   selectedPresetId,
   onPresetChange,
+  onInsertAllTemplatesFromCurrentCreative,
   onAddText,
   onAddShape,
   onOpenMedia,
 }) => {
+  const [insertingAll, setInsertingAll] = useState(false)
+
   if (!activeTool || activeTool === 'projects' || activeTool === 'settings') return null
 
   return (
@@ -27,11 +32,34 @@ export const RightStudioPanel: React.FC<RightStudioPanelProps> = ({
       {activeTool === 'layout' && (
         <>
           <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Layout / Template</h3>
+          <p className="mb-2 text-xs text-gray-500">
+            Add a new creative card for a preset, or drop every template using your current image and headline.
+          </p>
+          {onInsertAllTemplatesFromCurrentCreative && (
+            <button
+              type="button"
+              disabled={insertingAll}
+              onClick={async () => {
+                setInsertingAll(true)
+                try {
+                  await onInsertAllTemplatesFromCurrentCreative()
+                } finally {
+                  setInsertingAll(false)
+                }
+              }}
+              className="mb-3 w-full rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-left text-sm font-medium text-blue-800 transition-colors hover:bg-blue-100 disabled:opacity-50"
+            >
+              {insertingAll ? 'Creating templates…' : `Create all templates (${CREATIVE_PRESETS.length}) from current creative`}
+            </button>
+          )}
           <div className="space-y-2">
             {CREATIVE_PRESETS.map((preset) => (
               <button
                 key={preset.id}
-                onClick={() => onPresetChange(preset.id)}
+                type="button"
+                onClick={() => {
+                  void onPresetChange(preset.id)
+                }}
                 className={`w-full rounded-md border px-3 py-2 text-left text-sm ${
                   selectedPresetId === preset.id ? 'border-blue-300 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-700'
                 }`}

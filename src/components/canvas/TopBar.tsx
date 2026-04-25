@@ -7,16 +7,28 @@ import { useEmailStore } from '@/lib/email/emailStore'
 
 const MODES: { id: CanvasMode; label: string }[] = [
   { id: 'canvas', label: 'Canvas' },
-  { id: 'email',  label: 'Email'  },
-  { id: 'feeds',  label: 'Feeds'  },
+  { id: 'email', label: 'Email' },
+  { id: 'feeds', label: 'Feeds' },
 ]
 
 export interface TopBarProps {
   onExport?: () => void
+  onZoomIn?: () => void
+  onZoomOut?: () => void
+  onZoomReset?: () => void
+  onSelectAll?: () => void
+  onClearCanvas?: () => void
 }
 
-export const TopBar: React.FC<TopBarProps> = ({ onExport }) => {
-  const { mode, setMode, undo, redo, undoStack, redoStack } = useCanvasStore()
+export const TopBar: React.FC<TopBarProps> = ({
+  onExport,
+  onZoomIn,
+  onZoomOut,
+  onZoomReset,
+  onSelectAll,
+  onClearCanvas,
+}) => {
+  const { mode, setMode, undo, redo, undoStack, redoStack, zoom } = useCanvasStore()
   const emailUndo = useEmailStore((s) => s.undo)
   const emailRedo = useEmailStore((s) => s.redo)
   const emailHistoryLength = useEmailStore((s) => s.history.length)
@@ -31,7 +43,7 @@ export const TopBar: React.FC<TopBarProps> = ({ onExport }) => {
       emailUndo()
       return
     }
-    undo()
+    void undo()
   }
 
   const handleRedo = () => {
@@ -39,7 +51,7 @@ export const TopBar: React.FC<TopBarProps> = ({ onExport }) => {
       emailRedo()
       return
     }
-    redo()
+    void redo()
   }
 
   const handleExport = () => {
@@ -57,7 +69,7 @@ export const TopBar: React.FC<TopBarProps> = ({ onExport }) => {
   }
 
   return (
-    <header className="flex h-11 shrink-0 items-center justify-between border-b border-gray-200 bg-white px-3.5 z-40">
+    <header className="z-40 flex h-11 shrink-0 items-center justify-between border-b border-gray-200 bg-white px-3.5">
       {/* Left — logo + wordmark */}
       <div className="flex items-center gap-2">
         <div className="flex h-6 w-6 items-center justify-center rounded-[6px] bg-gray-900">
@@ -73,12 +85,13 @@ export const TopBar: React.FC<TopBarProps> = ({ onExport }) => {
         {MODES.map(({ id, label }) => (
           <button
             key={id}
+            type="button"
             onClick={() => setMode(id)}
             className={cn(
               'rounded-md px-3.5 py-1 text-[11px] font-medium transition-all',
               mode === id
                 ? 'bg-white text-gray-900 shadow-sm'
-                : 'text-gray-500 hover:text-gray-700'
+                : 'text-gray-500 hover:text-gray-700',
             )}
           >
             {label}
@@ -86,9 +99,57 @@ export const TopBar: React.FC<TopBarProps> = ({ onExport }) => {
         ))}
       </nav>
 
-      {/* Right — undo / redo / export */}
+      {/* Right — canvas zoom / selection (canvas only) + undo/redo/export */}
       <div className="flex items-center gap-1.5">
+        {mode === 'canvas' && (
+          <>
+            <button
+              type="button"
+              onClick={onZoomOut}
+              title="Zoom out"
+              className="flex h-7 w-7 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700"
+            >
+              −
+            </button>
+            <button
+              type="button"
+              onClick={onZoomReset}
+              title="Reset zoom"
+              className="rounded-md px-1.5 py-1 text-[10px] font-semibold text-gray-500 hover:bg-gray-100"
+            >
+              {Math.round(zoom * 100)}%
+            </button>
+            <button
+              type="button"
+              onClick={onZoomIn}
+              title="Zoom in"
+              className="flex h-7 w-7 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700"
+            >
+              +
+            </button>
+            <div className="mx-1 h-4 w-px bg-gray-200" />
+            <button
+              type="button"
+              onClick={onSelectAll}
+              title="Select all"
+              className="rounded-md px-1.5 py-1 text-[10px] font-semibold text-gray-500 hover:bg-gray-100"
+            >
+              Select all
+            </button>
+            <button
+              type="button"
+              onClick={onClearCanvas}
+              title="Clear canvas"
+              className="rounded-md px-1.5 py-1 text-[10px] font-semibold text-red-500 hover:bg-red-50"
+            >
+              Clear
+            </button>
+            <div className="mx-1 h-4 w-px bg-gray-200" />
+          </>
+        )}
+
         <button
+          type="button"
           onClick={handleUndo}
           disabled={!canUndo}
           title="Undo"
@@ -97,6 +158,7 @@ export const TopBar: React.FC<TopBarProps> = ({ onExport }) => {
           <Undo2 size={13} />
         </button>
         <button
+          type="button"
           onClick={handleRedo}
           disabled={!canRedo}
           title="Redo"
@@ -108,6 +170,7 @@ export const TopBar: React.FC<TopBarProps> = ({ onExport }) => {
         <div className="mx-1.5 h-4 w-px bg-gray-200" />
 
         <button
+          type="button"
           onClick={handleExport}
           className="flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-blue-700"
         >

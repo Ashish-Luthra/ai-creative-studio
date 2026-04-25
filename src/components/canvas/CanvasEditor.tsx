@@ -3,8 +3,16 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import type { Canvas, FabricObject } from 'fabric'
 import { useCanvasStore } from '@/lib/canvas/canvasStore'
-import { addShapeLayer, addTextLayer, disposeCanvas, initFabricCanvas, replaceOrAddImageLayer, seedDefaultCreative } from '@/lib/canvas/fabricInit'
-import { CREATIVE_PRESETS, getPresetById, isPresetId } from '@/lib/canvas/presets'
+import {
+  addShapeLayer,
+  addTextLayer,
+  disposeCanvas,
+  getCreativeFrameBounds,
+  initFabricCanvas,
+  replaceOrAddImageLayer,
+  seedDefaultCreative,
+} from '@/lib/canvas/fabricInit'
+import { CREATIVE_PRESETS, getPresetById, isPresetId, type CreativePreset } from '@/lib/canvas/presets'
 import { TopBar } from './TopBar'
 import { ToolbarLeft, type RailTool } from './ToolbarLeft'
 import { AgentPill } from './AgentPill'
@@ -47,6 +55,40 @@ const DEFAULT_TB: TbState = {
   color: '#FFFFFF',
 }
 
+const INSERT_FRAME_SCALE = 0.36
+const INSERT_GRID_PADDING = 40
+const INSERT_GRID_GAP = 24
+const ZOOM_MIN = 0.25
+const ZOOM_MAX = 4
+
+function maxPresetCellForInsertGrid(canvas: Canvas, frameScale: number) {
+  let maxW = 0
+  let maxH = 0
+  for (const preset of CREATIVE_PRESETS) {
+    const b = getCreativeFrameBounds(canvas, preset, { frameScale })
+    maxW = Math.max(maxW, b.width)
+    maxH = Math.max(maxH, b.height)
+  }
+  return { cellW: maxW, cellH: maxH }
+}
+
+function getInsertFrameTopLeft(canvas: Canvas, preset: CreativePreset, frameIndex: number, frameScale: number) {
+  const cw = canvas.getWidth()
+  const { cellW, cellH } = maxPresetCellForInsertGrid(canvas, frameScale)
+  const colWidth = cellW + INSERT_GRID_GAP
+  const rowHeight = cellH + INSERT_GRID_GAP
+  const cols = Math.max(1, Math.floor((cw - 2 * INSERT_GRID_PADDING + INSERT_GRID_GAP) / colWidth))
+  const col = frameIndex % cols
+  const row = Math.floor(frameIndex / cols)
+  const cellLeft = INSERT_GRID_PADDING + col * colWidth
+  const cellTop = INSERT_GRID_PADDING + row * rowHeight
+  const { width: fw, height: fh } = getCreativeFrameBounds(canvas, preset, { frameScale })
+  return {
+    left: cellLeft + (cellW - fw) / 2,
+    top: cellTop + (cellH - fh) / 2,
+  }
+}
+
 // ── Main component ──────────────────────────────────────────
 export interface CanvasEditorProps {
   briefId?: string
@@ -71,8 +113,17 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
   const [recentCampaigns, setRecentCampaigns] = useState<CampaignMeta[]>([])
 
   const {
-    mode, selectedLayer, selectedPresetId,
-    setSelectedLayer, setFabricCanvas, setSelectedPresetId, pushUndo, resetHistory,
+    mode,
+    selectedLayer,
+    selectedPresetId,
+    zoom,
+    fabricCanvas,
+    setSelectedLayer,
+    setFabricCanvas,
+    setSelectedPresetId,
+    setZoom,
+    pushUndo,
+    resetHistory,
   } = useCanvasStore()
 
   const [toolbarPos, setToolbarPos] = useState({ x: 0, y: 0 })
@@ -115,8 +166,10 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
       return { copyText: 'Enjoy Coffee', imageUrl: '/CoffeeInsta.png' }
     }
     const objects = canvas.getObjects()
-    const textObject = objects.find((obj) => obj.type === 'textbox') as FabricObject | undefined
-    const imageObject = objects.find((obj) => obj.type === 'image') as FabricObject | undefined
+    const texts = objects.filter((obj) => obj.type === 'textbox' || obj.type === 'i-text')
+    const imgs = objects.filter((obj) => obj.type === 'image')
+    const textObject = (texts[texts.length - 1] ?? texts[0]) as FabricObject | undefined
+    const imageObject = (imgs[imgs.length - 1] ?? imgs[0]) as FabricObject | undefined
     const copyText = String((textObject as { text?: string } | undefined)?.text ?? 'Enjoy Coffee')
     const imageUrl = String((imageObject as { getSrc?: () => string } | undefined)?.getSrc?.() ?? '/CoffeeInsta.png')
     return { copyText, imageUrl }
@@ -345,6 +398,15 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
     return () => ro.disconnect()
   }, [])
 
+  // ── Apply viewport zoom from store (Fabric canvas) ─────────
+  useEffect(() => {
+    if (mode !== 'canvas' || !fabricCanvas) return
+    const z = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zoom))
+    if (z !== zoom) setZoom(z)
+    fabricCanvas.setZoom(z)
+    fabricCanvas.renderAll()
+  }, [zoom, mode, fabricCanvas, setZoom])
+
   const handleAgentSubmit = useCallback((cmd: string) => {
     console.log('[AgentPill] command:', cmd)
   }, [])
@@ -358,6 +420,104 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
     link.download = `${briefId}-${selectedPresetId}.png`
     link.click()
   }, [briefId, selectedPresetId])
+
+  const handleZoomIn = useCallback(() => {
+    setZoom(Math.min(ZOOM_MAX, zoom * 1.15))
+  }, [zoom, setZoom])
+
+  const handleZoomOut = useCallback(() => {
+    setZoom(Math.max(ZOOM_MIN, zoom / 1.15))
+  }, [zoom, setZoom])
+
+  const handleZoomReset = useCallback(() => {
+    setZoom(1)
+  }, [setZoom])
+
+  const handleSelectAll = useCallback(async () => {
+    const canvas = fabricRef.current
+    if (!canvas) return
+    const { ActiveSelection } = await import('fabric')
+    const selectable = canvas.getObjects().filter((o) => o.selectable && o.evented !== false)
+    if (!selectable.length) return
+    const sel = new ActiveSelection(selectable, { canvas })
+    canvas.setActiveObject(sel)
+    canvas.renderAll()
+  }, [])
+
+  const handleClearCanvas = useCallback(() => {
+    const canvas = fabricRef.current
+    if (!canvas) return
+    if (!window.confirm('Clear all objects on the canvas? This cannot be undone from here.')) return
+    canvas.clear()
+    canvas.backgroundColor = '#FDFDFD'
+    canvas.renderAll()
+    setSelectedLayer(null)
+    resetHistory()
+    saveSnapshot()
+  }, [resetHistory, saveSnapshot, setSelectedLayer])
+
+  const handleInsertLayoutPreset = useCallback(
+    async (presetId: string) => {
+      const canvas = fabricRef.current
+      if (!canvas) return
+
+      const { copyText, imageUrl } = extractCreativeInputs()
+      const frameCount = canvas
+        .getObjects()
+        .filter((obj) => (obj as { data?: { kind?: string } }).data?.kind === 'creative-frame').length
+      const { left, top } = getInsertFrameTopLeft(canvas, getPresetById(presetId), frameCount, INSERT_FRAME_SCALE)
+
+      await seedDefaultCreative(canvas, imageUrl, copyText, getPresetById(presetId), {
+        frameLeft: left,
+        frameTop: top,
+        frameScale: INSERT_FRAME_SCALE,
+      })
+      canvas.renderAll()
+      saveSnapshot()
+      setSelectedPresetId(presetId)
+      localStorage.setItem(presetStorageKey, presetId)
+      setGeneratedPresetIds((prev) => {
+        const next = Array.from(new Set([...prev, presetId]))
+        localStorage.setItem(generatedKey, JSON.stringify(next))
+        return next
+      })
+      updateCampaignMeta({ activePresetId: presetId })
+    },
+    [extractCreativeInputs, generatedKey, presetStorageKey, saveSnapshot, setSelectedPresetId, updateCampaignMeta],
+  )
+
+  const handleInsertAllTemplatesFromCurrentCreative = useCallback(async () => {
+    const canvas = fabricRef.current
+    if (!canvas) return
+
+    const { copyText, imageUrl } = extractCreativeInputs()
+
+    for (const preset of CREATIVE_PRESETS) {
+      const frameCount = canvas
+        .getObjects()
+        .filter((obj) => (obj as { data?: { kind?: string } }).data?.kind === 'creative-frame').length
+      const { left, top } = getInsertFrameTopLeft(canvas, preset, frameCount, INSERT_FRAME_SCALE)
+      await seedDefaultCreative(canvas, imageUrl, copyText, preset, {
+        frameLeft: left,
+        frameTop: top,
+        frameScale: INSERT_FRAME_SCALE,
+      })
+    }
+
+    canvas.renderAll()
+    saveSnapshot()
+
+    const lastPreset = CREATIVE_PRESETS[CREATIVE_PRESETS.length - 1]
+    setSelectedPresetId(lastPreset.id)
+    localStorage.setItem(presetStorageKey, lastPreset.id)
+    const allIds = CREATIVE_PRESETS.map((p) => p.id)
+    setGeneratedPresetIds((prev) => {
+      const next = Array.from(new Set([...prev, ...allIds]))
+      localStorage.setItem(generatedKey, JSON.stringify(next))
+      return next
+    })
+    updateCampaignMeta({ activePresetId: lastPreset.id })
+  }, [extractCreativeInputs, generatedKey, presetStorageKey, saveSnapshot, setSelectedPresetId, updateCampaignMeta])
 
   const handlePresetChange = useCallback(async (presetId: string) => {
     const canvas = fabricRef.current
@@ -554,7 +714,14 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-[#FDFDFD]">
-      <TopBar onExport={handleCanvasExport} />
+      <TopBar
+        onExport={handleCanvasExport}
+        onZoomIn={handleZoomIn}
+        onZoomOut={handleZoomOut}
+        onZoomReset={handleZoomReset}
+        onSelectAll={handleSelectAll}
+        onClearCanvas={handleClearCanvas}
+      />
 
       <div className="flex flex-1 overflow-hidden">
         <ToolbarLeft onToolAction={handleToolAction} />
@@ -619,7 +786,8 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
                 <RightStudioPanel
                   activeTool={activeTool}
                   selectedPresetId={selectedPresetId}
-                  onPresetChange={handlePresetChange}
+                  onPresetChange={handleInsertLayoutPreset}
+                  onInsertAllTemplatesFromCurrentCreative={handleInsertAllTemplatesFromCurrentCreative}
                   onAddText={() => {
                     if (!fabricRef.current) return
                     void addTextLayer(fabricRef.current).then(saveSnapshot)

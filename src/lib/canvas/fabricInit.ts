@@ -86,11 +86,16 @@ export function disposeCanvas(canvas: Canvas, canvasEl?: HTMLCanvasElement) {
   }
 }
 
-function getFrameBounds(canvas: Canvas, preset: CreativePreset) {
+/** Pixel size and origin for a creative frame (layout + optional insert position). */
+export function getCreativeFrameBounds(
+  canvas: Canvas,
+  preset: CreativePreset,
+  options?: { frameLeft?: number; frameTop?: number; frameScale?: number },
+) {
   const cw = canvas.getWidth()
   const ch = canvas.getHeight()
   const ratio = preset.width / preset.height
-  const maxW = cw * 0.62
+  const maxW = cw * (options?.frameScale ?? 0.62)
   const maxH = ch * 0.78
 
   let frameW = maxW
@@ -103,8 +108,8 @@ function getFrameBounds(canvas: Canvas, preset: CreativePreset) {
   return {
     width: frameW,
     height: frameH,
-    left: (cw - frameW) / 2,
-    top: (ch - frameH) / 2,
+    left: options?.frameLeft ?? (cw - frameW) / 2,
+    top: options?.frameTop ?? (ch - frameH) / 2,
   }
 }
 
@@ -114,10 +119,11 @@ export async function seedDefaultCreative(
   imageUrl: string,
   copyText: string,
   preset: CreativePreset,
+  options?: { frameLeft?: number; frameTop?: number; frameScale?: number },
 ) {
   const { FabricImage, Textbox, Rect, Shadow, Gradient } = await import('fabric')
 
-  const { width: FRAME_W, height: FRAME_H, left: fx, top: fy } = getFrameBounds(canvas, preset)
+  const { width: FRAME_W, height: FRAME_H, left: fx, top: fy } = getCreativeFrameBounds(canvas, preset, options)
 
   // ── Background frame (rounded rect) ─────────────────────
   const frame = new Rect({
@@ -131,6 +137,7 @@ export async function seedDefaultCreative(
     selectable: false,
     evented: false,
     hoverCursor: 'default',
+    data: { kind: 'creative-frame', presetId: preset.id },
   })
   canvas.add(frame)
 
