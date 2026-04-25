@@ -4,9 +4,11 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import type { Canvas, FabricObject } from 'fabric'
 import { useCanvasStore } from '@/lib/canvas/canvasStore'
 import {
+  addBlankCreativeFrame,
   addShapeLayer,
   addTextLayer,
   disposeCanvas,
+  ensureCreativeMetadata,
   getCreativeIdFromObject,
   initFabricCanvas,
   moveCreativeBlock,
@@ -58,6 +60,27 @@ const DEFAULT_TB: TbState = {
 const ZOOM_MIN = 0.25
 const ZOOM_MAX = 4
 const ZOOM_STEP = 0.1
+
+const normalizeTextboxScale = (obj: FabricObject | undefined | null) => {
+  if (!obj) return false
+  if (obj.type !== 'textbox' && obj.type !== 'i-text') return false
+  const scaled = obj as FabricObject & { width?: number; scaleX?: number; scaleY?: number; setCoords?: () => void }
+  const nextScaleX = scaled.scaleX ?? 1
+  const nextScaleY = scaled.scaleY ?? 1
+  if (nextScaleX === 1 && nextScaleY === 1) return false
+
+  const currentWidth = scaled.width ?? 0
+  const nextWidth = currentWidth * nextScaleX
+  if (Number.isFinite(nextWidth) && nextWidth > 1) {
+    scaled.set({ width: nextWidth })
+  }
+  scaled.set({
+    scaleX: 1,
+    scaleY: 1,
+  })
+  scaled.setCoords?.()
+  return true
+}
 
 // ── Main component ──────────────────────────────────────────
 export interface CanvasEditorProps {
@@ -223,6 +246,10 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
           if (obj) { syncPos(obj); syncToolbar(obj) }
         },
         onModified: (target) => {
+          const textNormalized = normalizeTextboxScale(target)
+          if (textNormalized) {
+            c.requestRenderAll()
+          }
           const targetData = (
             target as { data?: { kind?: string; cropPending?: boolean; creativeId?: string } } | undefined
           )?.data
@@ -250,16 +277,33 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
       fabricRef.current = c
       setFabricCanvas(c)
 
-      c.on('object:scaling', (e) => { if (e.target) syncPos(e.target) })
+      c.on('object:scaling', (e) => {
+        if (!e.target) return
+        const normalized = normalizeTextboxScale(e.target)
+        if (normalized) {
+          c.requestRenderAll()
+        }
+        syncPos(e.target)
+      })
       c.on('mouse:down', (event) => {
         const target = event.target
         if (!target) return
+        ensureCreativeMetadata(c)
         const creativeId = getCreativeIdFromObject(target)
         if (!creativeId) return
         const data = (target as FabricObject & { data?: { kind?: string } }).data
         const handMode = activeToolRef.current === 'hand'
         const directMoveEnabled = data?.kind === 'creative-image' || data?.kind === 'creative-frame'
         if (!handMode && !directMoveEnabled) return
+
+        if (process.env.NODE_ENV !== 'production') {
+          console.debug('[HandMove] drag start', {
+            creativeId,
+            handMode,
+            directMoveEnabled,
+            kind: data?.kind ?? null,
+          })
+        }
 
         groupMoveRef.current = {
           creativeId,
@@ -296,6 +340,9 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
         if (!dx && !dy) return
 
         moveCreativeBlock(c, creativeId, dx, dy, target)
+        if (process.env.NODE_ENV !== 'production') {
+          console.debug('[HandMove] drag delta', { creativeId, dx, dy })
+        }
         groupMoveRef.current.lastLeft = nextLeft
         groupMoveRef.current.lastTop = nextTop
         groupMoveRef.current.moved = true
@@ -379,12 +426,14 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
           }
           await c.loadFromJSON(savedJson)
           if (cancelled || fabricRef.current !== c) return
+          ensureCreativeMetadata(c)
           c.renderAll()
         } catch (err) {
           console.warn('[CanvasEditor] Failed to restore draft from localStorage — starting fresh.', err)
           localStorage.removeItem(storageKey)
           if (!cancelled && fabricRef.current === c) {
             await seedDefaultCreative(c, '/CoffeeInsta.png', 'Enjoy Coffee', initialPreset)
+            ensureCreativeMetadata(c)
             c.renderAll()
           }
         } finally {
@@ -392,6 +441,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
         }
       } else if (!cancelled && fabricRef.current === c) {
         await seedDefaultCreative(c, '/CoffeeInsta.png', 'Enjoy Coffee', initialPreset)
+        ensureCreativeMetadata(c)
       }
 
       if (cancelled || fabricRef.current !== c) return
@@ -500,13 +550,26 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
     if (!canvas) return
     setSelectedPresetId(presetId)
     localStorage.setItem(presetStorageKey, presetId)
-    restoringRef.current = true
-    canvas.clear()
+    const creativeFrameCount = canvas
+      .getObjects()
+      .filter((obj) => (obj as { data?: { kind?: string } }).data?.kind === 'creative-frame')
+      .length
     const { copyText, imageUrl } = extractCreativeInputs()
-    await seedDefaultCreative(canvas, imageUrl, copyText, getPresetById(presetId))
-    canvas.renderAll()
-    restoringRef.current = false
-    resetHistory()
+
+    restoringRef.current = true
+    try {
+      if (creativeFrameCount <= 1) {
+        canvas.clear()
+      }
+      await seedDefaultCreative(canvas, imageUrl, copyText, getPresetById(presetId))
+      ensureCreativeMetadata(canvas)
+      canvas.renderAll()
+    } finally {
+      restoringRef.current = false
+    }
+    if (creativeFrameCount <= 1) {
+      resetHistory()
+    }
     saveSnapshot()
     setGeneratedPresetIds((prev) => {
       const next = Array.from(new Set([...prev, presetId]))
@@ -516,27 +579,92 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
     updateCampaignMeta({ activePresetId: presetId })
   }, [extractCreativeInputs, generatedKey, presetStorageKey, resetHistory, saveSnapshot, setSelectedPresetId, updateCampaignMeta])
 
-  const handleConvertToAll = useCallback(async () => {
+  const handleReplicateToAll = useCallback(async () => {
+    const canvas = fabricRef.current
+    if (!canvas) return
+    const shouldReplaceAll = window.confirm('Replicate to all sizes will replace all current creatives on canvas. Continue?')
+    if (!shouldReplaceAll) return
     const { copyText, imageUrl } = extractCreativeInputs()
-    const { Canvas: FabricCanvas } = await import('fabric')
+    const canvasWidth = canvas.getWidth()
+    const canvasHeight = canvas.getHeight()
+    const gap = 24
+    const outerPadding = 24
+    const itemCount = CREATIVE_PRESETS.length
+    const columns = Math.max(1, Math.ceil(Math.sqrt(itemCount)))
+    const rows = Math.max(1, Math.ceil(itemCount / columns))
+    const availableWidth = canvasWidth - outerPadding * 2 - gap * (columns - 1)
+    const availableHeight = canvasHeight - outerPadding * 2 - gap * (rows - 1)
+    const cellWidth = Math.max(80, availableWidth / columns)
+    const cellHeight = Math.max(80, availableHeight / rows)
 
-    for (const preset of CREATIVE_PRESETS) {
-      const tempEl = document.createElement('canvas')
-      const temp = new FabricCanvas(tempEl, { width: 1200, height: 1200, backgroundColor: '#FDFDFD' })
-      await seedDefaultCreative(temp, imageUrl, copyText, preset)
-      const url = temp.toDataURL({ format: 'png', multiplier: 2 })
-      const link = document.createElement('a')
-      link.href = url
-      link.download = `${briefId}-${preset.id}.png`
-      link.click()
-      temp.dispose()
+    restoringRef.current = true
+    try {
+      canvas.clear()
+      setSelectedLayer(null)
+      for (let index = 0; index < CREATIVE_PRESETS.length; index += 1) {
+        const preset = CREATIVE_PRESETS[index]
+        const col = index % columns
+        const row = Math.floor(index / columns)
+        const ratio = preset.width / preset.height
+
+        let frameWidth = cellWidth
+        let frameHeight = frameWidth / ratio
+        if (frameHeight > cellHeight) {
+          frameHeight = cellHeight
+          frameWidth = frameHeight * ratio
+        }
+
+        const left = outerPadding + col * (cellWidth + gap) + (cellWidth - frameWidth) / 2
+        const top = outerPadding + row * (cellHeight + gap) + (cellHeight - frameHeight) / 2
+
+        await seedDefaultCreative(canvas, imageUrl, copyText, preset, {
+          left,
+          top,
+          width: frameWidth,
+          height: frameHeight,
+        })
+      }
+    } finally {
+      restoringRef.current = false
     }
+    canvas.renderAll()
 
     const allIds = CREATIVE_PRESETS.map((preset) => preset.id)
     setGeneratedPresetIds(allIds)
     localStorage.setItem(generatedKey, JSON.stringify(allIds))
     updateCampaignMeta({ activePresetId: selectedPresetId })
-  }, [briefId, extractCreativeInputs, generatedKey, selectedPresetId, updateCampaignMeta])
+    resetHistory()
+    saveSnapshot()
+  }, [extractCreativeInputs, generatedKey, resetHistory, saveSnapshot, selectedPresetId, setSelectedLayer, updateCampaignMeta])
+
+  const handleAddFrame = useCallback(async () => {
+    const canvas = fabricRef.current
+    if (!canvas) return
+    const frameCount = canvas
+      .getObjects()
+      .filter((obj) => (obj as { data?: { kind?: string } }).data?.kind === 'creative-frame')
+      .length
+    const offsetStep = 36
+    const maxOffset = 180
+    const nextOffset = Math.min(maxOffset, frameCount * offsetStep)
+    const base = Math.max(20, canvas.getWidth() * 0.08)
+    const size = Math.max(160, Math.min(canvas.getWidth() * 0.28, canvas.getHeight() * 0.38))
+
+    restoringRef.current = true
+    try {
+      await addBlankCreativeFrame(canvas, {
+        left: base + nextOffset,
+        top: base + nextOffset,
+        width: size,
+        height: size,
+      })
+      ensureCreativeMetadata(canvas)
+      canvas.renderAll()
+    } finally {
+      restoringRef.current = false
+    }
+    saveSnapshot()
+  }, [saveSnapshot])
 
   const handleGenerateVariants = useCallback(() => {
     const canvas = fabricRef.current
@@ -600,6 +728,8 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
     if (tool === 'copy') {
       await addTextLayer(canvas, 'Add your headline')
       saveSnapshot()
+    } else if (tool === 'frame') {
+      await handleAddFrame()
     } else if (tool === 'media') {
       setShowApprovedImages(true)
     } else if (tool === 'preview' || tool === 'layout') {
@@ -609,7 +739,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
     } else if (tool === 'projects') {
       // projects panel view
     }
-  }, [mode, saveSnapshot, handleCanvasExport])
+  }, [mode, saveSnapshot, handleCanvasExport, handleAddFrame])
 
   const handleImageSelect = useCallback(async (src: string) => {
     const canvas = fabricRef.current
@@ -784,6 +914,12 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
                   activeTool={activeTool}
                   selectedPresetId={selectedPresetId}
                   onPresetChange={handlePresetChange}
+                  onAddFrame={() => {
+                    void handleAddFrame()
+                  }}
+                  onConvertToAll={() => {
+                    void handleReplicateToAll()
+                  }}
                   onAddText={() => {
                     if (!fabricRef.current) return
                     void addTextLayer(fabricRef.current).then(saveSnapshot)
@@ -836,7 +972,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
               }}
               onOpenMedia={() => setShowApprovedImages(true)}
               onConvertToAll={() => {
-                void handleConvertToAll()
+                void handleReplicateToAll()
               }}
               onSaveCrop={handleSaveImageCrop}
               cropPending={imageCropPending}

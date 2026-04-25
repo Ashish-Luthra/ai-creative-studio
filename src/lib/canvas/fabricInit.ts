@@ -2,7 +2,7 @@
 // Always import Fabric dynamically (client-side only, never SSR).
 
 import type { Canvas, FabricObject } from 'fabric'
-import type { CreativePreset } from './presets'
+import { getPresetById, type CreativePreset } from './presets'
 
 // Tracks live Canvas instances by their host element so we can dispose before reinit.
 const canvasRegistry = new WeakMap<HTMLCanvasElement, Canvas>()
@@ -26,6 +26,13 @@ interface CreativeData {
   cropPending?: boolean
 }
 
+interface CreativeFrameBounds {
+  left: number
+  top: number
+  width: number
+  height: number
+}
+
 export interface FabricInitOptions {
   canvasEl: HTMLCanvasElement
   width: number
@@ -35,11 +42,14 @@ export interface FabricInitOptions {
 }
 
 const createCreativeId = () => `creative-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+const BLANK_PIXEL_DATA_URL = 'data:image/gif;base64,R0lGODlhAQABAAAAACwAAAAAAQABAAA='
 
-const asCreativeData = (obj: FabricObject): CreativeData | undefined =>
-  (obj as FabricObject & { data?: CreativeData }).data
+const asCreativeData = (obj?: FabricObject | null): CreativeData | undefined => {
+  if (!obj) return undefined
+  return (obj as FabricObject & { data?: CreativeData }).data
+}
 
-export const getCreativeIdFromObject = (obj?: FabricObject | null) => asCreativeData(obj ?? undefined as never)?.creativeId
+export const getCreativeIdFromObject = (obj?: FabricObject | null) => asCreativeData(obj)?.creativeId
 
 export const getCreativeObjects = (canvas: Canvas, creativeId: string) =>
   canvas.getObjects().filter((obj) => asCreativeData(obj)?.creativeId === creativeId)
@@ -101,6 +111,40 @@ export const moveCreativeBlock = (
   }
 }
 
+const roleFromKind = (kind?: CreativeData['kind']): CreativeRole | null => {
+  if (!kind) return null
+  if (kind === 'creative-frame') return 'frame'
+  if (kind === 'creative-image') return 'image'
+  if (kind === 'creative-scrim') return 'scrim'
+  if (kind === 'creative-text') return 'text'
+  return null
+}
+
+export const ensureCreativeMetadata = (canvas: Canvas) => {
+  const creativeObjects = canvas.getObjects().filter((obj) => {
+    const kind = asCreativeData(obj)?.kind
+    return kind === 'creative-frame' || kind === 'creative-image' || kind === 'creative-scrim' || kind === 'creative-text'
+  })
+  if (!creativeObjects.length) return
+
+  const existingId = creativeObjects
+    .map((obj) => asCreativeData(obj)?.creativeId)
+    .find((id): id is string => typeof id === 'string' && id.length > 0)
+  const creativeId = existingId ?? createCreativeId()
+
+  for (const obj of creativeObjects) {
+    const data = asCreativeData(obj)
+    if (!data) continue
+    const role = roleFromKind(data.kind)
+    if (!role) continue
+    ;(obj as FabricObject & { data?: CreativeData }).data = {
+      ...data,
+      creativeId: data.creativeId ?? creativeId,
+      role: data.role ?? role,
+    }
+  }
+}
+
 export async function initFabricCanvas({
   canvasEl,
   width,
@@ -157,6 +201,23 @@ export function applySelectionStyle(obj: FabricObject) {
   })
 }
 
+const applyTextboxResizeBehavior = (obj: FabricObject) => {
+  if (obj.type !== 'textbox' && obj.type !== 'i-text') return
+  obj.set({
+    lockScalingY: true,
+    lockSkewingX: true,
+    lockSkewingY: true,
+  })
+  obj.setControlsVisibility({
+    mt: false,
+    mb: false,
+    tl: false,
+    tr: false,
+    bl: false,
+    br: false,
+  })
+}
+
 export function disposeCanvas(canvas: Canvas, canvasEl?: HTMLCanvasElement) {
   if (canvasEl) {
     canvasRegistry.delete(canvasEl)
@@ -200,10 +261,11 @@ export async function seedDefaultCreative(
   imageUrl: string,
   copyText: string,
   preset: CreativePreset,
+  frameBounds?: CreativeFrameBounds,
 ) {
   const { FabricImage, Textbox, Rect, Shadow, Gradient } = await import('fabric')
 
-  const { width: FRAME_W, height: FRAME_H, left: fx, top: fy } = getFrameBounds(canvas, preset)
+  const { width: FRAME_W, height: FRAME_H, left: fx, top: fy } = frameBounds ?? getFrameBounds(canvas, preset)
   const creativeId = createCreativeId()
   const frameState: CreativeFrame = { left: fx, top: fy, width: FRAME_W, height: FRAME_H, rx: 12, ry: 12 }
 
@@ -320,6 +382,7 @@ export async function seedDefaultCreative(
     data: { kind: 'creative-text', creativeId, role: 'text' } satisfies CreativeData,
   })
   applySelectionStyle(txt)
+  applyTextboxResizeBehavior(txt)
   canvas.add(txt)
 
   canvas.renderAll()
@@ -341,6 +404,7 @@ export async function addTextLayer(canvas: Canvas, text = 'Headline text') {
     data: { kind: 'creative-text' },
   })
   applySelectionStyle(textbox)
+  applyTextboxResizeBehavior(textbox)
   canvas.add(textbox)
   canvas.setActiveObject(textbox)
   canvas.renderAll()
@@ -363,6 +427,11 @@ export async function addShapeLayer(canvas: Canvas) {
   canvas.add(rect)
   canvas.setActiveObject(rect)
   canvas.renderAll()
+}
+
+export async function addBlankCreativeFrame(canvas: Canvas, frameBounds?: CreativeFrameBounds) {
+  const preset = getPresetById('instagram-1-1')
+  await seedDefaultCreative(canvas, BLANK_PIXEL_DATA_URL, '', preset, frameBounds)
 }
 
 export async function replaceOrAddImageLayer(canvas: Canvas, imageUrl: string, selected?: FabricObject | null) {

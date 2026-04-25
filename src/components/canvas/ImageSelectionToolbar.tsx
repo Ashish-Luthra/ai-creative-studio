@@ -54,7 +54,7 @@ export const ImageSelectionToolbar: React.FC<ImageSelectionToolbarProps> = ({
         </select>
       </div>
       <button onClick={onConvertToAll} className="rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-700">
-        Convert all
+        Replicate all
       </button>
       <button
         onClick={onSaveCrop}

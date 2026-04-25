@@ -1,12 +1,13 @@
 'use client'
 
-import { Folder, Grid2X2, Image, Type, MousePointer2, Hand, Palette, Sparkles, Shuffle, Smartphone, Upload, Settings } from 'lucide-react'
+import { Folder, Grid2X2, Image, Type, MousePointer2, Hand, Palette, Sparkles, Shuffle, Smartphone, Upload, Settings, Square } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useState } from 'react'
 
 export type RailTool =
   | 'projects'
   | 'layout'
+  | 'frame'
   | 'media'
   | 'copy'
   | 'hand'
@@ -51,6 +52,7 @@ export const ToolbarLeft: React.FC<ToolbarLeftProps> = ({ onToolAction }) => {
   const tools: { id: RailTool; icon: React.ReactNode; title: string }[] = [
     { id: 'projects', icon: <Folder size={15} />, title: 'Projects / Assets' },
     { id: 'layout', icon: <Grid2X2 size={15} />, title: 'Layout / Template' },
+    { id: 'frame', icon: <Square size={15} />, title: 'Add Frame (1:1)' },
     { id: 'media', icon: <Image size={15} />, title: 'Media' },
     { id: 'copy', icon: <Type size={15} />, title: 'Copy' },
     { id: 'hand', icon: <Hand size={15} />, title: 'Hand Move' },
