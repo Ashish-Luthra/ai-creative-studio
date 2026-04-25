@@ -1123,65 +1123,62 @@ export const EmailEditorPanel: React.FC = () => {
 
               return (
                 <React.Fragment key={block.id}>
-                  {/* Block row: content + action bar */}
+                  {/* Block row — extra right margin so the absolute action bar has room */}
                   <div
-                    className="mb-1 flex items-start gap-3"
+                    className="relative mb-1 mr-14"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    {/* Block wrapper with selection outline + ± buttons */}
-                    <div className="relative flex-1">
-                      {/* The block itself */}
-                      <div
-                        className={cn(
-                          'cursor-pointer overflow-hidden rounded border-2 transition-all',
-                          isSelected
-                            ? 'border-blue-400 shadow-[0_0_0_3px_rgba(96,165,250,0.15)]'
-                            : 'border-transparent hover:border-gray-200',
-                        )}
-                        onClick={() => {
-                          setSelectedId(block.id)
-                          setInsertState(null)
-                        }}
-                      >
-                        <BlockContent
-                          type={block.type}
-                          backgroundColor={block.backgroundColor}
-                          onTextClick={handleTextClick}
-                        />
-                      </div>
-
-                      {/* ± Insert above (top center of outline) */}
-                      {isSelected && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setInsertState({ afterId: prevId })
-                          }}
-                          className="absolute -top-3 left-1/2 z-20 flex h-6 w-6 -translate-x-1/2 items-center justify-center rounded-full border-2 border-white bg-blue-500 text-white shadow-md transition-transform hover:scale-110 hover:bg-blue-600"
-                          title="Insert block above"
-                        >
-                          <Plus size={12} />
-                        </button>
+                    {/* The block itself */}
+                    <div
+                      className={cn(
+                        'cursor-pointer overflow-hidden rounded border-2 transition-all',
+                        isSelected
+                          ? 'border-blue-400 shadow-[0_0_0_3px_rgba(96,165,250,0.15)]'
+                          : 'border-transparent hover:border-gray-200',
                       )}
-
-                      {/* ± Insert below (bottom center of outline) */}
-                      {isSelected && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setInsertState({ afterId: block.id })
-                          }}
-                          className="absolute -bottom-3 left-1/2 z-20 flex h-6 w-6 -translate-x-1/2 translate-y-0 items-center justify-center rounded-full border-2 border-white bg-blue-500 text-white shadow-md transition-transform hover:scale-110 hover:bg-blue-600"
-                          title="Insert block below"
-                        >
-                          <Plus size={12} />
-                        </button>
-                      )}
+                      onClick={() => {
+                        setSelectedId(block.id)
+                        setInsertState(null)
+                      }}
+                    >
+                      <BlockContent
+                        type={block.type}
+                        backgroundColor={block.backgroundColor}
+                        onTextClick={handleTextClick}
+                      />
                     </div>
 
-                    {/* Floating action bar (visible only when selected) */}
+                    {/* ± Insert above (top center of outline) */}
                     {isSelected && (
-                      <div className="shrink-0 pt-1">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setInsertState({ afterId: prevId })
+                        }}
+                        className="absolute -top-3 left-1/2 z-20 flex h-6 w-6 -translate-x-1/2 items-center justify-center rounded-full border-2 border-white bg-blue-500 text-white shadow-md transition-transform hover:scale-110 hover:bg-blue-600"
+                        title="Insert block above"
+                      >
+                        <Plus size={12} />
+                      </button>
+                    )}
+
+                    {/* ± Insert below (bottom center of outline) */}
+                    {isSelected && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setInsertState({ afterId: block.id })
+                        }}
+                        className="absolute -bottom-3 left-1/2 z-20 flex h-6 w-6 -translate-x-1/2 items-center justify-center rounded-full border-2 border-white bg-blue-500 text-white shadow-md transition-transform hover:scale-110 hover:bg-blue-600"
+                        title="Insert block below"
+                      >
+                        <Plus size={12} />
+                      </button>
+                    )}
+
+                    {/* Floating action bar — absolutely to the right, outside the block */}
+                    {isSelected && (
+                      <div className="absolute right-[-52px] top-2 z-30">
                         <FloatingActionBar
                           onMoveUp={() => handleMoveUp(block.id)}
                           onMoveDown={() => handleMoveDown(block.id)}
