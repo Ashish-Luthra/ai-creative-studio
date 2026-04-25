@@ -6,7 +6,7 @@ import { useCanvasStore, type CanvasMode } from '@/lib/canvas/canvasStore'
 import { useEmailStore } from '@/lib/email/emailStore'
 
 const MODES: { id: CanvasMode; label: string }[] = [
-  { id: 'canvas', label: 'Canvas' },
+  { id: 'canvas', label: 'AdCanvas' },
   { id: 'email', label: 'Email' },
   { id: 'feeds', label: 'Feeds' },
 ]

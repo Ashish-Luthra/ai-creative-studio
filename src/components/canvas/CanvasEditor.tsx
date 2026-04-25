@@ -800,7 +800,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
       />
 
       <div className="flex flex-1 overflow-hidden">
-        <ToolbarLeft onToolAction={handleToolAction} />
+        {mode !== 'email' && <ToolbarLeft onToolAction={handleToolAction} />}
 
         {/* ── Canvas surface ───────────────────────────────── */}
         <main
