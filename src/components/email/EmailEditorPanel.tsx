@@ -371,6 +371,111 @@ function ContentPanel({
   )
 }
 
+// ─── Block Properties Panel (Right Nav — shown when a block is selected) ─────
+
+const BG_SWATCHES = [
+  '#ffffff','#f9fafb','#f3f4f6','#e5e7eb','#d1d5db',
+  '#111827','#1f2937','#374151','#6b7280','#9ca3af',
+  '#eff6ff','#dbeafe','#bfdbfe','#93c5fd','#3b82f6',
+  '#fdf4ff','#fae8ff','#e9d5ff','#c084fc','#a855f7',
+  '#fdf2f8','#fce7f3','#fbcfe8','#f9a8d4','#ec4899',
+  '#fff7ed','#ffedd5','#fed7aa','#fb923c','#f97316',
+  '#f0fdf4','#dcfce7','#bbf7d0','#86efac','#22c55e',
+  '#fefce8','#fef9c3','#fef08a','#fde047','#eab308',
+]
+
+interface BlockPropertiesPanelProps {
+  block: CanvasBlock
+  onColorChange: (id: string, color: string) => void
+  onBack: () => void
+}
+
+function BlockPropertiesPanel({ block, onColorChange, onBack }: BlockPropertiesPanelProps) {
+  const bg = block.backgroundColor ?? '#ffffff'
+
+  return (
+    <div className="flex flex-1 flex-col overflow-hidden bg-white">
+      {/* Header */}
+      <div className="flex h-9 shrink-0 items-center justify-between border-b border-gray-100 px-4">
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+          Block Style
+        </span>
+        <button
+          onClick={onBack}
+          className="text-[11px] text-gray-400 hover:text-gray-700 transition-colors"
+        >
+          ← Blocks
+        </button>
+      </div>
+
+      <div className="flex-1 overflow-auto px-4 py-4 space-y-4">
+
+        {/* Selected block badge */}
+        <div className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2.5">
+          <p className="text-[9px] font-semibold uppercase tracking-wider text-blue-400">
+            Selected
+          </p>
+          <p className="mt-0.5 text-[12px] font-medium capitalize text-blue-800">
+            {BLOCK_LABEL[block.type] ?? block.type}
+          </p>
+        </div>
+
+        {/* Background colour */}
+        <div>
+          <label className="mb-2 block text-[10px] font-medium text-gray-500">
+            Background Colour
+          </label>
+
+          {/* Native colour input + hex field row */}
+          <div className="flex items-center gap-2 rounded-md border border-gray-200 bg-white px-2 py-1.5">
+            <input
+              type="color"
+              value={bg}
+              onChange={(e) => onColorChange(block.id, e.target.value)}
+              className="h-6 w-6 cursor-pointer rounded border-0 bg-transparent p-0"
+            />
+            <input
+              type="text"
+              value={bg}
+              onChange={(e) => {
+                if (/^#[0-9a-fA-F]{0,6}$/.test(e.target.value)) {
+                  onColorChange(block.id, e.target.value)
+                }
+              }}
+              maxLength={7}
+              className="flex-1 text-[12px] text-gray-600 focus:outline-none"
+            />
+            {bg !== '#ffffff' && (
+              <button
+                onClick={() => onColorChange(block.id, '#ffffff')}
+                className="shrink-0 rounded border border-gray-200 px-2 py-0.5 text-[10px] text-gray-400 hover:border-gray-300 hover:text-gray-600 transition-colors"
+              >
+                Reset
+              </button>
+            )}
+          </div>
+
+          {/* Swatch grid */}
+          <div className="mt-3 grid grid-cols-5 gap-1.5">
+            {BG_SWATCHES.map((colour) => (
+              <button
+                key={colour}
+                onClick={() => onColorChange(block.id, colour)}
+                title={colour}
+                className={cn(
+                  'h-8 w-full rounded-md border transition-transform hover:scale-105',
+                  bg === colour ? 'border-blue-400 ring-2 ring-blue-200' : 'border-gray-200',
+                )}
+                style={{ backgroundColor: colour }}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Style Panel ──────────────────────────────────────────────────────────────
 
 function StylePanel() {
@@ -1036,9 +1141,6 @@ export const EmailEditorPanel: React.FC = () => {
                         onClick={() => {
                           setSelectedId(block.id)
                           setInsertState(null)
-                          // Auto-open Content tab so colour picker is immediately visible
-                          setActiveTab('content')
-                          setPanelOpen(true)
                         }}
                       >
                         <BlockContent
@@ -1085,8 +1187,6 @@ export const EmailEditorPanel: React.FC = () => {
                           onMoveDown={() => handleMoveDown(block.id)}
                           onDuplicate={() => handleDuplicate(block.id)}
                           onDelete={() => handleDelete(block.id)}
-                          currentColor={block.backgroundColor ?? '#ffffff'}
-                          onColorChange={(color) => handleBlockColorChange(block.id, color)}
                         />
                       </div>
                     )}
@@ -1109,7 +1209,7 @@ export const EmailEditorPanel: React.FC = () => {
         <FloatingTextToolbar position={textToolbarPosition} />
       </div>
 
-      {/* ── Right: Block Library / Text Edit Panel ────────── */}
+      {/* ── Right Nav: Text Edit → Block Props → Block Library ─ */}
       <aside className="flex w-[300px] shrink-0 flex-col border-l border-gray-200 bg-white">
         {showTextEdit ? (
           <TextEditPanel
@@ -1118,9 +1218,15 @@ export const EmailEditorPanel: React.FC = () => {
               setTextToolbarPosition(undefined)
             }}
           />
+        ) : selectedBlock ? (
+          <BlockPropertiesPanel
+            block={selectedBlock}
+            onColorChange={handleBlockColorChange}
+            onBack={() => setSelectedId(null)}
+          />
         ) : (
           <BlockLibrary
-            selectedBlock={selectedId ? canvasBlocks.find((b) => b.id === selectedId)?.type : undefined}
+            selectedBlock={undefined}
             onBlockSelect={handleAppendInsert}
           />
         )}

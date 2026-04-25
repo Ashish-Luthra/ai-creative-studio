@@ -1,11 +1,9 @@
 interface FloatingActionBarProps {
-  onMoveUp?: () => void;
-  onMoveDown?: () => void;
-  onSaveToFavorites?: () => void;
-  onDuplicate?: () => void;
-  onDelete?: () => void;
-  currentColor?: string;
-  onColorChange?: (color: string) => void;
+  onMoveUp?: () => void
+  onMoveDown?: () => void
+  onSaveToFavorites?: () => void
+  onDuplicate?: () => void
+  onDelete?: () => void
 }
 
 export function FloatingActionBar({
@@ -14,8 +12,6 @@ export function FloatingActionBar({
   onSaveToFavorites,
   onDuplicate,
   onDelete,
-  currentColor = '#ffffff',
-  onColorChange,
 }: FloatingActionBarProps) {
   return (
     <div className="bg-white rounded-lg shadow-lg p-1.5 flex flex-col gap-0.5 shrink-0">
@@ -25,30 +21,7 @@ export function FloatingActionBar({
       <button onClick={onMoveDown} className="w-9 h-9 flex items-center justify-center hover:bg-gray-100 rounded transition-colors" title="Move down">
         <svg width="18" height="18" viewBox="0 0 20 20" fill="none" className="text-gray-600"><path d="M10 5V15M10 15L15 10M10 15L5 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
       </button>
-
       <div className="w-full h-px bg-gray-200 my-0.5" />
-
-      {/* ── Background colour swatch ── */}
-      <label
-        className="w-9 h-9 flex items-center justify-center hover:bg-gray-100 rounded transition-colors cursor-pointer relative"
-        title="Block background colour"
-      >
-        <input
-          type="color"
-          value={currentColor}
-          onChange={(e) => onColorChange?.(e.target.value)}
-          onClick={(e) => e.stopPropagation()}
-          className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
-        />
-        {/* Swatch circle */}
-        <span
-          className="w-5 h-5 rounded-full border-2 border-gray-300 shadow-inner block"
-          style={{ backgroundColor: currentColor }}
-        />
-      </label>
-
-      <div className="w-full h-px bg-gray-200 my-0.5" />
-
       <button onClick={onSaveToFavorites} className="w-9 h-9 flex items-center justify-center hover:bg-gray-100 rounded transition-colors" title="Save to favorites">
         <svg width="18" height="18" viewBox="0 0 20 20" fill="none" className="text-gray-600"><path d="M10 17.5L8.5 16.125C4.5 12.5 2 10.25 2 7.5C2 5.25 3.75 3.5 6 3.5C7.25 3.5 8.45 4.05 10 5.05C11.55 4.05 12.75 3.5 14 3.5C16.25 3.5 18 5.25 18 7.5C18 10.25 15.5 12.5 11.5 16.125L10 17.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" /></svg>
       </button>
