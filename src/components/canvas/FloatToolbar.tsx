@@ -2,9 +2,10 @@
 
 import { type CSSProperties } from 'react'
 import { Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight } from 'lucide-react'
+import { GOOGLE_FONT_FAMILIES } from '@/lib/canvas/googleFonts'
+import { DEFAULT_TEXT_FONT_FAMILY, DEFAULT_TEXT_FONT_SIZE } from '@/lib/canvas/canvasDefaults'
 import { cn } from '@/lib/utils'
-
-const BRAND_COLORS = ['#111827', '#2563EB', '#7C3AED', '#16A34A', '#DC2626', '#D97706']
+import { FontColorPicker } from './FontColorPicker'
 
 export interface FloatToolbarProps {
   /** Position of the toolbar in canvas-relative coordinates */
@@ -28,8 +29,8 @@ export interface FloatToolbarProps {
 
 export const FloatToolbar: React.FC<FloatToolbarProps> = ({
   position,
-  fontFamily = 'Inter',
-  fontSize = 16,
+  fontFamily = DEFAULT_TEXT_FONT_FAMILY,
+  fontSize = DEFAULT_TEXT_FONT_SIZE,
   isBold = false,
   isItalic = false,
   isUnderline = false,
@@ -70,8 +71,10 @@ export const FloatToolbar: React.FC<FloatToolbarProps> = ({
         onChange={(e) => onFontChange?.(e.target.value)}
         className="min-w-[82px] rounded-[5px] border border-gray-200 bg-gray-50 px-1.5 py-1 text-[11px] font-medium text-gray-700 outline-none"
       >
-        {['Inter', 'Helvetica', 'Georgia', 'Playfair Display', 'Space Grotesk'].map((f) => (
-          <option key={f}>{f}</option>
+        {GOOGLE_FONT_FAMILIES.map((f) => (
+          <option key={f} value={f}>
+            {f}
+          </option>
         ))}
       </select>
 
@@ -115,19 +118,7 @@ export const FloatToolbar: React.FC<FloatToolbarProps> = ({
 
       <Sep />
 
-      {/* Color swatches */}
-      {BRAND_COLORS.map((hex) => (
-        <button
-          key={hex}
-          title={hex}
-          onClick={() => onColorChange?.(hex)}
-          style={{ background: hex }}
-          className={cn(
-            'h-[17px] w-[17px] rounded-[4px] border transition-transform hover:scale-110',
-            color === hex ? 'border-blue-500 ring-1 ring-blue-500' : 'border-black/10'
-          )}
-        />
-      ))}
+      <FontColorPicker color={color} onColorChange={(c) => onColorChange?.(c)} />
 
       <Sep />
 

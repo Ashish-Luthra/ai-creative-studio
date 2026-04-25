@@ -2,6 +2,11 @@
 // Always import Fabric dynamically (client-side only, never SSR).
 
 import type { Canvas, FabricObject } from 'fabric'
+import {
+  DEFAULT_TEXT_FONT_FAMILY,
+  DEFAULT_TEXT_FONT_SIZE,
+  DEFAULT_TEXT_FONT_WEIGHT,
+} from '@/lib/canvas/canvasDefaults'
 import type { CreativePreset } from './presets'
 
 // Tracks live Canvas instances by their host element so we can dispose before reinit.
@@ -220,11 +225,11 @@ export async function seedDefaultCreative(
     left: fx + 28,
     top: fy + FRAME_H - 110,
     width: FRAME_W - 56,
-    fontFamily: 'Georgia',
-    fontSize: 40,
+    fontFamily: DEFAULT_TEXT_FONT_FAMILY,
+    fontSize: DEFAULT_TEXT_FONT_SIZE,
     fill: '#FFFFFF',
     textAlign: 'center',
-    fontWeight: 'bold',
+    fontWeight: DEFAULT_TEXT_FONT_WEIGHT,
     shadow: new Shadow({ color: 'rgba(0,0,0,0.55)', blur: 10, offsetX: 0, offsetY: 2 }),
     editable: true,
     selectable: true,
@@ -242,9 +247,9 @@ export async function addTextLayer(canvas: Canvas, text = 'Headline text') {
     left: canvas.getWidth() * 0.25,
     top: canvas.getHeight() * 0.2,
     width: canvas.getWidth() * 0.5,
-    fontFamily: 'Inter',
-    fontSize: 48,
-    fontWeight: 'bold',
+    fontFamily: DEFAULT_TEXT_FONT_FAMILY,
+    fontSize: DEFAULT_TEXT_FONT_SIZE,
+    fontWeight: DEFAULT_TEXT_FONT_WEIGHT,
     fill: '#FFFFFF',
     textAlign: 'center',
     shadow: new Shadow({ color: 'rgba(0,0,0,0.45)', blur: 8, offsetX: 0, offsetY: 1 }),

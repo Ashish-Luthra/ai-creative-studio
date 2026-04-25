@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { Canvas, FabricObject } from 'fabric'
+import { DEFAULT_CANVAS_ZOOM } from '@/lib/canvas/canvasDefaults'
 
 export type CanvasMode = 'canvas' | 'email' | 'feeds'
 
@@ -27,7 +28,7 @@ interface CanvasState {
 export const useCanvasStore = create<CanvasState>((set, get) => ({
   mode: 'canvas',
   selectedLayer: null,
-  zoom: 1,
+  zoom: DEFAULT_CANVAS_ZOOM,
   undoStack: [],
   redoStack: [],
   fabricCanvas: null,

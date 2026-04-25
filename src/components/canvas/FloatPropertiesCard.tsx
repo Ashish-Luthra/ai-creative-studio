@@ -2,6 +2,7 @@
 
 import type { FabricObject } from 'fabric'
 import { Sparkles } from 'lucide-react'
+import { DEFAULT_TEXT_FONT_FAMILY, DEFAULT_TEXT_FONT_SIZE } from '@/lib/canvas/canvasDefaults'
 import { cn } from '@/lib/utils'
 
 const SWATCHES = ['#111827', '#2563EB', '#7C3AED', '#DC2626', '#16A34A', '#D97706']
@@ -20,8 +21,8 @@ export const FloatPropertiesCard: React.FC<FloatPropertiesCardProps> = ({
 }) => {
   // Extract properties from the Fabric object (best-effort — works for IText/Textbox)
   const obj = selectedLayer as unknown as Record<string, unknown>
-  const fontFamily  = (obj.fontFamily  as string)  ?? 'Inter'
-  const fontSize    = (obj.fontSize    as number)   ?? 16
+  const fontFamily  = (obj.fontFamily  as string)  ?? DEFAULT_TEXT_FONT_FAMILY
+  const fontSize    = (obj.fontSize    as number)   ?? DEFAULT_TEXT_FONT_SIZE
   const fontWeight  = (obj.fontWeight  as string | number) ?? 400
   const lineHeight  = (obj.lineHeight  as number)   ?? 1.2
   const fill        = (obj.fill        as string)   ?? '#111827'

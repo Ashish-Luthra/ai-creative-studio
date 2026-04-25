@@ -12,6 +12,11 @@ import {
   replaceOrAddImageLayer,
   seedDefaultCreative,
 } from '@/lib/canvas/fabricInit'
+import {
+  DEFAULT_CANVAS_ZOOM,
+  DEFAULT_TEXT_FONT_FAMILY,
+  DEFAULT_TEXT_FONT_SIZE,
+} from '@/lib/canvas/canvasDefaults'
 import { CREATIVE_PRESETS, getPresetById, isPresetId, type CreativePreset } from '@/lib/canvas/presets'
 import { TopBar } from './TopBar'
 import { ToolbarLeft, type RailTool } from './ToolbarLeft'
@@ -46,9 +51,9 @@ interface CampaignMeta {
 }
 
 const DEFAULT_TB: TbState = {
-  fontFamily: 'Georgia',
-  fontSize: 40,
-  isBold: true,
+  fontFamily: DEFAULT_TEXT_FONT_FAMILY,
+  fontSize: DEFAULT_TEXT_FONT_SIZE,
+  isBold: false,
   isItalic: false,
   isUnderline: false,
   textAlign: 'center',
@@ -182,8 +187,8 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
     const t = obj as any
     if (t.text !== undefined) {
       setTbState({
-        fontFamily: t.fontFamily ?? 'Georgia',
-        fontSize: typeof t.fontSize === 'number' ? t.fontSize : 40,
+        fontFamily: t.fontFamily ?? DEFAULT_TEXT_FONT_FAMILY,
+        fontSize: typeof t.fontSize === 'number' ? t.fontSize : DEFAULT_TEXT_FONT_SIZE,
         isBold: t.fontWeight === 'bold' || t.fontWeight === 700,
         isItalic: t.fontStyle === 'italic',
         isUnderline: !!t.underline,
@@ -430,7 +435,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
   }, [zoom, setZoom])
 
   const handleZoomReset = useCallback(() => {
-    setZoom(1)
+    setZoom(DEFAULT_CANVAS_ZOOM)
   }, [setZoom])
 
   const handleSelectAll = useCallback(async () => {
