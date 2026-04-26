@@ -736,6 +736,7 @@ function BlockContent({
   letterSpacing,
   // Image settings
   imageShape,
+  onButtonAreaClick,
 }: {
   type: string
   backgroundColor?: string
@@ -761,6 +762,8 @@ function BlockContent({
   lineHeight?: number
   letterSpacing?: number
   imageShape?: string
+  /** Separate handler for button elements so they route to the Button tab, not Font tab */
+  onButtonAreaClick?: (e: React.MouseEvent) => void
 }) {
   // ── Button style derivation ──────────────────────────────────────────────────
   const BTN_SHAPES = [
@@ -816,6 +819,15 @@ function BlockContent({
     onClick: onTextClick,
     className:
       'outline-none cursor-text border-2 border-transparent hover:border-blue-200 rounded px-1 transition-colors',
+  }
+
+  // Used for the CTA button element inside layout blocks — same contentEditable
+  // behaviour but routes to the Button tab instead of the Font tab in the right nav.
+  const buttonEditable = {
+    contentEditable: true as const,
+    suppressContentEditableWarning: true,
+    onClick: onButtonAreaClick ?? onTextClick,
+    className: editable.className,
   }
 
   // Inline bg style — overrides Tailwind bg-* classes on the outermost element
@@ -979,7 +991,7 @@ function BlockContent({
           </h2>
           <div className="h-px w-16 bg-gray-400" />
           <div style={{ display: 'flex', justifyContent: btnJustify }}>
-            <div {...editable} style={btnStyle} className={`${editable.className} px-6 py-2 text-xs font-semibold tracking-widest`}>
+            <div {...buttonEditable} style={btnStyle} className={`${buttonEditable.className} px-6 py-2 text-xs font-semibold tracking-widest`}>
               SEE IT
             </div>
           </div>
@@ -1003,7 +1015,7 @@ function BlockContent({
           </p>
           <div className="mt-4" style={{ display: 'flex', alignItems: 'center', justifyContent: btnJustify, gap: 12 }}>
             <span className="text-sm text-gray-400">001</span>
-            <div {...editable} style={btnStyle} className={`${editable.className} px-6 py-2 text-xs font-semibold tracking-widest`}>
+            <div {...buttonEditable} style={btnStyle} className={`${buttonEditable.className} px-6 py-2 text-xs font-semibold tracking-widest`}>
               READ IT
             </div>
           </div>
@@ -1022,7 +1034,7 @@ function BlockContent({
           </h3>
           <div className="mx-auto mt-4 h-px w-16 bg-black" />
           <div className="mt-6" style={{ display: 'flex', justifyContent: btnJustify }}>
-            <div {...editable} style={btnStyle} className={`${editable.className} px-8 py-2.5 text-xs font-semibold tracking-widest`}>
+            <div {...buttonEditable} style={btnStyle} className={`${buttonEditable.className} px-8 py-2.5 text-xs font-semibold tracking-widest`}>
               CLAIM GIFT
             </div>
           </div>
@@ -1046,7 +1058,7 @@ function BlockContent({
             WEL—COME
           </h3>
           <div style={{ display: 'flex', justifyContent: btnJustify }}>
-            <div {...editable} style={btnStyle} className={`${editable.className} px-6 py-2 text-xs font-semibold tracking-widest`}>
+            <div {...buttonEditable} style={btnStyle} className={`${buttonEditable.className} px-6 py-2 text-xs font-semibold tracking-widest`}>
               EXPLORE
             </div>
           </div>
@@ -1084,7 +1096,7 @@ function BlockContent({
             A warming recipe perfect for fall evenings.
           </p>
           <div style={{ display: 'flex', justifyContent: btnJustify }}>
-            <div {...editable} style={btnStyle} className={`${editable.className} px-6 py-2 text-xs font-semibold tracking-widest`}>
+            <div {...buttonEditable} style={btnStyle} className={`${buttonEditable.className} px-6 py-2 text-xs font-semibold tracking-widest`}>
               GET RECIPE
             </div>
           </div>
@@ -1111,7 +1123,7 @@ function BlockContent({
             for the next 24 hours only.
           </p>
           <div className="mt-6" style={{ display: 'flex', justifyContent: btnJustify }}>
-            <div {...editable} style={btnStyle} className={`${editable.className} px-8 py-2.5 text-xs font-semibold tracking-widest`}>
+            <div {...buttonEditable} style={btnStyle} className={`${buttonEditable.className} px-8 py-2.5 text-xs font-semibold tracking-widest`}>
               BOOK NOW
             </div>
           </div>
@@ -1167,6 +1179,8 @@ export const EmailEditorPanel: React.FC = () => {
   const [textToolbarPosition, setTextToolbarPosition] = useState<{ top: number; left: number } | undefined>()
   const [showApprovedImages, setShowApprovedImages] = useState(false)
   const [pendingImageTarget, setPendingImageTarget] = useState<{ blockId: string; imageKey: string } | null>(null)
+  // Signals EmailRightNav which tab to activate when a specific element is clicked
+  const [focusTab, setFocusTab] = useState<{ tab: string; seq: number } | undefined>()
 
   const { document: doc, previewMode, setPreviewMode } = useEmailStore()
 
@@ -1260,9 +1274,15 @@ export const EmailEditorPanel: React.FC = () => {
 
   const handleTextClick = useCallback((e: React.MouseEvent) => {
     // Do NOT stopPropagation — let the click bubble up to the block wrapper
-    // so the block gets selected and EmailRightNav (Button/Font tabs) stays visible.
+    // so the block gets selected and EmailRightNav stays visible.
     setTextToolbarPosition({ top: e.clientY - 50, left: e.clientX - 60 })
     setShowTextEdit(true)
+    setFocusTab((prev) => ({ tab: 'font', seq: (prev?.seq ?? 0) + 1 }))
+  }, [])
+
+  // Clicking the styled button element inside a layout block → show Button tab
+  const handleButtonAreaClick = useCallback(() => {
+    setFocusTab((prev) => ({ tab: 'button', seq: (prev?.seq ?? 0) + 1 }))
   }, [])
 
   const handleCanvasClick = useCallback(() => {
@@ -1465,6 +1485,7 @@ export const EmailEditorPanel: React.FC = () => {
                         lineHeight={block.lineHeight}
                         letterSpacing={block.letterSpacing}
                         imageShape={block.imageShape}
+                        onButtonAreaClick={handleButtonAreaClick}
                       />
                     </div>
 
@@ -1542,6 +1563,7 @@ export const EmailEditorPanel: React.FC = () => {
             onOpenImagePicker={handleOpenImagePicker}
             onImageUpload={handleDirectImageUpload}
             onBack={() => setSelectedId(null)}
+            focusTab={focusTab}
           />
         ) : (
           <BlockLibrary

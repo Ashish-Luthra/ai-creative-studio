@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import {
   ChevronDown, Upload,
   Bold, Italic, Underline,
@@ -43,12 +43,10 @@ function getTabsForBlock(blockType: string): { id: RightTab; label: string }[] {
   const hasShape  = IMAGE_BLOCK_TYPES.has(blockType)
   const hasButton = BUTTON_LAYOUT_TYPES.has(blockType)
 
-  // Layout with shape-image AND button (e.g. recipe-card)
-  if (hasShape && hasButton) return [B, I, L, K]
-  // Layout with shape-image only (e.g. testimonial)
-  if (hasShape)              return [I, L, K]
-  // Layout with button only (full-bleed image blocks + centered-content)
-  if (hasButton)             return [B, L, K]
+  // All layout blocks include a Font tab since they contain editable text
+  if (hasShape && hasButton) return [B, I, F, L, K]   // recipe-card
+  if (hasShape)              return [I, F, L, K]       // testimonial
+  if (hasButton)             return [B, F, L, K]       // all other layout blocks with buttons
 
   return [K, L]
 }
@@ -636,9 +634,15 @@ export interface EmailRightNavProps {
   /** Called when the user uploads an image directly from their computer via the Image tab */
   onImageUpload: (blockId: string, imageKey: string, src: string) => void
   onBack: () => void
+  /**
+   * Imperative tab-focus signal from the canvas.
+   * `seq` increments on every click so the effect always fires, even if
+   * the same tab is requested twice in a row.
+   */
+  focusTab?: { tab: string; seq: number }
 }
 
-export function EmailRightNav({ block, onPatch, onOpenImagePicker, onImageUpload, onBack }: EmailRightNavProps) {
+export function EmailRightNav({ block, onPatch, onOpenImagePicker, onImageUpload, onBack, focusTab }: EmailRightNavProps) {
   const tabs = getTabsForBlock(block.type)
   const [activeTab, setActiveTab] = useState<RightTab>(tabs[0].id)
 
@@ -646,6 +650,14 @@ export function EmailRightNav({ block, onPatch, onOpenImagePicker, onImageUpload
     (p: Partial<CanvasBlock>) => onPatch(block.id, p),
     [block.id, onPatch],
   )
+
+  // Switch to the tab requested by a canvas click (text → font, button → button)
+  useEffect(() => {
+    if (!focusTab?.tab) return
+    const found = tabs.find((t) => t.id === focusTab.tab)
+    if (found) setActiveTab(found.id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusTab?.seq])
 
   // If block type changes (e.g. user selects different block), resolve tab
   const resolvedTab = tabs.some((t) => t.id === activeTab) ? activeTab : tabs[0].id
