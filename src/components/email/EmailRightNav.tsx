@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import {
   ChevronDown, Upload,
   Bold, Italic, Underline,
@@ -75,6 +75,20 @@ const IMAGE_SHAPES: { id: CanvasBlock['imageShape']; path: string }[] = [
 
 const FONT_OPTIONS = ['Arial', 'Georgia', 'Helvetica', 'Tahoma', 'Trebuchet MS', 'Verdana', 'Times New Roman']
 
+// ─── Preset soft-colour palette (matches ColorPickerPopup) ────────────────────
+const PRESET_COLORS = [
+  // Row 1 — warm neutrals + slate
+  '#D4B5A7','#B07B7B','#F5E6E8','#C9A89C','#E8D5C4','#C9C5A3','#A8A67E','#8FA095','#9EA5A3','#B8CDE0','#000814',
+  // Row 2 — blush + sage + sky
+  '#E8BBA8','#D4A5A5','#E8D5C4','#D4B5A7','#F5D5C4','#C9D5C4','#7FBC8C','#A8C9C5','#B8CDE0','#D5E0C9','#3D4149',
+  // Row 3 — terracotta + teal + lime
+  '#E87B5C','#C96B5C','#F5A5A5','#E85C7B','#C96B5C','#E89C5C','#5FBC8C','#A8D5C9','#C9E0D5','#E0E8C9','#5A5D66',
+  // Row 4 — deep reds + greens + blues
+  '#BC4B3C','#7B3D3D','#C97B8C','#BC3D5C','#E87B5C','#E8A85C','#8FD5A8','#A8C9B8','#C9D5C4','#E0E8D5','#1A3D3D',
+  // Row 5 — wine + cobalt + cool grays
+  '#8C3D3D','#C9A89C','#C97B9C','#BC5C7B','#E8A87B','#5FBC8C','#7BA8A8','#7BB8D5','#0047AB','#A8B8C9','#8899AA',
+]
+
 const LINK_ACTIONS = [
   'Add to segment',
   'Remove from segment',
@@ -96,18 +110,97 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 function ColorSwatch({
   label, value, onChange,
 }: { label: string; value: string; onChange: (v: string) => void }) {
+  const [open, setOpen] = useState(false)
+  const [hex, setHex] = useState(value)
+  const panelRef = useRef<HTMLDivElement>(null)
+
+  // Keep local hex in sync when value changes externally
+  useEffect(() => { setHex(value) }, [value])
+
+  // Close panel on outside click
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: MouseEvent) => {
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
+
   return (
-    <div className="flex flex-col items-start gap-2">
-      <p className="text-[11px] font-medium text-gray-700">{label}</p>
-      <label className="relative flex h-11 w-11 cursor-pointer items-center justify-center overflow-hidden rounded-full border-2 border-gray-200 shadow-sm">
-        <div className="absolute inset-0 rounded-full" style={{ backgroundColor: value }} />
-        <input
-          type="color"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="absolute inset-0 cursor-pointer opacity-0"
-        />
-      </label>
+    <div className="relative flex flex-col items-start gap-2" ref={panelRef}>
+      {label && <p className="text-[11px] font-medium text-gray-700">{label}</p>}
+
+      {/* Swatch circle — click to toggle panel */}
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full border-2 border-gray-200 shadow-sm transition-transform hover:scale-105"
+        style={{ backgroundColor: value }}
+        title={value}
+      />
+
+      {/* Dropdown panel */}
+      {open && (
+        <div className="absolute left-0 top-[52px] z-50 w-[268px] rounded-2xl border border-gray-200 bg-white p-3 shadow-2xl">
+          {/* Preset palette grid */}
+          <p className="mb-2 text-[9px] font-semibold uppercase tracking-wider text-gray-400">Palette</p>
+          <div className="grid grid-cols-11 gap-1 mb-3">
+            {PRESET_COLORS.map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => { onChange(c); setHex(c); setOpen(false) }}
+                title={c}
+                className={cn(
+                  'h-5 w-5 rounded-full border-2 transition-all hover:scale-110',
+                  value === c ? 'border-blue-500 scale-110' : 'border-transparent hover:border-blue-300',
+                )}
+                style={{ backgroundColor: c }}
+              />
+            ))}
+          </div>
+
+          {/* Divider */}
+          <div className="mb-3 h-px bg-gray-100" />
+
+          {/* Native colour picker + hex input */}
+          <p className="mb-2 text-[9px] font-semibold uppercase tracking-wider text-gray-400">Custom</p>
+          <div className="flex items-center gap-2 rounded-xl border border-gray-200 px-2.5 py-2">
+            {/* Native colour wheel */}
+            <label className="relative flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-full border border-gray-200">
+              <div className="absolute inset-0 rounded-full" style={{ backgroundColor: value }} />
+              <input
+                type="color"
+                value={value}
+                onChange={(e) => { onChange(e.target.value); setHex(e.target.value) }}
+                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+              />
+            </label>
+            {/* Hex field */}
+            <input
+              type="text"
+              value={hex}
+              onChange={(e) => {
+                setHex(e.target.value)
+                if (/^#[0-9a-fA-F]{6}$/.test(e.target.value)) onChange(e.target.value)
+              }}
+              maxLength={7}
+              placeholder="#000000"
+              className="flex-1 font-mono text-[12px] text-gray-700 focus:outline-none"
+            />
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              className="shrink-0 text-[14px] leading-none text-gray-400 hover:text-gray-700"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -144,33 +237,24 @@ function BlockTab({ block, onPatch }: { block: CanvasBlock; onPatch: (p: Partial
       {/* Background */}
       <div>
         <SectionLabel>Background</SectionLabel>
-        <div className="flex items-center gap-2 rounded-xl border border-gray-200 px-3 py-2.5">
-          <label className="relative flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-full border border-gray-200">
-            <div className="absolute inset-0 rounded-full" style={{ backgroundColor: bg }} />
-            <input
-              type="color"
-              value={bg}
-              onChange={(e) => onPatch({ backgroundColor: e.target.value })}
-              className="absolute inset-0 cursor-pointer opacity-0"
-            />
-          </label>
-          <input
-            type="text"
+        <div className="flex items-center gap-3">
+          <ColorSwatch
+            label=""
             value={bg}
-            onChange={(e) => {
-              if (/^#[0-9a-fA-F]{0,6}$/.test(e.target.value)) onPatch({ backgroundColor: e.target.value })
-            }}
-            maxLength={7}
-            className="flex-1 text-[12px] text-gray-600 focus:outline-none"
+            onChange={(v) => onPatch({ backgroundColor: v })}
           />
-          {bg !== '#ffffff' && (
-            <button
-              onClick={() => onPatch({ backgroundColor: '#ffffff' })}
-              className="shrink-0 text-[10px] text-gray-400 hover:text-gray-600 transition-colors"
-            >
-              Reset
-            </button>
-          )}
+          <div className="flex flex-1 flex-col gap-1">
+            <span className="font-mono text-[12px] text-gray-500">{bg}</span>
+            {bg !== '#ffffff' && (
+              <button
+                type="button"
+                onClick={() => onPatch({ backgroundColor: '#ffffff' })}
+                className="w-fit text-[10px] text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                Reset to white
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -232,7 +316,7 @@ function FontTab({ block, onPatch }: { block: CanvasBlock; onPatch: (p: Partial<
           </div>
         </div>
         <ColorSwatch
-          label="Color"
+          label="Font Color"
           value={block.fontColor ?? '#111827'}
           onChange={(v) => onPatch({ fontColor: v })}
         />
