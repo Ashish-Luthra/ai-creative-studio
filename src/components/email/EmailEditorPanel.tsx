@@ -1054,7 +1054,8 @@ function BlockContent({
           src={imageSrcs['main'] ?? 'https://images.unsplash.com/photo-1547592166-23ac45744acd?w=400&h=400&fit=crop'}
           alt="Recipe"
           height={imageSizes['main'] ?? 240}
-          className="w-1/2 rounded"
+          className="w-1/2"
+          style={imgClip}
           onDoubleClick={() => onImageDoubleClick('main')}
           onResize={(h) => onImageResize('main', h)}
         />
