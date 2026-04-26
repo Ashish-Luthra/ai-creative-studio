@@ -20,7 +20,6 @@ import { TopBar } from './TopBar'
 import { ToolbarLeft, type RailTool } from './ToolbarLeft'
 import { AgentPill } from './AgentPill'
 import { FloatToolbar } from './FloatToolbar'
-import { FloatPropertiesCard } from './FloatPropertiesCard'
 import { EmailEditorPanel } from '@/components/email/EmailEditorPanel'
 import { ApprovedImagesPanel } from './ApprovedImagesPanel'
 import { RightStudioPanel } from './RightStudioPanel'
@@ -99,9 +98,9 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
   const [variants, setVariants] = useState<CanvasVariant[]>([])
   const [campaign, setCampaign] = useState<CampaignMeta>({
     briefId,
-    name: 'Creative Campaign',
+    name: 'Untitled',
     updatedAt: null,
-    activePresetId: 'instagram-4-5',
+    activePresetId: 'instagram-1-1',
   })
   const [recentCampaigns, setRecentCampaigns] = useState<CampaignMeta[]>([])
 
@@ -133,6 +132,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
   const generatedKey = `${storageKey}:generated-presets`
   const variantsKey = `${storageKey}:variants`
   const campaignKey = `${storageKey}:campaign`
+  const savedFlagKey = `${storageKey}:saved`
   const recentCampaignsKey = 'creative-canvas:recent-campaigns'
 
   const saveSnapshot = useCallback(() => {
@@ -293,7 +293,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
         if (!creativeId) return
         const data = (target as FabricObject & { data?: { kind?: string } }).data
         const handMode = activeToolRef.current === 'hand'
-        const directMoveEnabled = data?.kind === 'creative-image' || data?.kind === 'creative-frame'
+        const directMoveEnabled = data?.kind === 'creative-frame' || data?.moveHandle === true
         if (!handMode && !directMoveEnabled) return
 
         if (process.env.NODE_ENV !== 'production') {
@@ -320,7 +320,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
 
         const data = (target as FabricObject & { data?: { kind?: string } }).data
         const handMode = activeToolRef.current === 'hand'
-        const directMoveEnabled = data?.kind === 'creative-image' || data?.kind === 'creative-frame'
+        const directMoveEnabled = data?.kind === 'creative-frame' || data?.moveHandle === true
         if (!handMode && !directMoveEnabled) return
 
         if (groupMoveRef.current.creativeId !== creativeId) {
@@ -368,13 +368,11 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
         setActiveTool('media')
         setShowApprovedImages(true)
       })
-
       const storedPresetId = localStorage.getItem(presetStorageKey)
       const resolvedPresetId =
         (initialPresetId && isPresetId(initialPresetId) ? initialPresetId : null)
         ?? storedPresetId
         ?? selectedPresetId
-      const initialPreset = getPresetById(resolvedPresetId)
       setSelectedPresetId(resolvedPresetId)
       localStorage.setItem(presetStorageKey, resolvedPresetId)
 
@@ -397,7 +395,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
       } else {
         const initialCampaign: CampaignMeta = {
           briefId,
-          name: `Campaign ${briefId}`,
+          name: 'Untitled',
           updatedAt: new Date().toLocaleString(),
           activePresetId: resolvedPresetId,
         }
@@ -411,7 +409,8 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
       }
 
       const savedJson = localStorage.getItem(storageKey)
-      if (savedJson) {
+      const hasSavedSnapshot = localStorage.getItem(savedFlagKey) === '1'
+      if (savedJson && hasSavedSnapshot) {
         restoringRef.current = true
         try {
           if (cancelled || fabricRef.current !== c) return
@@ -431,17 +430,12 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
         } catch (err) {
           console.warn('[CanvasEditor] Failed to restore draft from localStorage — starting fresh.', err)
           localStorage.removeItem(storageKey)
-          if (!cancelled && fabricRef.current === c) {
-            await seedDefaultCreative(c, '/CoffeeInsta.png', 'Enjoy Coffee', initialPreset)
-            ensureCreativeMetadata(c)
-            c.renderAll()
-          }
+          if (!cancelled && fabricRef.current === c) c.renderAll()
         } finally {
           restoringRef.current = false
         }
-      } else if (!cancelled && fabricRef.current === c) {
-        await seedDefaultCreative(c, '/CoffeeInsta.png', 'Enjoy Coffee', initialPreset)
-        ensureCreativeMetadata(c)
+      } else {
+        localStorage.removeItem(storageKey)
       }
 
       if (cancelled || fabricRef.current !== c) return
@@ -461,7 +455,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [briefId, campaignKey, generatedKey, initialPresetId, mode, recentCampaignsKey, resetHistory, saveSnapshot, selectedPresetId, setSelectedPresetId, storageKey, presetStorageKey, setSelectedLayer, setFabricCanvas, syncPos, syncToolbar, variantsKey])
+  }, [briefId, campaignKey, generatedKey, initialPresetId, mode, recentCampaignsKey, resetHistory, saveSnapshot, selectedPresetId, setSelectedPresetId, storageKey, presetStorageKey, savedFlagKey, setSelectedLayer, setFabricCanvas, syncPos, syncToolbar, variantsKey])
 
   // ── Delete selected object on Delete / Backspace ──────────
   // Only fires when mode==='canvas', an object is selected, and the
@@ -523,6 +517,17 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
     canvas.renderAll()
   }, [mode, zoom, setZoom])
 
+  // Guard against stale selection references when canvas objects are cleared/replaced.
+  useEffect(() => {
+    if (mode !== 'canvas') return
+    const canvas = fabricRef.current
+    if (!canvas || !selectedLayer) return
+    const stillPresent = canvas.getObjects().includes(selectedLayer)
+    if (!stillPresent) {
+      setSelectedLayer(null)
+    }
+  }, [mode, selectedLayer, setSelectedLayer])
+
   const handleZoomIn = useCallback(() => {
     setZoom(Math.min(ZOOM_MAX, zoom + ZOOM_STEP))
   }, [zoom, setZoom])
@@ -545,31 +550,43 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
     link.click()
   }, [briefId, selectedPresetId])
 
+  const handleSaveCanvas = useCallback(() => {
+    saveSnapshot()
+    localStorage.setItem(savedFlagKey, '1')
+    updateCampaignMeta()
+  }, [saveSnapshot, savedFlagKey, updateCampaignMeta])
+
+  const handleClearCanvas = useCallback(() => {
+    const canvas = fabricRef.current
+    if (!canvas) return
+    restoringRef.current = true
+    try {
+      canvas.clear()
+      setSelectedLayer(null)
+      localStorage.removeItem(savedFlagKey)
+      resetHistory()
+      saveSnapshot()
+    } finally {
+      restoringRef.current = false
+    }
+  }, [resetHistory, saveSnapshot, savedFlagKey, setSelectedLayer])
+
   const handlePresetChange = useCallback(async (presetId: string) => {
     const canvas = fabricRef.current
     if (!canvas) return
     setSelectedPresetId(presetId)
     localStorage.setItem(presetStorageKey, presetId)
-    const creativeFrameCount = canvas
-      .getObjects()
-      .filter((obj) => (obj as { data?: { kind?: string } }).data?.kind === 'creative-frame')
-      .length
-    const { copyText, imageUrl } = extractCreativeInputs()
 
     restoringRef.current = true
     try {
-      if (creativeFrameCount <= 1) {
-        canvas.clear()
-      }
-      await seedDefaultCreative(canvas, imageUrl, copyText, getPresetById(presetId))
+      canvas.clear()
+      await addBlankCreativeFrame(canvas, { preset: getPresetById(presetId) })
       ensureCreativeMetadata(canvas)
       canvas.renderAll()
     } finally {
       restoringRef.current = false
     }
-    if (creativeFrameCount <= 1) {
-      resetHistory()
-    }
+    resetHistory()
     saveSnapshot()
     setGeneratedPresetIds((prev) => {
       const next = Array.from(new Set([...prev, presetId]))
@@ -577,7 +594,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
       return next
     })
     updateCampaignMeta({ activePresetId: presetId })
-  }, [extractCreativeInputs, generatedKey, presetStorageKey, resetHistory, saveSnapshot, setSelectedPresetId, updateCampaignMeta])
+  }, [generatedKey, presetStorageKey, resetHistory, saveSnapshot, setSelectedPresetId, updateCampaignMeta])
 
   const handleReplicateToAll = useCallback(async () => {
     const canvas = fabricRef.current
@@ -653,10 +670,12 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
     restoringRef.current = true
     try {
       await addBlankCreativeFrame(canvas, {
-        left: base + nextOffset,
-        top: base + nextOffset,
-        width: size,
-        height: size,
+        frameBounds: {
+          left: base + nextOffset,
+          top: base + nextOffset,
+          width: size,
+          height: size,
+        },
       })
       ensureCreativeMetadata(canvas)
       canvas.renderAll()
@@ -844,7 +863,9 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-[#FDFDFD]">
       <TopBar
-        onExport={handleCanvasExport}
+        fileName={campaign.name || 'Untitled'}
+        onSave={handleSaveCanvas}
+        onClear={handleClearCanvas}
         zoomPercent={Math.round(zoom * 100)}
         onZoomIn={handleZoomIn}
         onZoomOut={handleZoomOut}
@@ -858,9 +879,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
           ref={containerRef}
           className="relative flex-1 overflow-hidden"
           style={{
-            backgroundColor: '#FDFDFD',
-            backgroundImage: 'radial-gradient(circle, #E5E7EB 1px, transparent 1px)',
-            backgroundSize: '24px 24px',
+            backgroundColor: '#F5F5F5',
           }}
         >
           {/* Always in DOM — Fabric owns the wrapper div, removing it causes removeChild errors */}
@@ -977,11 +996,6 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
               onSaveCrop={handleSaveImageCrop}
               cropPending={imageCropPending}
             />
-          )}
-
-          {/* Properties card — shown for any selected layer */}
-          {mode === 'canvas' && selectedLayer && (
-            <FloatPropertiesCard selectedLayer={selectedLayer} />
           )}
 
           {mode !== 'feeds' && (

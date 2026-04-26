@@ -24,6 +24,7 @@ interface CreativeData {
   role: CreativeRole
   frame?: CreativeFrame
   cropPending?: boolean
+  moveHandle?: boolean
 }
 
 interface CreativeFrameBounds {
@@ -31,6 +32,11 @@ interface CreativeFrameBounds {
   top: number
   width: number
   height: number
+}
+
+interface BlankCreativeFrameOptions {
+  frameBounds?: CreativeFrameBounds
+  preset?: CreativePreset
 }
 
 export interface FabricInitOptions {
@@ -42,7 +48,6 @@ export interface FabricInitOptions {
 }
 
 const createCreativeId = () => `creative-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
-const BLANK_PIXEL_DATA_URL = 'data:image/gif;base64,R0lGODlhAQABAAAAACwAAAAAAQABAAA='
 
 const asCreativeData = (obj?: FabricObject | null): CreativeData | undefined => {
   if (!obj) return undefined
@@ -163,7 +168,7 @@ export async function initFabricCanvas({
   const canvas = new FabricCanvas(canvasEl, {
     width,
     height,
-    backgroundColor: '#FDFDFD',
+    backgroundColor: '#F5F5F5',
     selection: true,
     preserveObjectStacking: true,
   })
@@ -267,17 +272,17 @@ export async function seedDefaultCreative(
 
   const { width: FRAME_W, height: FRAME_H, left: fx, top: fy } = frameBounds ?? getFrameBounds(canvas, preset)
   const creativeId = createCreativeId()
-  const frameState: CreativeFrame = { left: fx, top: fy, width: FRAME_W, height: FRAME_H, rx: 12, ry: 12 }
+  const frameState: CreativeFrame = { left: fx, top: fy, width: FRAME_W, height: FRAME_H, rx: 0, ry: 0 }
 
-  // ── Background frame (rounded rect) ─────────────────────
+  // ── Background frame (square light-gray frame) ──────────
   const frame = new Rect({
     left: fx,
     top: fy,
     width: FRAME_W,
     height: FRAME_H,
-    rx: 12,
-    ry: 12,
-    fill: '#1a1a2e',
+    rx: 0,
+    ry: 0,
+    fill: '#D1D5DB',
     selectable: false,
     evented: false,
     hoverCursor: 'default',
@@ -298,8 +303,8 @@ export async function seedDefaultCreative(
       top: fy,
       width: FRAME_W,
       height: FRAME_H,
-      rx: 12,
-      ry: 12,
+      rx: 0,
+      ry: 0,
       absolutePositioned: true,
     })
     img.clipPath = clip
@@ -358,8 +363,8 @@ export async function seedDefaultCreative(
       top: fy + FRAME_H * 0.55,
       width: FRAME_W,
       height: FRAME_H * 0.45,
-      rx: 12,
-      ry: 12,
+      rx: 0,
+      ry: 0,
       absolutePositioned: true,
     }),
     data: { kind: 'creative-scrim', creativeId, role: 'scrim' } satisfies CreativeData,
@@ -429,9 +434,52 @@ export async function addShapeLayer(canvas: Canvas) {
   canvas.renderAll()
 }
 
-export async function addBlankCreativeFrame(canvas: Canvas, frameBounds?: CreativeFrameBounds) {
-  const preset = getPresetById('instagram-1-1')
-  await seedDefaultCreative(canvas, BLANK_PIXEL_DATA_URL, '', preset, frameBounds)
+export async function addBlankCreativeFrame(canvas: Canvas, options: BlankCreativeFrameOptions = {}) {
+  const { Rect, Textbox } = await import('fabric')
+  const preset = options.preset ?? getPresetById('instagram-1-1')
+  const bounds = options.frameBounds ?? getFrameBounds(canvas, preset)
+  const creativeId = createCreativeId()
+
+  const frameLabel = new Textbox(`Frame ${preset.ratioLabel}`, {
+    left: bounds.left,
+    top: Math.max(12, bounds.top - 24),
+    width: Math.max(120, bounds.width),
+    fontFamily: 'Inter',
+    fontSize: 12,
+    fontWeight: 500,
+    fill: '#6B7280',
+    editable: true,
+    selectable: true,
+    hoverCursor: 'move',
+    data: {
+      kind: 'creative-text',
+      creativeId,
+      role: 'text',
+      moveHandle: true,
+    } satisfies CreativeData,
+  })
+  applySelectionStyle(frameLabel)
+
+  const frame = new Rect({
+    left: bounds.left,
+    top: bounds.top,
+    width: bounds.width,
+    height: bounds.height,
+    rx: 0,
+    ry: 0,
+    fill: '#FFFFFF',
+    stroke: '#D1D5DB',
+    strokeWidth: 1,
+    selectable: true,
+    evented: true,
+    hoverCursor: 'move',
+    data: { kind: 'creative-frame', creativeId, role: 'frame' } satisfies CreativeData,
+  })
+  canvas.add(frameLabel)
+  applySelectionStyle(frame)
+  canvas.add(frame)
+  canvas.setActiveObject(frame)
+  canvas.renderAll()
 }
 
 export async function replaceOrAddImageLayer(canvas: Canvas, imageUrl: string, selected?: FabricObject | null) {

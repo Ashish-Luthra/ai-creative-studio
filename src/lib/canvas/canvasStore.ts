@@ -31,7 +31,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   undoStack: [],
   redoStack: [],
   fabricCanvas: null,
-  selectedPresetId: 'instagram-4-5',
+  selectedPresetId: 'instagram-1-1',
 
   setMode: (mode) => set({ mode, selectedLayer: null }),
   setSelectedLayer: (obj) => set({ selectedLayer: obj }),

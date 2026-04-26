@@ -63,15 +63,7 @@ export const RightStudioPanel: React.FC<RightStudioPanelProps> = ({
         </>
       )}
 
-      {activeTool === 'media' && (
-        <>
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Media</h3>
-          <p className="mb-3 text-sm text-gray-600">Open approved images and replace the selected creative image.</p>
-          <button onClick={onOpenMedia} className="w-full rounded-md bg-gray-900 px-3 py-2 text-sm font-medium text-white">
-            Open Approved Images
-          </button>
-        </>
-      )}
+      {activeTool === 'media' && null}
 
       {activeTool === 'copy' && (
         <>
