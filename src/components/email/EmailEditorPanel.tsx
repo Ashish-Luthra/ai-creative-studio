@@ -978,7 +978,11 @@ function BlockContent({
             The Post That Got Everyone Talking
           </h2>
           <div className="h-px w-16 bg-gray-400" />
-          <button className="bg-gray-200 px-6 py-2 text-xs">SEE IT</button>
+          <div style={{ display: 'flex', justifyContent: btnJustify }}>
+            <div {...editable} style={btnStyle} className={`${editable.className} px-6 py-2 text-xs font-semibold tracking-widest`}>
+              SEE IT
+            </div>
+          </div>
         </div>
       </div>
     )
@@ -997,9 +1001,11 @@ function BlockContent({
           <p {...editable} className={`${editable.className} mx-auto mt-3 max-w-xs text-sm text-gray-600`}>
             I remember my first try at food photography. I created this guide to help you get started without making all the mistakes I did.
           </p>
-          <div className="mt-4 flex items-center justify-center gap-3">
+          <div className="mt-4" style={{ display: 'flex', alignItems: 'center', justifyContent: btnJustify, gap: 12 }}>
             <span className="text-sm text-gray-400">001</span>
-            <button className="bg-gray-800 px-6 py-2 text-xs text-white">READ IT</button>
+            <div {...editable} style={btnStyle} className={`${editable.className} px-6 py-2 text-xs font-semibold tracking-widest`}>
+              READ IT
+            </div>
           </div>
         </div>
       </div>
@@ -1015,6 +1021,11 @@ function BlockContent({
             A Little Gift of Thanks for Joining the List.
           </h3>
           <div className="mx-auto mt-4 h-px w-16 bg-black" />
+          <div className="mt-6" style={{ display: 'flex', justifyContent: btnJustify }}>
+            <div {...editable} style={btnStyle} className={`${editable.className} px-8 py-2.5 text-xs font-semibold tracking-widest`}>
+              CLAIM GIFT
+            </div>
+          </div>
         </div>
         <ResizableImageSlot
           src={imageSrcs['bg'] ?? 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=680&h=400&fit=crop'}
@@ -1030,10 +1041,15 @@ function BlockContent({
   if (type === 'text-left-image-right') {
     return (
       <div className="flex min-h-[300px]" style={bg}>
-        <div className="flex w-1/3 items-center justify-center p-12">
+        <div className="flex w-1/3 flex-col items-center justify-center gap-6 p-12">
           <h3 {...editable} className={`${editable.className} text-4xl font-bold leading-tight`}>
             WEL—COME
           </h3>
+          <div style={{ display: 'flex', justifyContent: btnJustify }}>
+            <div {...editable} style={btnStyle} className={`${editable.className} px-6 py-2 text-xs font-semibold tracking-widest`}>
+              EXPLORE
+            </div>
+          </div>
         </div>
         <ResizableImageSlot
           src={imageSrcs['bg'] ?? 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=500&h=400&fit=crop'}
@@ -1067,6 +1083,11 @@ function BlockContent({
           <p {...editable} className={`${editable.className} text-sm italic text-gray-500`}>
             A warming recipe perfect for fall evenings.
           </p>
+          <div style={{ display: 'flex', justifyContent: btnJustify }}>
+            <div {...editable} style={btnStyle} className={`${editable.className} px-6 py-2 text-xs font-semibold tracking-widest`}>
+              GET RECIPE
+            </div>
+          </div>
         </div>
       </div>
     )
@@ -1089,6 +1110,11 @@ function BlockContent({
           <p {...editable} className={`${editable.className} italic text-gray-500`}>
             for the next 24 hours only.
           </p>
+          <div className="mt-6" style={{ display: 'flex', justifyContent: btnJustify }}>
+            <div {...editable} style={btnStyle} className={`${editable.className} px-8 py-2.5 text-xs font-semibold tracking-widest`}>
+              BOOK NOW
+            </div>
+          </div>
         </div>
       </div>
     )

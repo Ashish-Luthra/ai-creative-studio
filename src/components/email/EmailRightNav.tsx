@@ -14,15 +14,43 @@ import type { CanvasBlock } from './EmailEditorPanel'
 type RightTab = 'block' | 'font' | 'button' | 'image' | 'link'
 
 // Only blocks where the image has a distinct shape (circle/arch/etc.) get the Image tab.
-// Full-bleed blocks (image-left-text-right, text-over-image, text-left-image-right,
-// image-top-text-bottom) intentionally fall through to the default [Block, Link] tab set.
+// Full-bleed blocks intentionally do NOT appear here.
 const IMAGE_BLOCK_TYPES = new Set(['testimonial', 'recipe-card'])
 
+// Every layout block that contains a CTA button whose style is driven by
+// buttonShapeVariant / buttonFillColor / etc.
+const BUTTON_LAYOUT_TYPES = new Set([
+  'image-left-text-right',
+  'centered-content',
+  'text-over-image',
+  'text-left-image-right',
+  'recipe-card',
+  'image-top-text-bottom',
+])
+
 function getTabsForBlock(blockType: string): { id: RightTab; label: string }[] {
-  if (blockType === 'button')          return [{ id: 'button', label: 'Button' }, { id: 'font', label: 'Font' }, { id: 'link', label: 'Link' }, { id: 'block', label: 'Block' }]
-  if (blockType === 'text')            return [{ id: 'font', label: 'Font' }, { id: 'link', label: 'Link' }, { id: 'block', label: 'Block' }]
-  if (IMAGE_BLOCK_TYPES.has(blockType)) return [{ id: 'image', label: 'Image' }, { id: 'link', label: 'Link' }, { id: 'block', label: 'Block' }]
-  return [{ id: 'block', label: 'Block' }, { id: 'link', label: 'Link' }]
+  const B = { id: 'button' as RightTab, label: 'Button' }
+  const F = { id: 'font'   as RightTab, label: 'Font'   }
+  const I = { id: 'image'  as RightTab, label: 'Image'  }
+  const L = { id: 'link'   as RightTab, label: 'Link'   }
+  const K = { id: 'block'  as RightTab, label: 'Block'  }
+
+  // Standalone button block
+  if (blockType === 'button') return [B, F, L, K]
+  // Text-only block
+  if (blockType === 'text')   return [F, L, K]
+
+  const hasShape  = IMAGE_BLOCK_TYPES.has(blockType)
+  const hasButton = BUTTON_LAYOUT_TYPES.has(blockType)
+
+  // Layout with shape-image AND button (e.g. recipe-card)
+  if (hasShape && hasButton) return [B, I, L, K]
+  // Layout with shape-image only (e.g. testimonial)
+  if (hasShape)              return [I, L, K]
+  // Layout with button only (full-bleed image blocks + centered-content)
+  if (hasButton)             return [B, L, K]
+
+  return [K, L]
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
