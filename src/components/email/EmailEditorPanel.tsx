@@ -1259,7 +1259,8 @@ export const EmailEditorPanel: React.FC = () => {
   }, [selectedId])
 
   const handleTextClick = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation()
+    // Do NOT stopPropagation — let the click bubble up to the block wrapper
+    // so the block gets selected and EmailRightNav (Button/Font tabs) stays visible.
     setTextToolbarPosition({ top: e.clientY - 50, left: e.clientX - 60 })
     setShowTextEdit(true)
   }, [])
@@ -1532,16 +1533,9 @@ export const EmailEditorPanel: React.FC = () => {
         />
       </div>
 
-      {/* ── Right Nav: Text Edit → EmailRightNav → Block Library ─ */}
+      {/* ── Right Nav: EmailRightNav (when block selected) → Block Library ─ */}
       <aside className="flex w-[300px] shrink-0 flex-col border-l border-gray-200 bg-white">
-        {showTextEdit ? (
-          <TextEditPanel
-            onClose={() => {
-              setShowTextEdit(false)
-              setTextToolbarPosition(undefined)
-            }}
-          />
-        ) : selectedBlock ? (
+        {selectedBlock ? (
           <EmailRightNav
             block={selectedBlock}
             onPatch={handleBlockPatch}
