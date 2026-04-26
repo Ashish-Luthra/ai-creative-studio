@@ -144,7 +144,7 @@ function ColorSwatch({
 
       {/* Dropdown panel */}
       {open && (
-        <div className="absolute left-0 top-[52px] z-50 w-[268px] rounded-2xl border border-gray-200 bg-white p-3 shadow-2xl">
+        <div className="absolute left-0 top-[52px] z-50 w-[268px] max-w-[calc(100vw-2rem)] rounded-2xl border border-gray-200 bg-white p-3 shadow-2xl">
           {/* Preset palette grid */}
           <p className="mb-2 text-[9px] font-semibold uppercase tracking-wider text-gray-400">Palette</p>
           <div className="grid grid-cols-11 gap-1 mb-3">
@@ -299,24 +299,27 @@ function FontTab({ block, onPatch }: { block: CanvasBlock; onPatch: (p: Partial<
         </select>
       </div>
 
-      {/* Size + Color */}
-      <div className="flex items-end gap-3">
-        <div className="flex-1">
-          <SectionLabel>Size</SectionLabel>
-          <div className="flex items-center gap-1 rounded-xl border border-gray-200 px-3 py-2.5">
-            <input
-              type="number"
-              min={8}
-              max={72}
-              value={block.fontSize ?? 16}
-              onChange={(e) => onPatch({ fontSize: Number(e.target.value) })}
-              className="w-full text-[12px] text-gray-700 focus:outline-none"
-            />
-            <span className="text-[10px] text-gray-400">px</span>
-          </div>
+      {/* Size */}
+      <div>
+        <SectionLabel>Size</SectionLabel>
+        <div className="flex items-center gap-1 rounded-xl border border-gray-200 px-3 py-2.5">
+          <input
+            type="number"
+            min={8}
+            max={72}
+            value={block.fontSize ?? 16}
+            onChange={(e) => onPatch({ fontSize: Number(e.target.value) })}
+            className="w-full text-[12px] text-gray-700 focus:outline-none"
+          />
+          <span className="text-[10px] text-gray-400">px</span>
         </div>
+      </div>
+
+      {/* Font Color — full-width row so palette dropdown has room */}
+      <div>
+        <SectionLabel>Font Color</SectionLabel>
         <ColorSwatch
-          label="Font Color"
+          label=""
           value={block.fontColor ?? '#111827'}
           onChange={(v) => onPatch({ fontColor: v })}
         />
@@ -460,8 +463,8 @@ function ButtonTab({ block, onPatch }: { block: CanvasBlock; onPatch: (p: Partia
           </div>
         </div>
 
-        {/* Colors */}
-        <div className="flex gap-8">
+        {/* Colors — each on its own row so the palette dropdown has full width */}
+        <div className="space-y-4">
           <ColorSwatch label="Fill color"   value={fillColor}   onChange={(v) => onPatch({ buttonFillColor: v })} />
           <ColorSwatch label="Border color" value={borderColor} onChange={(v) => onPatch({ buttonBorderColor: v })} />
         </div>
