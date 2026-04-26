@@ -1273,6 +1273,17 @@ export const EmailEditorPanel: React.FC = () => {
     )
   }, [])
 
+  /** Direct upload from "My computer" in the Image tab — no ApprovedImagesPanel needed */
+  const handleDirectImageUpload = useCallback((blockId: string, imageKey: string, src: string) => {
+    setCanvasBlocks((prev) =>
+      prev.map((b) =>
+        b.id === blockId
+          ? { ...b, imageSrcs: { ...(b.imageSrcs ?? {}), [imageKey]: src } }
+          : b,
+      ),
+    )
+  }, [])
+
   const handleBlockPatch = useCallback((id: string, patch: Partial<CanvasBlock>) => {
     setCanvasBlocks((prev) => prev.map((b) => (b.id === id ? { ...b, ...patch } : b)))
   }, [])
@@ -1508,6 +1519,7 @@ export const EmailEditorPanel: React.FC = () => {
             block={selectedBlock}
             onPatch={handleBlockPatch}
             onOpenImagePicker={handleOpenImagePicker}
+            onImageUpload={handleDirectImageUpload}
             onBack={() => setSelectedId(null)}
           />
         ) : (

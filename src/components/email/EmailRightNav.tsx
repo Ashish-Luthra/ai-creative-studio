@@ -13,10 +13,10 @@ import type { CanvasBlock } from './EmailEditorPanel'
 
 type RightTab = 'block' | 'font' | 'button' | 'image' | 'link'
 
-const IMAGE_BLOCK_TYPES = new Set([
-  'image-left-text-right', 'text-over-image', 'text-left-image-right',
-  'recipe-card', 'image-top-text-bottom', 'testimonial',
-])
+// Only blocks where the image has a distinct shape (circle/arch/etc.) get the Image tab.
+// Full-bleed blocks (image-left-text-right, text-over-image, text-left-image-right,
+// image-top-text-bottom) intentionally fall through to the default [Block, Link] tab set.
+const IMAGE_BLOCK_TYPES = new Set(['testimonial', 'recipe-card'])
 
 function getTabsForBlock(blockType: string): { id: RightTab; label: string }[] {
   if (blockType === 'button')          return [{ id: 'button', label: 'Button' }, { id: 'font', label: 'Font' }, { id: 'link', label: 'Link' }, { id: 'block', label: 'Block' }]
@@ -410,9 +410,30 @@ function ButtonTab({ block, onPatch }: { block: CanvasBlock; onPatch: (p: Partia
 // ─── Tab: Image ────────────────────────────────────────────────────────────────
 
 function ImageTab({
-  block, onPatch, onOpenPicker,
-}: { block: CanvasBlock; onPatch: (p: Partial<CanvasBlock>) => void; onOpenPicker: () => void }) {
+  block, onPatch, onImageUpload,
+}: {
+  block: CanvasBlock
+  onPatch: (p: Partial<CanvasBlock>) => void
+  onImageUpload: (src: string) => void
+}) {
   const selectedShape = block.imageShape ?? 'circle'
+
+  const handleFileChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0]
+      if (!file) return
+      const reader = new FileReader()
+      reader.onload = () => {
+        if (typeof reader.result === 'string') {
+          onImageUpload(reader.result)
+        }
+      }
+      reader.readAsDataURL(file)
+      // Reset the input so the same file can be re-selected
+      e.target.value = ''
+    },
+    [onImageUpload],
+  )
 
   return (
     <div className="flex-1 overflow-auto">
@@ -448,13 +469,17 @@ function ImageTab({
             My computer
             <ChevronDown size={13} className="text-gray-400" />
           </div>
-          <button
-            onClick={onOpenPicker}
-            className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-200 py-6 text-[12px] text-gray-400 transition-colors hover:border-blue-300 hover:text-blue-500"
-          >
+          {/* Hidden file input — label acts as the clickable upload area */}
+          <label className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-200 py-6 text-[12px] text-gray-400 transition-colors hover:border-blue-300 hover:text-blue-500">
             <Upload size={15} />
             Upload image
-          </button>
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif,image/svg+xml"
+              className="sr-only"
+              onChange={handleFileChange}
+            />
+          </label>
           <p className="mt-2 text-center text-[10px] text-gray-400">Max image size 10MB</p>
         </div>
       </div>
@@ -580,10 +605,12 @@ export interface EmailRightNavProps {
   block: CanvasBlock
   onPatch: (id: string, patch: Partial<CanvasBlock>) => void
   onOpenImagePicker: (blockId: string, imageKey: string) => void
+  /** Called when the user uploads an image directly from their computer via the Image tab */
+  onImageUpload: (blockId: string, imageKey: string, src: string) => void
   onBack: () => void
 }
 
-export function EmailRightNav({ block, onPatch, onOpenImagePicker, onBack }: EmailRightNavProps) {
+export function EmailRightNav({ block, onPatch, onOpenImagePicker, onImageUpload, onBack }: EmailRightNavProps) {
   const tabs = getTabsForBlock(block.type)
   const [activeTab, setActiveTab] = useState<RightTab>(tabs[0].id)
 
@@ -630,7 +657,11 @@ export function EmailRightNav({ block, onPatch, onOpenImagePicker, onBack }: Ema
         <ImageTab
           block={block}
           onPatch={patch}
-          onOpenPicker={() => onOpenImagePicker(block.id, 'main')}
+          onImageUpload={(src) => {
+            // testimonial uses 'avatar' key; recipe-card uses 'main'
+            const imageKey = block.type === 'testimonial' ? 'avatar' : 'main'
+            onImageUpload(block.id, imageKey, src)
+          }}
         />
       )}
       {resolvedTab === 'link'   && <LinkTab   block={block} onPatch={patch} />}
