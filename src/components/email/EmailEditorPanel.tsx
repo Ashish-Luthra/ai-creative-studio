@@ -15,17 +15,44 @@ import { FloatingActionBar } from './FloatingActionBar'
 import { FloatingTextToolbar } from './FloatingTextToolbar'
 import { TextEditPanel } from './TextEditPanel'
 import { ApprovedImagesPanel } from '@/components/canvas/ApprovedImagesPanel'
+import { EmailRightNav } from './EmailRightNav'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type EmailTab = 'tree' | 'sections' | 'text' | 'content' | 'style'
 
-interface CanvasBlock {
+export interface CanvasBlock {
   id: string
   type: string
+  // Block
   backgroundColor?: string
-  imageSrcs?: Record<string, string>   // imageKey → custom src URL
-  imageSizes?: Record<string, number>  // imageKey → custom height px
+  padding?: { top: number; right: number; bottom: number; left: number }
+  // Image
+  imageSrcs?: Record<string, string>
+  imageSizes?: Record<string, number>
+  imageShape?: 'circle' | 'square' | 'rounded' | 'arch' | 'diamond' | 'hexagon'
+  // Button
+  buttonShapeVariant?: number
+  buttonFillColor?: string
+  buttonBorderColor?: string
+  buttonPosition?: 'left' | 'center' | 'right'
+  buttonBorderWidth?: number
+  buttonWidth?: number
+  buttonHeight?: number
+  // Font
+  fontFamily?: string
+  fontSize?: number
+  fontBold?: boolean
+  fontItalic?: boolean
+  fontUnderline?: boolean
+  fontColor?: string
+  textAlign?: 'left' | 'center' | 'right'
+  lineHeight?: number
+  letterSpacing?: number
+  // Link
+  linkType?: 'url' | 'file' | 'checkout'
+  linkUrl?: string
+  linkAction?: string
 }
 
 // afterId: null = insert at very top; string = insert after that block id
@@ -608,9 +635,9 @@ function RailBtn({
 interface ResizableImageSlotProps {
   src: string
   alt: string
-  height?: number      // custom height px; falls back to className/natural height
+  height?: number
   className?: string
-  style?: React.CSSProperties
+  style?: React.CSSProperties  // e.g. clip-path for image shape
   onDoubleClick: () => void
   onResize: (newHeight: number) => void
 }
@@ -689,6 +716,26 @@ function BlockContent({
   imageSizes = {},
   onImageDoubleClick,
   onImageResize,
+  // Button settings
+  buttonShapeVariant,
+  buttonFillColor,
+  buttonBorderColor,
+  buttonPosition,
+  buttonBorderWidth,
+  buttonWidth,
+  buttonHeight,
+  // Font settings
+  fontFamily,
+  fontSize,
+  fontBold,
+  fontItalic,
+  fontUnderline,
+  fontColor,
+  textAlign,
+  lineHeight,
+  letterSpacing,
+  // Image settings
+  imageShape,
 }: {
   type: string
   backgroundColor?: string
@@ -697,7 +744,72 @@ function BlockContent({
   imageSizes?: Record<string, number>
   onImageDoubleClick: (key: string) => void
   onImageResize: (key: string, height: number) => void
+  buttonShapeVariant?: number
+  buttonFillColor?: string
+  buttonBorderColor?: string
+  buttonPosition?: 'left' | 'center' | 'right'
+  buttonBorderWidth?: number
+  buttonWidth?: number
+  buttonHeight?: number
+  fontFamily?: string
+  fontSize?: number
+  fontBold?: boolean
+  fontItalic?: boolean
+  fontUnderline?: boolean
+  fontColor?: string
+  textAlign?: 'left' | 'center' | 'right'
+  lineHeight?: number
+  letterSpacing?: number
+  imageShape?: string
 }) {
+  // ── Button style derivation ──────────────────────────────────────────────────
+  const BTN_SHAPES = [
+    { radius: '0px',   filled: true  },
+    { radius: '4px',   filled: true  },
+    { radius: '12px',  filled: true  },
+    { radius: '999px', filled: true  },
+    { radius: '0px',   filled: false },
+    { radius: '4px',   filled: false },
+    { radius: '12px',  filled: false },
+    { radius: '999px', filled: false },
+  ]
+  const btnShape  = BTN_SHAPES[buttonShapeVariant ?? 0]
+  const btnFill   = buttonFillColor   ?? '#1F2937'
+  const btnBorder = buttonBorderColor ?? '#1F2937'
+  const btnStyle: React.CSSProperties = {
+    borderRadius:    btnShape.radius,
+    backgroundColor: btnShape.filled ? btnFill : 'transparent',
+    border:          `${buttonBorderWidth ?? 1}px solid ${btnBorder}`,
+    color:           btnShape.filled ? '#FFFFFF' : btnFill,
+    width:           buttonWidth  ? `${buttonWidth}px`  : undefined,
+    height:          buttonHeight ? `${buttonHeight}px` : undefined,
+  }
+  const btnJustify = { left: 'flex-start', center: 'center', right: 'flex-end' }[buttonPosition ?? 'center']
+
+  // ── Font style derivation ────────────────────────────────────────────────────
+  const fontStyle: React.CSSProperties = {
+    fontFamily:      fontFamily    ?? undefined,
+    fontSize:        fontSize      ? `${fontSize}px`        : undefined,
+    fontWeight:      fontBold      ? 'bold'                 : undefined,
+    fontStyle:       fontItalic    ? 'italic'               : undefined,
+    textDecoration:  fontUnderline ? 'underline'            : undefined,
+    color:           fontColor     ?? undefined,
+    textAlign:       textAlign     ?? undefined,
+    lineHeight:      lineHeight    ?? undefined,
+    letterSpacing:   letterSpacing ? `${letterSpacing}px`  : undefined,
+  }
+
+  // ── Image shape clip ─────────────────────────────────────────────────────────
+  const IMAGE_CLIP: Record<string, React.CSSProperties> = {
+    circle:  { borderRadius: '50%' },
+    rounded: { borderRadius: '12px' },
+    square:  { borderRadius: '0' },
+    arch:    { borderRadius: '50% 50% 0 0' },
+    diamond: { clipPath: 'polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)' },
+    hexagon: { clipPath: 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)' },
+  }
+  const imgClip = imageShape ? (IMAGE_CLIP[imageShape] ?? {}) : {}
+
   const editable = {
     contentEditable: true as const,
     suppressContentEditableWarning: true,
@@ -757,8 +869,9 @@ function BlockContent({
         <p
           {...editable}
           className={`${editable.className} text-sm leading-relaxed text-gray-700`}
+          style={fontStyle}
         >
-          Your text content here. Click to edit this paragraph and add your own copy. You can style the text using the formatting toolbar that appears when you click.
+          Your text content here. Click to edit this paragraph and add your own copy.
         </p>
       </div>
     )
@@ -766,10 +879,11 @@ function BlockContent({
 
   if (type === 'button') {
     return (
-      <div className="flex items-center justify-center bg-white py-8" style={bg}>
+      <div className="bg-white py-8" style={{ ...bg, display: 'flex', alignItems: 'center', justifyContent: btnJustify, paddingLeft: 48, paddingRight: 48 }}>
         <div
           {...editable}
-          className={`${editable.className} bg-gray-900 px-10 py-3 text-sm font-semibold tracking-widest text-white`}
+          className={`${editable.className} px-10 py-3 text-sm font-semibold tracking-widest`}
+          style={btnStyle}
         >
           CLICK HERE
         </div>
@@ -986,7 +1100,8 @@ function BlockContent({
           src={imageSrcs['avatar'] ?? 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&h=200&fit=crop'}
           alt="Testimonial"
           height={imageSizes['avatar'] ?? 128}
-          className="w-32 shrink-0 rounded"
+          className="w-32 shrink-0"
+          style={imgClip}
           onDoubleClick={() => onImageDoubleClick('avatar')}
           onResize={(h) => onImageResize('avatar', h)}
         />
@@ -1158,6 +1273,10 @@ export const EmailEditorPanel: React.FC = () => {
     )
   }, [])
 
+  const handleBlockPatch = useCallback((id: string, patch: Partial<CanvasBlock>) => {
+    setCanvasBlocks((prev) => prev.map((b) => (b.id === id ? { ...b, ...patch } : b)))
+  }, [])
+
   const selectedBlock = canvasBlocks.find((b) => b.id === selectedId) ?? null
 
   return (
@@ -1290,6 +1409,23 @@ export const EmailEditorPanel: React.FC = () => {
                         imageSizes={block.imageSizes}
                         onImageDoubleClick={(key) => handleOpenImagePicker(block.id, key)}
                         onImageResize={(key, h) => handleImageResize(block.id, key, h)}
+                        buttonShapeVariant={block.buttonShapeVariant}
+                        buttonFillColor={block.buttonFillColor}
+                        buttonBorderColor={block.buttonBorderColor}
+                        buttonPosition={block.buttonPosition}
+                        buttonBorderWidth={block.buttonBorderWidth}
+                        buttonWidth={block.buttonWidth}
+                        buttonHeight={block.buttonHeight}
+                        fontFamily={block.fontFamily}
+                        fontSize={block.fontSize}
+                        fontBold={block.fontBold}
+                        fontItalic={block.fontItalic}
+                        fontUnderline={block.fontUnderline}
+                        fontColor={block.fontColor}
+                        textAlign={block.textAlign}
+                        lineHeight={block.lineHeight}
+                        letterSpacing={block.letterSpacing}
+                        imageShape={block.imageShape}
                       />
                     </div>
 
@@ -1358,7 +1494,7 @@ export const EmailEditorPanel: React.FC = () => {
         />
       </div>
 
-      {/* ── Right Nav: Text Edit → Block Props → Block Library ─ */}
+      {/* ── Right Nav: Text Edit → EmailRightNav → Block Library ─ */}
       <aside className="flex w-[300px] shrink-0 flex-col border-l border-gray-200 bg-white">
         {showTextEdit ? (
           <TextEditPanel
@@ -1368,9 +1504,10 @@ export const EmailEditorPanel: React.FC = () => {
             }}
           />
         ) : selectedBlock ? (
-          <BlockPropertiesPanel
+          <EmailRightNav
             block={selectedBlock}
-            onColorChange={handleBlockColorChange}
+            onPatch={handleBlockPatch}
+            onOpenImagePicker={handleOpenImagePicker}
             onBack={() => setSelectedId(null)}
           />
         ) : (
