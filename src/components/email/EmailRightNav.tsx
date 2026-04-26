@@ -130,24 +130,51 @@ function ColorSwatch({
   }, [open])
 
   return (
-    <div className="relative flex flex-col items-start gap-2" ref={panelRef}>
-      {label && <p className="text-[11px] font-medium text-gray-700">{label}</p>}
+    <div className="relative" ref={panelRef}>
+      {label && <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-gray-400">{label}</p>}
 
-      {/* Swatch circle — click to toggle panel */}
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full border-2 border-gray-200 shadow-sm transition-transform hover:scale-105"
-        style={{ backgroundColor: value }}
-        title={value}
-      />
+      {/* ── Always-visible row: swatch circle + hex input ── */}
+      <div className="flex items-center gap-2 rounded-xl border border-gray-200 px-2.5 py-2">
+        {/* Swatch circle — click to toggle palette */}
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          title={open ? 'Close palette' : 'Open palette'}
+          className="relative flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-full border-2 border-gray-200 shadow-sm transition-transform hover:scale-105"
+          style={{ backgroundColor: value }}
+        />
+        {/* Hex text input — always editable */}
+        <input
+          type="text"
+          value={hex}
+          onChange={(e) => {
+            setHex(e.target.value)
+            if (/^#[0-9a-fA-F]{6}$/.test(e.target.value)) onChange(e.target.value)
+          }}
+          maxLength={7}
+          placeholder="#000000"
+          className="flex-1 font-mono text-[12px] text-gray-700 focus:outline-none"
+        />
+        {/* Native colour wheel — opens OS picker */}
+        <label className="relative flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-full border border-gray-200" title="Custom colour">
+          <div className="absolute inset-0 rounded-full" style={{ backgroundColor: value }} />
+          <input
+            type="color"
+            value={value}
+            onChange={(e) => { onChange(e.target.value); setHex(e.target.value) }}
+            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+          />
+        </label>
+      </div>
 
-      {/* Dropdown panel */}
+      {/* ── Palette dropdown — opens below the row ── */}
       {open && (
-        <div className="absolute left-0 top-[52px] z-50 w-[268px] max-w-[calc(100vw-2rem)] rounded-2xl border border-gray-200 bg-white p-3 shadow-2xl">
-          {/* Preset palette grid */}
-          <p className="mb-2 text-[9px] font-semibold uppercase tracking-wider text-gray-400">Palette</p>
-          <div className="grid grid-cols-11 gap-1 mb-3">
+        <div className="absolute left-0 top-[calc(100%+6px)] z-50 w-[268px] max-w-[calc(100vw-2rem)] rounded-2xl border border-gray-200 bg-white p-3 shadow-2xl">
+          <div className="mb-1.5 flex items-center justify-between">
+            <p className="text-[9px] font-semibold uppercase tracking-wider text-gray-400">Palette</p>
+            <button type="button" onClick={() => setOpen(false)} className="text-[13px] leading-none text-gray-400 hover:text-gray-700">✕</button>
+          </div>
+          <div className="grid grid-cols-11 gap-1">
             {PRESET_COLORS.map((c) => (
               <button
                 key={c}
@@ -161,43 +188,6 @@ function ColorSwatch({
                 style={{ backgroundColor: c }}
               />
             ))}
-          </div>
-
-          {/* Divider */}
-          <div className="mb-3 h-px bg-gray-100" />
-
-          {/* Native colour picker + hex input */}
-          <p className="mb-2 text-[9px] font-semibold uppercase tracking-wider text-gray-400">Custom</p>
-          <div className="flex items-center gap-2 rounded-xl border border-gray-200 px-2.5 py-2">
-            {/* Native colour wheel */}
-            <label className="relative flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-full border border-gray-200">
-              <div className="absolute inset-0 rounded-full" style={{ backgroundColor: value }} />
-              <input
-                type="color"
-                value={value}
-                onChange={(e) => { onChange(e.target.value); setHex(e.target.value) }}
-                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-              />
-            </label>
-            {/* Hex field */}
-            <input
-              type="text"
-              value={hex}
-              onChange={(e) => {
-                setHex(e.target.value)
-                if (/^#[0-9a-fA-F]{6}$/.test(e.target.value)) onChange(e.target.value)
-              }}
-              maxLength={7}
-              placeholder="#000000"
-              className="flex-1 font-mono text-[12px] text-gray-700 focus:outline-none"
-            />
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              className="shrink-0 text-[14px] leading-none text-gray-400 hover:text-gray-700"
-            >
-              ✕
-            </button>
           </div>
         </div>
       )}
@@ -236,26 +226,20 @@ function BlockTab({ block, onPatch }: { block: CanvasBlock; onPatch: (p: Partial
     <div className="flex-1 overflow-auto px-4 py-4 space-y-5">
       {/* Background */}
       <div>
-        <SectionLabel>Background</SectionLabel>
-        <div className="flex items-center gap-3">
-          <ColorSwatch
-            label=""
-            value={bg}
-            onChange={(v) => onPatch({ backgroundColor: v })}
-          />
-          <div className="flex flex-1 flex-col gap-1">
-            <span className="font-mono text-[12px] text-gray-500">{bg}</span>
-            {bg !== '#ffffff' && (
-              <button
-                type="button"
-                onClick={() => onPatch({ backgroundColor: '#ffffff' })}
-                className="w-fit text-[10px] text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                Reset to white
-              </button>
-            )}
-          </div>
-        </div>
+        <ColorSwatch
+          label="Background"
+          value={bg}
+          onChange={(v) => onPatch({ backgroundColor: v })}
+        />
+        {bg !== '#ffffff' && (
+          <button
+            type="button"
+            onClick={() => onPatch({ backgroundColor: '#ffffff' })}
+            className="mt-1.5 text-[10px] text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            Reset to white
+          </button>
+        )}
       </div>
 
       {/* Padding */}
@@ -315,15 +299,12 @@ function FontTab({ block, onPatch }: { block: CanvasBlock; onPatch: (p: Partial<
         </div>
       </div>
 
-      {/* Font Color — full-width row so palette dropdown has room */}
-      <div>
-        <SectionLabel>Font Color</SectionLabel>
-        <ColorSwatch
-          label=""
-          value={block.fontColor ?? '#111827'}
-          onChange={(v) => onPatch({ fontColor: v })}
-        />
-      </div>
+      {/* Font Color */}
+      <ColorSwatch
+        label="Font Color"
+        value={block.fontColor ?? '#111827'}
+        onChange={(v) => onPatch({ fontColor: v })}
+      />
 
       {/* Style toggles */}
       <div>
