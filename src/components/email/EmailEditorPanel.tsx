@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useRef } from 'react'
 import {
   Layers, LayoutGrid, Palette, FileText,
   Monitor, Smartphone, ChevronUp, ChevronDown, Trash2,
@@ -14,6 +14,7 @@ import { BlockLibrary } from './BlockLibrary'
 import { FloatingActionBar } from './FloatingActionBar'
 import { FloatingTextToolbar } from './FloatingTextToolbar'
 import { TextEditPanel } from './TextEditPanel'
+import { ApprovedImagesPanel } from '@/components/canvas/ApprovedImagesPanel'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -23,6 +24,8 @@ interface CanvasBlock {
   id: string
   type: string
   backgroundColor?: string
+  imageSrcs?: Record<string, string>   // imageKey → custom src URL
+  imageSizes?: Record<string, number>  // imageKey → custom height px
 }
 
 // afterId: null = insert at very top; string = insert after that block id
@@ -596,16 +599,104 @@ function RailBtn({
   )
 }
 
+// ─── ResizableImageSlot ────────────────────────────────────────────────────────
+// Renders an image that:
+//  • shows a "Double-click to change" overlay on hover
+//  • exposes a bottom-right drag handle to resize height (width stays 100% of column)
+//  • never distorts (object-cover always active)
+
+interface ResizableImageSlotProps {
+  src: string
+  alt: string
+  height?: number      // custom height px; falls back to className/natural height
+  className?: string
+  style?: React.CSSProperties
+  onDoubleClick: () => void
+  onResize: (newHeight: number) => void
+}
+
+function ResizableImageSlot({
+  src, alt, height, className, style, onDoubleClick, onResize,
+}: ResizableImageSlotProps) {
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const dragRef = useRef<{ startY: number; startH: number } | null>(null)
+
+  const startResize = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const startH = wrapRef.current ? wrapRef.current.offsetHeight : (height ?? 240)
+    dragRef.current = { startY: e.clientY, startH }
+
+    const onMove = (ev: MouseEvent) => {
+      if (!dragRef.current) return
+      const newH = Math.max(60, dragRef.current.startH + (ev.clientY - dragRef.current.startY))
+      onResize(Math.round(newH))
+    }
+    const onUp = (ev: MouseEvent) => {
+      if (dragRef.current) {
+        const newH = Math.max(60, dragRef.current.startH + (ev.clientY - dragRef.current.startY))
+        onResize(Math.round(newH))
+      }
+      dragRef.current = null
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }
+
+  return (
+    <div
+      ref={wrapRef}
+      className={cn('group relative overflow-hidden', className)}
+      style={{ ...(style ?? {}), ...(height != null ? { height } : {}) }}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt={alt}
+        className="h-full w-full object-cover"
+        onDoubleClick={(e) => { e.stopPropagation(); onDoubleClick() }}
+        draggable={false}
+      />
+      {/* Hover overlay */}
+      <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/0 transition-all group-hover:bg-black/25">
+        <span className="rounded bg-black/60 px-2 py-1 text-[10px] font-medium text-white opacity-0 transition-opacity group-hover:opacity-100">
+          Double-click to change
+        </span>
+      </div>
+      {/* Bottom-right resize handle */}
+      <div
+        className="absolute bottom-0 right-0 z-10 hidden h-5 w-5 cursor-se-resize items-end justify-end pb-1 pr-1 group-hover:flex"
+        onMouseDown={startResize}
+        title="Drag to resize"
+      >
+        <svg width="8" height="8" viewBox="0 0 8 8" fill="none" className="text-white drop-shadow-md">
+          <path d="M1 7L7 1M4 7L7 4M7 7V7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+        </svg>
+      </div>
+    </div>
+  )
+}
+
 // ─── BlockContent: full-size block renderer (9 structural + 7 prebuilt) ───────
 
 function BlockContent({
   type,
   backgroundColor,
   onTextClick,
+  imageSrcs = {},
+  imageSizes = {},
+  onImageDoubleClick,
+  onImageResize,
 }: {
   type: string
   backgroundColor?: string
   onTextClick: (e: React.MouseEvent) => void
+  imageSrcs?: Record<string, string>
+  imageSizes?: Record<string, number>
+  onImageDoubleClick: (key: string) => void
+  onImageResize: (key: string, height: number) => void
 }) {
   const editable = {
     contentEditable: true as const,
@@ -757,13 +848,14 @@ function BlockContent({
   if (type === 'image-left-text-right') {
     return (
       <div className="flex min-h-[300px]" style={bg}>
-        <div className="w-1/2">
-          <img
-            src="https://images.unsplash.com/photo-1523381210434-271e8be1f52b?w=400&h=500&fit=crop"
-            alt="Fashion"
-            className="h-full w-full object-cover"
-          />
-        </div>
+        <ResizableImageSlot
+          src={imageSrcs['main'] ?? 'https://images.unsplash.com/photo-1523381210434-271e8be1f52b?w=400&h=500&fit=crop'}
+          alt="Fashion"
+          height={imageSizes['main']}
+          className="w-1/2 self-stretch"
+          onDoubleClick={() => onImageDoubleClick('main')}
+          onResize={(h) => onImageResize('main', h)}
+        />
         <div className="flex w-1/2 flex-col items-center justify-center gap-4 p-12">
           <p {...editable} className={`${editable.className} text-sm italic text-gray-500`}>
             From The &apos;Gram
@@ -810,9 +902,12 @@ function BlockContent({
           </h3>
           <div className="mx-auto mt-4 h-px w-16 bg-black" />
         </div>
-        <div
-          className="h-64 bg-cover bg-center"
-          style={{ backgroundImage: 'url(https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=680&h=400&fit=crop)' }}
+        <ResizableImageSlot
+          src={imageSrcs['bg'] ?? 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=680&h=400&fit=crop'}
+          alt="Background"
+          height={imageSizes['bg'] ?? 256}
+          onDoubleClick={() => onImageDoubleClick('bg')}
+          onResize={(h) => onImageResize('bg', h)}
         />
       </div>
     )
@@ -826,9 +921,13 @@ function BlockContent({
             WEL—COME
           </h3>
         </div>
-        <div
-          className="min-h-[300px] w-2/3 bg-cover bg-center"
-          style={{ backgroundImage: 'url(https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=500&h=400&fit=crop)' }}
+        <ResizableImageSlot
+          src={imageSrcs['bg'] ?? 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=500&h=400&fit=crop'}
+          alt="Background"
+          height={imageSizes['bg'] ?? 300}
+          className="w-2/3"
+          onDoubleClick={() => onImageDoubleClick('bg')}
+          onResize={(h) => onImageResize('bg', h)}
         />
       </div>
     )
@@ -837,9 +936,13 @@ function BlockContent({
   if (type === 'recipe-card') {
     return (
       <div className="flex min-h-[280px] gap-8 bg-white p-8" style={bg}>
-        <div
-          className="w-1/2 rounded bg-cover bg-center"
-          style={{ backgroundImage: 'url(https://images.unsplash.com/photo-1547592166-23ac45744acd?w=400&h=400&fit=crop)' }}
+        <ResizableImageSlot
+          src={imageSrcs['main'] ?? 'https://images.unsplash.com/photo-1547592166-23ac45744acd?w=400&h=400&fit=crop'}
+          alt="Recipe"
+          height={imageSizes['main'] ?? 240}
+          className="w-1/2 rounded"
+          onDoubleClick={() => onImageDoubleClick('main')}
+          onResize={(h) => onImageResize('main', h)}
         />
         <div className="flex w-1/2 flex-col justify-center gap-3 px-4">
           <p {...editable} className={`${editable.className} text-sm italic text-gray-500`}>One</p>
@@ -857,9 +960,12 @@ function BlockContent({
   if (type === 'image-top-text-bottom') {
     return (
       <div className="bg-white" style={bg}>
-        <div
-          className="h-96 bg-cover bg-center"
-          style={{ backgroundImage: 'url(https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=680&h=400&fit=crop)' }}
+        <ResizableImageSlot
+          src={imageSrcs['main'] ?? 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=680&h=400&fit=crop'}
+          alt="Main image"
+          height={imageSizes['main'] ?? 384}
+          onDoubleClick={() => onImageDoubleClick('main')}
+          onResize={(h) => onImageResize('main', h)}
         />
         <div className="bg-gray-100 p-12 text-center">
           <h3 {...editable} className={`${editable.className} mb-3 font-serif text-2xl`}>
@@ -876,9 +982,13 @@ function BlockContent({
   if (type === 'testimonial') {
     return (
       <div className="flex min-h-[200px] gap-8 bg-gray-50 p-12" style={bg}>
-        <div
-          className="h-32 w-32 shrink-0 rounded bg-cover bg-center"
-          style={{ backgroundImage: 'url(https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&h=200&fit=crop)' }}
+        <ResizableImageSlot
+          src={imageSrcs['avatar'] ?? 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&h=200&fit=crop'}
+          alt="Testimonial"
+          height={imageSizes['avatar'] ?? 128}
+          className="w-32 shrink-0 rounded"
+          onDoubleClick={() => onImageDoubleClick('avatar')}
+          onResize={(h) => onImageResize('avatar', h)}
         />
         <div className="flex flex-1 flex-col justify-center gap-3">
           <h4 {...editable} className={`${editable.className} text-sm font-bold tracking-widest`}>
@@ -913,6 +1023,8 @@ export const EmailEditorPanel: React.FC = () => {
   const [insertState, setInsertState] = useState<InsertState>(null)
   const [showTextEdit, setShowTextEdit] = useState(false)
   const [textToolbarPosition, setTextToolbarPosition] = useState<{ top: number; left: number } | undefined>()
+  const [showApprovedImages, setShowApprovedImages] = useState(false)
+  const [pendingImageTarget, setPendingImageTarget] = useState<{ blockId: string; imageKey: string } | null>(null)
 
   const { document: doc, previewMode, setPreviewMode } = useEmailStore()
 
@@ -1015,6 +1127,35 @@ export const EmailEditorPanel: React.FC = () => {
     setInsertState(null)
     setTextToolbarPosition(undefined)
     setShowTextEdit(false)
+  }, [])
+
+  const handleOpenImagePicker = useCallback((blockId: string, imageKey: string) => {
+    setPendingImageTarget({ blockId, imageKey })
+    setShowApprovedImages(true)
+  }, [])
+
+  const handleImageSelect = useCallback((src: string) => {
+    if (!pendingImageTarget) return
+    const { blockId, imageKey } = pendingImageTarget
+    setCanvasBlocks((prev) =>
+      prev.map((b) =>
+        b.id === blockId
+          ? { ...b, imageSrcs: { ...(b.imageSrcs ?? {}), [imageKey]: src } }
+          : b,
+      ),
+    )
+    setShowApprovedImages(false)
+    setPendingImageTarget(null)
+  }, [pendingImageTarget])
+
+  const handleImageResize = useCallback((blockId: string, imageKey: string, height: number) => {
+    setCanvasBlocks((prev) =>
+      prev.map((b) =>
+        b.id === blockId
+          ? { ...b, imageSizes: { ...(b.imageSizes ?? {}), [imageKey]: height } }
+          : b,
+      ),
+    )
   }, [])
 
   const selectedBlock = canvasBlocks.find((b) => b.id === selectedId) ?? null
@@ -1145,6 +1286,10 @@ export const EmailEditorPanel: React.FC = () => {
                         type={block.type}
                         backgroundColor={block.backgroundColor}
                         onTextClick={handleTextClick}
+                        imageSrcs={block.imageSrcs}
+                        imageSizes={block.imageSizes}
+                        onImageDoubleClick={(key) => handleOpenImagePicker(block.id, key)}
+                        onImageResize={(key, h) => handleImageResize(block.id, key, h)}
                       />
                     </div>
 
@@ -1204,6 +1349,13 @@ export const EmailEditorPanel: React.FC = () => {
 
         {/* Floating text toolbar */}
         <FloatingTextToolbar position={textToolbarPosition} />
+
+        {/* Approved images overlay — opens when an image slot is double-clicked */}
+        <ApprovedImagesPanel
+          open={showApprovedImages}
+          onClose={() => { setShowApprovedImages(false); setPendingImageTarget(null) }}
+          onSelect={handleImageSelect}
+        />
       </div>
 
       {/* ── Right Nav: Text Edit → Block Props → Block Library ─ */}
