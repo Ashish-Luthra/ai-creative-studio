@@ -1638,7 +1638,13 @@ export const EmailEditorPanel: React.FC = () => {
 
   // ── Persistence state ───────────────────────────────────────────────────────
   const [currentEmailerId, setCurrentEmailerId] = useState<string | null>(null)
-  const [savedEmailers, setSavedEmailers] = useState<EmailerMeta[]>([])
+  const [savedEmailers, setSavedEmailers] = useState<EmailerMeta[]>([
+    { id: 'demo-1', name: 'Dormant User — Winter Win-Back Campaign',   subject: 'We miss you! Here\'s 20% off to welcome you back',  created_at: '2025-01-15T10:00:00Z', updated_at: '2025-01-15T10:00:00Z' },
+    { id: 'demo-2', name: 'Summer Flash Sale — 48 Hour Countdown',     subject: 'Only 48 hrs left: up to 50% off sitewide',           created_at: '2025-02-10T09:00:00Z', updated_at: '2025-02-10T09:00:00Z' },
+    { id: 'demo-3', name: 'New Product Launch — Spring Collection',    subject: 'Introducing our brand-new Spring 2025 line',         created_at: '2025-03-01T08:00:00Z', updated_at: '2025-03-01T08:00:00Z' },
+    { id: 'demo-4', name: 'Monthly Newsletter — April Edition',        subject: 'Your April update: tips, stories & exclusive offers', created_at: '2025-04-01T07:00:00Z', updated_at: '2025-04-01T07:00:00Z' },
+    { id: 'demo-5', name: 'VIP Early Access — Members Only Preview',   subject: 'You\'re invited: shop 24 hours before everyone else', created_at: '2025-04-20T06:00:00Z', updated_at: '2025-04-20T06:00:00Z' },
+  ])
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [showEmailerDropdown, setShowEmailerDropdown] = useState(false)
   const [showSaveModal, setShowSaveModal] = useState(false)
@@ -1970,15 +1976,8 @@ export const EmailEditorPanel: React.FC = () => {
         {/* Top toolbar strip */}
         <div className="flex h-10 shrink-0 items-center gap-3 border-b border-gray-200 bg-white px-4">
 
-          {/* Subject / emailer name */}
-          <span className="min-w-0 flex-1 truncate text-[11px] text-gray-400">
-            {savedEmailers.find((e) => e.id === currentEmailerId)?.name
-              ? savedEmailers.find((e) => e.id === currentEmailerId)!.name
-              : (doc.subject || 'Untitled email')}
-          </span>
-
-          {/* ── Open existing emailer dropdown ── */}
-          <div className="relative" ref={dropdownRef}>
+          {/* ── Open existing emailer dropdown — far LEFT ── */}
+          <div className="relative shrink-0" ref={dropdownRef}>
             <button
               onClick={() => setShowEmailerDropdown((o) => !o)}
               className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-[11px] font-medium text-gray-600 transition-colors hover:bg-gray-50"
@@ -2035,6 +2034,13 @@ export const EmailEditorPanel: React.FC = () => {
               </div>
             )}
           </div>
+
+          {/* Subject / emailer name — centre fill */}
+          <span className="min-w-0 flex-1 truncate text-center text-[11px] text-gray-400">
+            {savedEmailers.find((e) => e.id === currentEmailerId)?.name
+              || doc.subject
+              || 'Untitled email'}
+          </span>
 
           {/* ── Save / Save as New ── */}
           <div className="inline-flex items-center gap-1">
