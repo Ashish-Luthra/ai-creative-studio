@@ -12,7 +12,6 @@ export const IMAGE_CATEGORIES = [
   'Lifestyle & Campaign',
   'Backgrounds & Textures',
   'Icons & UI Elements',
-  'Banners & Headers',
   'Social Media Assets',
   'AI Generated',
   'Illustrations & Graphics',
