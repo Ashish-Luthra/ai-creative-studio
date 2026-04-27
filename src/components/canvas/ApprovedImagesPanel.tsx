@@ -145,10 +145,10 @@ export const ApprovedImagesPanel: React.FC<ApprovedImagesPanelProps> = ({ open, 
                   <button
                     type="button"
                     onClick={(e) => handleDelete(image.id, e)}
-                    className="rounded p-0.5 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500"
+                    className="ml-auto rounded p-0.5 text-red-500 transition-colors hover:bg-red-50 hover:text-red-600"
                     title="Delete image"
                   >
-                    <Trash2 size={12} />
+                    <Trash2 size={13} />
                   </button>
                 )}
               </div>
