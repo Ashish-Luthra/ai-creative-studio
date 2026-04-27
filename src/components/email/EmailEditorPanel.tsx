@@ -1654,11 +1654,15 @@ export const EmailEditorPanel: React.FC = () => {
 
   const { document: doc, previewMode, setPreviewMode } = useEmailStore()
 
-  // Fetch emailer list on mount
+  // Fetch emailer list on mount — only replace dummy data if real rows come back
   useEffect(() => {
     fetch('/api/emailers')
-      .then((r) => r.ok ? r.json() : [])
-      .then((list) => setSavedEmailers(list as EmailerMeta[]))
+      .then((r) => r.ok ? r.json() : null)
+      .then((list) => {
+        if (Array.isArray(list) && list.length > 0) {
+          setSavedEmailers(list as EmailerMeta[])
+        }
+      })
       .catch(() => {})
   }, [])
 
