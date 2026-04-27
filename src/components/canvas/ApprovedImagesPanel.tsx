@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { Search, Upload, X, Trash2, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -31,14 +31,25 @@ interface ImageEntry {
   deletable: boolean
 }
 
-// ─── Preset images ────────────────────────────────────────────────────────────
+const STORAGE_KEY = 'ai-creative-studio:image-library'
 
-const PRESET_IMAGES: ImageEntry[] = [
-  { id: 'coffee-1', name: 'Coffee Product',  category: 'Product Images',      src: '/CoffeeInsta.png', uploadedAt: '2025-03-10T08:00:00Z', deletable: false },
-  { id: 'coffee-2', name: 'Latte Table',     category: 'Lifestyle & Campaign', src: '/coffee.png',       uploadedAt: '2025-03-10T08:00:00Z', deletable: false },
-  { id: 'coffee-3', name: 'Studio Portrait', category: 'Lifestyle & Campaign', src: '/CoffeeInsta.png',  uploadedAt: '2025-03-12T09:30:00Z', deletable: false },
-  { id: 'coffee-4', name: 'Urban Mood',      category: 'Backgrounds & Textures', src: '/coffee.png',    uploadedAt: '2025-03-14T11:00:00Z', deletable: false },
-]
+function loadFromStorage(): ImageEntry[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (!raw) return []
+    return JSON.parse(raw) as ImageEntry[]
+  } catch {
+    return []
+  }
+}
+
+function saveToStorage(entries: ImageEntry[]) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(entries))
+  } catch {
+    // localStorage quota exceeded — silently ignore
+  }
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -61,19 +72,28 @@ export const ApprovedImagesPanel: React.FC<ApprovedImagesPanelProps> = ({ open, 
   const [activeCategory, setActiveCategory] = useState<ImageCategory | 'All'>('All')
   const [uploadCategory, setUploadCategory] = useState<ImageCategory>('Uncategorised')
   const [showUploadCategoryMenu, setShowUploadCategoryMenu] = useState(false)
-  const [localUploads, setLocalUploads] = useState<ImageEntry[]>([])
+  const [uploads, setUploads] = useState<ImageEntry[]>([])
+
+  // Load from localStorage on first mount
+  useEffect(() => {
+    setUploads(loadFromStorage())
+  }, [])
+
+  // Persist to localStorage whenever uploads change
+  useEffect(() => {
+    saveToStorage(uploads)
+  }, [uploads])
 
   const images = useMemo(() => {
-    const merged = [...localUploads, ...PRESET_IMAGES]
-    const byCat = activeCategory === 'All' ? merged : merged.filter((img) => img.category === activeCategory)
+    const byCat = activeCategory === 'All' ? uploads : uploads.filter((img) => img.category === activeCategory)
     const q = search.trim().toLowerCase()
     if (!q) return byCat
     return byCat.filter((img) => img.name.toLowerCase().includes(q) || img.category.toLowerCase().includes(q))
-  }, [search, activeCategory, localUploads])
+  }, [search, activeCategory, uploads])
 
   const handleDelete = (id: string, e: React.MouseEvent) => {
     e.stopPropagation()
-    setLocalUploads((prev) => prev.filter((img) => img.id !== id))
+    setUploads((prev) => prev.filter((img) => img.id !== id))
   }
 
   if (!open) return null
@@ -128,7 +148,7 @@ export const ApprovedImagesPanel: React.FC<ApprovedImagesPanelProps> = ({ open, 
                   reader.onload = () => {
                     const src = String(reader.result ?? '')
                     if (!src) return
-                    setLocalUploads((prev) => [
+                    setUploads((prev) => [
                       {
                         id: `upload-${Date.now()}`,
                         name: file.name.replace(/\.[^.]+$/, ''),
