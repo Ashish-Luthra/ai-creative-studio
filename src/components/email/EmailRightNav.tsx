@@ -39,6 +39,8 @@ function getTabsForBlock(blockType: string): { id: RightTab; label: string }[] {
   if (blockType === 'button') return [B, F, L, K]
   // Text-only block
   if (blockType === 'text')   return [F, L, K]
+  // Spacer — only needs Block tab (height + background)
+  if (blockType === 'spacer') return [K]
 
   const hasShape  = IMAGE_BLOCK_TYPES.has(blockType)
   const hasButton = BUTTON_LAYOUT_TYPES.has(blockType)
@@ -221,9 +223,40 @@ function Accordion({
 function BlockTab({ block, onPatch }: { block: CanvasBlock; onPatch: (p: Partial<CanvasBlock>) => void }) {
   const bg  = block.backgroundColor ?? '#ffffff'
   const pad = block.padding ?? { top: 0, right: 0, bottom: 0, left: 0 }
+  const spacerH = block.spacerHeight ?? 64
 
   return (
     <div className="flex-1 overflow-auto px-4 py-4 space-y-5">
+
+      {/* Spacer height — only shown for spacer blocks */}
+      {block.type === 'spacer' && (
+        <div>
+          <SectionLabel>Height</SectionLabel>
+          <div className="flex items-center gap-3">
+            <input
+              type="range"
+              min={8}
+              max={320}
+              step={4}
+              value={spacerH}
+              onChange={(e) => onPatch({ spacerHeight: Number(e.target.value) })}
+              className="flex-1 accent-gray-800"
+            />
+            <div className="flex items-center gap-1 rounded-xl border border-gray-200 px-2.5 py-2 w-20 shrink-0">
+              <input
+                type="number"
+                min={8}
+                max={320}
+                value={spacerH}
+                onChange={(e) => onPatch({ spacerHeight: Math.max(8, Math.min(320, Number(e.target.value))) })}
+                className="w-full text-[12px] text-gray-700 focus:outline-none"
+              />
+              <span className="text-[9px] text-gray-300">px</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Background */}
       <div>
         <ColorSwatch

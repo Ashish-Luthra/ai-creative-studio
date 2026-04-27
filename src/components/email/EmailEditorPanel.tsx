@@ -49,6 +49,8 @@ export interface CanvasBlock {
   textAlign?: 'left' | 'center' | 'right'
   lineHeight?: number
   letterSpacing?: number
+  // Spacer
+  spacerHeight?: number
   // Content block inner layout
   contentLayout?: '2col-text' | '3col-text' | 'image' | 'image-text'
   // Link
@@ -742,6 +744,7 @@ function BlockContent({
   // Content block
   contentLayout,
   onContentLayoutSelect,
+  spacerHeight,
 }: {
   type: string
   backgroundColor?: string
@@ -771,6 +774,7 @@ function BlockContent({
   onButtonAreaClick?: (e: React.MouseEvent) => void
   contentLayout?: string
   onContentLayoutSelect?: (layout: string) => void
+  spacerHeight?: number
 }) {
   // ── Button style derivation ──────────────────────────────────────────────────
   const BTN_SHAPES = [
@@ -1232,10 +1236,14 @@ function BlockContent({
   }
 
   if (type === 'spacer') {
+    const spacerPx = spacerHeight ?? 64
     return (
-      <div className="flex h-16 items-center justify-center border-y border-dashed border-gray-200 bg-white" style={bg}>
+      <div
+        className="flex items-center justify-center border-y border-dashed border-gray-200 bg-white"
+        style={{ ...bg, height: spacerPx }}
+      >
         <span className="text-[9px] font-medium uppercase tracking-widest text-gray-300">
-          Spacer
+          Spacer · {spacerPx}px
         </span>
       </div>
     )
@@ -1762,6 +1770,7 @@ export const EmailEditorPanel: React.FC = () => {
                         onContentLayoutSelect={(layout) =>
                           handleBlockPatch(block.id, { contentLayout: (layout || undefined) as CanvasBlock['contentLayout'] })
                         }
+                        spacerHeight={block.spacerHeight}
                       />
                     </div>
 
