@@ -885,11 +885,44 @@ function BlockContent({
   // ── Structural blocks ──────────────────────────────────────────────────────
 
   if (type === 'logo') {
+    const logoSrc = imageSrcs['logo']
     return (
       <div className="flex items-center justify-center bg-white py-6" style={bg}>
-        <div className="flex h-14 w-40 items-center justify-center rounded-md border-2 border-dashed border-gray-200 bg-gray-50 text-[10px] font-semibold uppercase tracking-widest text-gray-300">
-          YOUR LOGO
-        </div>
+        {logoSrc ? (
+          <div className="group relative">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={logoSrc}
+              alt="Logo"
+              className="max-h-16 max-w-[200px] object-contain"
+              draggable={false}
+            />
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onImageDoubleClick('logo') }}
+              className="absolute inset-0 flex items-center justify-center rounded bg-black/0 text-transparent transition-all group-hover:bg-black/30 group-hover:text-white"
+            >
+              <span className="rounded bg-black/60 px-2 py-1 text-[10px] font-medium opacity-0 transition-opacity group-hover:opacity-100">
+                Change logo
+              </span>
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onImageDoubleClick('logo') }}
+            className="flex h-14 w-44 flex-col items-center justify-center gap-1.5 rounded-md border-2 border-dashed border-gray-200 bg-gray-50 transition-all hover:border-blue-400 hover:bg-blue-50"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="text-gray-300">
+              <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="1.5"/>
+              <circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/>
+              <path d="M21 15l-5-5L5 21" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+            <span className="text-[9px] font-semibold uppercase tracking-widest text-gray-300">
+              Upload Logo
+            </span>
+          </button>
+        )}
       </div>
     )
   }
