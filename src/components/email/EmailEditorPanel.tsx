@@ -1652,7 +1652,7 @@ export const EmailEditorPanel: React.FC = () => {
   const [emailerNameInput, setEmailerNameInput] = useState('')
   const dropdownRef = useRef<HTMLDivElement>(null)
 
-  const { document: doc, previewMode, setPreviewMode } = useEmailStore()
+  const { document: doc, previewMode, setPreviewMode, updateSubject } = useEmailStore()
 
   // Fetch emailer list on mount — only replace dummy data if real rows come back
   useEffect(() => {
@@ -2039,12 +2039,14 @@ export const EmailEditorPanel: React.FC = () => {
             )}
           </div>
 
-          {/* Subject / emailer name — centre fill */}
-          <span className="min-w-0 flex-1 truncate text-center text-[11px] text-gray-400">
-            {savedEmailers.find((e) => e.id === currentEmailerId)?.name
-              || doc.subject
-              || 'Untitled email'}
-          </span>
+          {/* Subject line — editable, centre fill */}
+          <input
+            type="text"
+            value={doc.subject ?? ''}
+            onChange={(e) => updateSubject(e.target.value)}
+            placeholder="Add email subject line…"
+            className="min-w-0 flex-1 bg-transparent text-center text-[11px] text-gray-700 placeholder:text-gray-300 focus:outline-none focus:ring-0"
+          />
 
           {/* ── Save / Save as New ── */}
           <div className="inline-flex items-center gap-1">
