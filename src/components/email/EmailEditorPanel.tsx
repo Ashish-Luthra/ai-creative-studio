@@ -51,6 +51,9 @@ export interface CanvasBlock {
   letterSpacing?: number
   // Spacer
   spacerHeight?: number
+  // Content block
+  contentHeight?: number
+  contentButton?: { position: 'below-text' | 'on-image'; label: string } | null
   // Link bar
   linkBarItems?: { label: string; url: string }[]
   // Content block inner layout
@@ -252,7 +255,15 @@ function TreePanel({ blocks, selectedId, onSelect, onMoveUp, onMoveDown, onDelet
 
 // ─── Sections Panel ───────────────────────────────────────────────────────────
 
-function SectionsPanel({ onInsert }: { onInsert: (type: string) => void }) {
+function SectionsPanel({
+  onInsert,
+  onBlockDragStart,
+  onBlockDragEnd,
+}: {
+  onInsert: (type: string) => void
+  onBlockDragStart?: (type: string) => void
+  onBlockDragEnd?: () => void
+}) {
   return (
     <div className="flex flex-1 flex-col overflow-auto">
       <div className="px-3 pb-3 pt-2">
@@ -260,14 +271,21 @@ function SectionsPanel({ onInsert }: { onInsert: (type: string) => void }) {
           Email Blocks
         </p>
         <p className="mb-3 text-[10px] text-gray-400 leading-relaxed">
-          Click a block to insert it after the selected block in the canvas.
+          Click to insert · Drag into a Content block
         </p>
         <div className="grid grid-cols-3 gap-1.5">
           {CANVAS_BLOCK_TYPES.map(({ id, label, Icon }) => (
             <button
               key={id}
+              draggable
               onClick={() => onInsert(id)}
-              className="flex flex-col items-center gap-1.5 rounded-lg border border-gray-200 bg-white p-2.5 text-center transition-all hover:border-blue-400 hover:bg-blue-50 hover:shadow-sm active:scale-95"
+              onDragStart={(e) => {
+                e.dataTransfer.setData('blockType', id)
+                e.dataTransfer.effectAllowed = 'copy'
+                onBlockDragStart?.(id)
+              }}
+              onDragEnd={onBlockDragEnd}
+              className="flex flex-col items-center gap-1.5 rounded-lg border border-gray-200 bg-white p-2.5 text-center transition-all hover:border-blue-400 hover:bg-blue-50 hover:shadow-sm active:scale-95 cursor-grab active:cursor-grabbing"
             >
               <div className="flex h-7 w-7 items-center justify-center rounded-md bg-gray-100 text-gray-500">
                 <Icon size={13} />
@@ -748,6 +766,11 @@ function BlockContent({
   onContentLayoutSelect,
   spacerHeight,
   linkBarItems,
+  contentHeight,
+  contentButton,
+  isDraggingButton,
+  onDropButton,
+  onContentButtonRemove,
 }: {
   type: string
   backgroundColor?: string
@@ -779,6 +802,11 @@ function BlockContent({
   onContentLayoutSelect?: (layout: string) => void
   spacerHeight?: number
   linkBarItems?: { label: string; url: string }[]
+  contentHeight?: number
+  contentButton?: { position: 'below-text' | 'on-image'; label: string } | null
+  isDraggingButton?: boolean
+  onDropButton?: (pos: 'below-text' | 'on-image') => void
+  onContentButtonRemove?: () => void
 }) {
   // ── Button style derivation ──────────────────────────────────────────────────
   const BTN_SHAPES = [
@@ -978,11 +1006,51 @@ function BlockContent({
       )
     }
 
+    // ── Shared helpers ────────────────────────────────────────────────────────
+    const dropZoneBelow = (
+      <div
+        onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy' }}
+        onDrop={(e) => { e.preventDefault(); e.stopPropagation(); onDropButton?.('below-text') }}
+        className={cn(
+          'mx-8 mb-4 flex items-center justify-center rounded-xl border-2 border-dashed py-3 text-[10px] font-medium transition-all',
+          isDraggingButton
+            ? 'border-blue-400 bg-blue-50 text-blue-500 opacity-100'
+            : 'border-transparent opacity-0 pointer-events-none',
+        )}
+      >
+        Drop button here
+      </div>
+    )
+
+    const embeddedBtn = contentButton ? (
+      <div className="relative flex items-center justify-center px-8 py-4" style={{ justifyContent: btnJustify }}>
+        <div
+          {...buttonEditable}
+          style={btnStyle}
+          className="relative inline-flex items-center justify-center px-5 py-2 text-[13px] font-semibold"
+        >
+          {contentButton.label}
+          <button
+            type="button"
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => { e.stopPropagation(); onContentButtonRemove?.() }}
+            className="absolute -right-2 -top-2 flex h-4 w-4 items-center justify-center rounded-full bg-gray-800 text-[8px] text-white opacity-0 transition-opacity hover:bg-red-500 group-hover/cbtn:opacity-100"
+            title="Remove button"
+          >
+            ✕
+          </button>
+        </div>
+      </div>
+    ) : null
+
     // ── 2-column text ────────────────────────────────────────────────────────
     if (contentLayout === '2col-text') {
       return (
-        <div className="bg-white" style={bg}>
-          <div className="grid grid-cols-2 divide-x divide-gray-100 px-2 py-8">
+        <div className="group/cbtn bg-white" style={bg}>
+          <div
+            className="grid grid-cols-2 divide-x divide-gray-100 px-2 py-8"
+            style={contentHeight ? { minHeight: contentHeight } : undefined}
+          >
             <div className="flex flex-col gap-2 px-8">
               <h4 {...editable} className={`${editable.className} text-sm font-semibold`} style={fontStyle}>
                 Column One Heading
@@ -1000,6 +1068,7 @@ function BlockContent({
               </p>
             </div>
           </div>
+          {contentButton?.position === 'below-text' ? embeddedBtn : dropZoneBelow}
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); onContentLayoutSelect?.('') }}
@@ -1014,8 +1083,11 @@ function BlockContent({
     // ── 3-column text ────────────────────────────────────────────────────────
     if (contentLayout === '3col-text') {
       return (
-        <div className="bg-white" style={bg}>
-          <div className="grid grid-cols-3 divide-x divide-gray-100 px-2 py-8">
+        <div className="group/cbtn bg-white" style={bg}>
+          <div
+            className="grid grid-cols-3 divide-x divide-gray-100 px-2 py-8"
+            style={contentHeight ? { minHeight: contentHeight } : undefined}
+          >
             {(['One', 'Two', 'Three'] as const).map((col) => (
               <div key={col} className="flex flex-col gap-2 px-6">
                 <h4 {...editable} className={`${editable.className} text-sm font-semibold`} style={fontStyle}>
@@ -1027,6 +1099,7 @@ function BlockContent({
               </div>
             ))}
           </div>
+          {contentButton?.position === 'below-text' ? embeddedBtn : dropZoneBelow}
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); onContentLayoutSelect?.('') }}
@@ -1041,30 +1114,67 @@ function BlockContent({
     // ── Image only ───────────────────────────────────────────────────────────
     if (contentLayout === 'image') {
       const imgSrc = imageSrcs['content-img']
+      const hasOnImageBtn = contentButton?.position === 'on-image'
       return (
-        <div className="bg-white" style={bg}>
-          {imgSrc ? (
-            <ResizableImageSlot
-              src={imgSrc}
-              alt="Content"
-              height={imageSizes['content-img'] ?? 320}
-              onDoubleClick={() => onImageDoubleClick('content-img')}
-              onResize={(h) => onImageResize('content-img', h)}
-            />
-          ) : (
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); onImageDoubleClick('content-img') }}
-              className="flex w-full flex-col items-center justify-center gap-3 border-2 border-dashed border-gray-200 bg-gray-50 py-16 transition-all hover:border-blue-400 hover:bg-blue-50"
-            >
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" className="text-gray-300">
-                <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="1.5"/>
-                <circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/>
-                <path d="M21 15l-5-5L5 21" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-              </svg>
-              <span className="text-[11px] font-medium text-gray-400">Click to add image</span>
-            </button>
-          )}
+        <div className="group/cbtn bg-white" style={bg}>
+          <div
+            className="relative"
+            style={contentHeight ? { minHeight: contentHeight } : undefined}
+            onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy' }}
+            onDrop={(e) => { e.preventDefault(); e.stopPropagation(); onDropButton?.('on-image') }}
+          >
+            {imgSrc ? (
+              <ResizableImageSlot
+                src={imgSrc}
+                alt="Content"
+                height={imageSizes['content-img'] ?? 320}
+                onDoubleClick={() => onImageDoubleClick('content-img')}
+                onResize={(h) => onImageResize('content-img', h)}
+              />
+            ) : (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onImageDoubleClick('content-img') }}
+                className="flex w-full flex-col items-center justify-center gap-3 border-2 border-dashed border-gray-200 bg-gray-50 py-16 transition-all hover:border-blue-400 hover:bg-blue-50"
+              >
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" className="text-gray-300">
+                  <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="1.5"/>
+                  <circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/>
+                  <path d="M21 15l-5-5L5 21" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                </svg>
+                <span className="text-[11px] font-medium text-gray-400">Click to add image</span>
+              </button>
+            )}
+            {/* On-image drop hint */}
+            {isDraggingButton && !hasOnImageBtn && (
+              <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded border-2 border-dashed border-blue-400 bg-blue-500/10">
+                <span className="rounded-lg bg-white/90 px-3 py-1.5 text-[11px] font-medium text-blue-600 shadow">
+                  Drop button on image
+                </span>
+              </div>
+            )}
+            {/* On-image embedded button */}
+            {hasOnImageBtn && (
+              <div className="absolute inset-0 flex items-end justify-center pb-6">
+                <div
+                  {...buttonEditable}
+                  style={btnStyle}
+                  className="relative inline-flex items-center justify-center px-5 py-2 text-[13px] font-semibold"
+                >
+                  {contentButton!.label}
+                  <button
+                    type="button"
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onClick={(e) => { e.stopPropagation(); onContentButtonRemove?.() }}
+                    className="absolute -right-2 -top-2 flex h-4 w-4 items-center justify-center rounded-full bg-gray-800 text-[8px] text-white opacity-0 transition-opacity hover:bg-red-500 group-hover/cbtn:opacity-100"
+                    title="Remove button"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); onContentLayoutSelect?.('') }}
@@ -1079,41 +1189,88 @@ function BlockContent({
     // ── Image + Text ─────────────────────────────────────────────────────────
     if (contentLayout === 'image-text') {
       const imgSrc = imageSrcs['content-img']
+      const hasOnImageBtn = contentButton?.position === 'on-image'
       return (
-        <div className="bg-white" style={bg}>
-          <div className="flex min-h-[200px]">
+        <div className="group/cbtn bg-white" style={bg}>
+          <div
+            className="flex"
+            style={{ minHeight: contentHeight ?? 200 }}
+          >
             {/* Image half */}
-            {imgSrc ? (
-              <ResizableImageSlot
-                src={imgSrc}
-                alt="Content"
-                height={imageSizes['content-img'] ?? 240}
-                className="w-1/2 self-stretch"
-                onDoubleClick={() => onImageDoubleClick('content-img')}
-                onResize={(h) => onImageResize('content-img', h)}
-              />
-            ) : (
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); onImageDoubleClick('content-img') }}
-                className="flex w-1/2 flex-col items-center justify-center gap-2 border-2 border-dashed border-gray-200 bg-gray-50 transition-all hover:border-blue-400 hover:bg-blue-50"
-              >
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" className="text-gray-300">
-                  <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="1.5"/>
-                  <circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/>
-                  <path d="M21 15l-5-5L5 21" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                </svg>
-                <span className="text-[10px] font-medium text-gray-400">Click to add image</span>
-              </button>
-            )}
+            <div
+              className="relative w-1/2"
+              onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy' }}
+              onDrop={(e) => { e.preventDefault(); e.stopPropagation(); onDropButton?.('on-image') }}
+            >
+              {imgSrc ? (
+                <ResizableImageSlot
+                  src={imgSrc}
+                  alt="Content"
+                  height={imageSizes['content-img'] ?? 240}
+                  className="w-full self-stretch"
+                  onDoubleClick={() => onImageDoubleClick('content-img')}
+                  onResize={(h) => onImageResize('content-img', h)}
+                />
+              ) : (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); onImageDoubleClick('content-img') }}
+                  className="flex h-full min-h-[200px] w-full flex-col items-center justify-center gap-2 border-2 border-dashed border-gray-200 bg-gray-50 transition-all hover:border-blue-400 hover:bg-blue-50"
+                >
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" className="text-gray-300">
+                    <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="1.5"/>
+                    <circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/>
+                    <path d="M21 15l-5-5L5 21" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                  </svg>
+                  <span className="text-[10px] font-medium text-gray-400">Click to add image</span>
+                </button>
+              )}
+              {isDraggingButton && !hasOnImageBtn && (
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded border-2 border-dashed border-blue-400 bg-blue-500/10">
+                  <span className="rounded-lg bg-white/90 px-2 py-1 text-[10px] font-medium text-blue-600 shadow">
+                    Drop on image
+                  </span>
+                </div>
+              )}
+              {hasOnImageBtn && (
+                <div className="absolute inset-0 flex items-end justify-center pb-4">
+                  <div
+                    {...buttonEditable}
+                    style={btnStyle}
+                    className="relative inline-flex items-center justify-center px-4 py-1.5 text-[12px] font-semibold"
+                  >
+                    {contentButton!.label}
+                    <button
+                      type="button"
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onClick={(e) => { e.stopPropagation(); onContentButtonRemove?.() }}
+                      className="absolute -right-2 -top-2 flex h-4 w-4 items-center justify-center rounded-full bg-gray-800 text-[8px] text-white opacity-0 transition-opacity hover:bg-red-500 group-hover/cbtn:opacity-100"
+                      title="Remove button"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
             {/* Text half */}
-            <div className="flex w-1/2 flex-col justify-center gap-3 px-8 py-8">
+            <div
+              className="flex w-1/2 flex-col justify-center gap-3 px-8 py-8"
+              onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy' }}
+              onDrop={(e) => { e.preventDefault(); e.stopPropagation(); onDropButton?.('below-text') }}
+            >
               <h4 {...editable} className={`${editable.className} font-semibold text-sm`} style={fontStyle}>
                 Content Heading
               </h4>
               <p {...editable} className={`${editable.className} text-sm leading-relaxed text-gray-600`} style={fontStyle}>
                 Click to edit this text. Tell your story alongside the image.
               </p>
+              {isDraggingButton && !contentButton && (
+                <div className="rounded-xl border-2 border-dashed border-blue-400 bg-blue-50 py-2 text-center text-[10px] font-medium text-blue-500">
+                  Drop button below text
+                </div>
+              )}
+              {contentButton?.position === 'below-text' && embeddedBtn}
             </div>
           </div>
           <button
@@ -1474,6 +1631,8 @@ export const EmailEditorPanel: React.FC = () => {
   const [pendingImageTarget, setPendingImageTarget] = useState<{ blockId: string; imageKey: string } | null>(null)
   // Signals EmailRightNav which tab to activate when a specific element is clicked
   const [focusTab, setFocusTab] = useState<{ tab: string; seq: number } | undefined>()
+  // Tracks which block type is currently being dragged from the sections panel
+  const [draggedBlockType, setDraggedBlockType] = useState<string | null>(null)
 
   const { document: doc, previewMode, setPreviewMode } = useEmailStore()
 
@@ -1666,7 +1825,13 @@ export const EmailEditorPanel: React.FC = () => {
                 onDelete={handleDelete}
               />
             )}
-            {activeTab === 'sections' && <SectionsPanel onInsert={handleAppendInsert} />}
+            {activeTab === 'sections' && (
+              <SectionsPanel
+                onInsert={handleAppendInsert}
+                onBlockDragStart={setDraggedBlockType}
+                onBlockDragEnd={() => setDraggedBlockType(null)}
+              />
+            )}
             {activeTab === 'text'     && <TextBlocksPanel onInsert={handleAppendInsert} />}
             {activeTab === 'content'  && <ContentPanel selectedBlock={selectedBlock} onBlockColorChange={handleBlockColorChange} />}
             {activeTab === 'style'    && <StylePanel />}
@@ -1785,6 +1950,13 @@ export const EmailEditorPanel: React.FC = () => {
                         }
                         spacerHeight={block.spacerHeight}
                         linkBarItems={block.linkBarItems}
+                        contentHeight={block.contentHeight}
+                        contentButton={block.contentButton}
+                        isDraggingButton={draggedBlockType === 'button'}
+                        onDropButton={(pos) => handleBlockPatch(block.id, {
+                          contentButton: { position: pos, label: 'Click Here' },
+                        })}
+                        onContentButtonRemove={() => handleBlockPatch(block.id, { contentButton: null })}
                       />
                     </div>
 
