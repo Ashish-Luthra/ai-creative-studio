@@ -2345,9 +2345,6 @@ export const EmailEditorPanel: React.FC = () => {
           </div>
         </div>
 
-        {/* Floating text toolbar */}
-        <FloatingTextToolbar position={textToolbarPosition} />
-
         {/* Approved images overlay — opens when an image slot is double-clicked */}
         <ApprovedImagesPanel
           open={showApprovedImages}
