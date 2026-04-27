@@ -42,8 +42,9 @@ function getTabsForBlock(blockType: string): { id: RightTab; label: string }[] {
   if (blockType === 'text')   return [F, L, K]
   // Spacer — only needs Block tab (height + background)
   if (blockType === 'spacer') return [K]
-  // Link bar — only needs Block tab (link items editor + background)
+  // Link bar / Footer — only need Block tab (link items editor + background)
   if (blockType === 'link-bar') return [K]
+  if (blockType === 'footer')   return [K]
 
   const hasShape  = IMAGE_BLOCK_TYPES.has(blockType)
   const hasButton = BUTTON_LAYOUT_TYPES.has(blockType)
@@ -332,6 +333,91 @@ function LinkBarEditor({ block, onPatch }: { block: CanvasBlock; onPatch: (p: Pa
   )
 }
 
+// ─── Footer editor (used inside BlockTab) ────────────────────────────────────
+
+const DEFAULT_FOOTER_LINKS = [
+  { label: 'Privacy Policy',  url: '' },
+  { label: 'Unsubscribe',     url: '' },
+  { label: 'View in Browser', url: '' },
+  { label: 'Contact Us',      url: '' },
+]
+
+function FooterEditor({ block, onPatch }: { block: CanvasBlock; onPatch: (p: Partial<CanvasBlock>) => void }) {
+  const items = (block.footerLinks && block.footerLinks.length > 0)
+    ? block.footerLinks
+    : DEFAULT_FOOTER_LINKS
+
+  const patchItems = (next: { label: string; url: string }[]) =>
+    onPatch({ footerLinks: next })
+
+  const updateItem = (i: number, field: 'label' | 'url', value: string) =>
+    patchItems(items.map((item, idx) => idx === i ? { ...item, [field]: value } : item))
+
+  const removeItem = (i: number) => {
+    if (items.length <= 1) return
+    patchItems(items.filter((_, idx) => idx !== i))
+  }
+
+  const addItem = () => patchItems([...items, { label: 'New Link', url: '' }])
+
+  const moveItem = (from: number, to: number) => {
+    if (to < 0 || to >= items.length) return
+    const next = [...items]
+    const [moved] = next.splice(from, 1)
+    next.splice(to, 0, moved)
+    patchItems(next)
+  }
+
+  return (
+    <div>
+      <SectionLabel>Footer Links</SectionLabel>
+      <div className="space-y-2">
+        {items.map((item, i) => (
+          <div key={i} className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 space-y-2">
+            <div className="flex items-center gap-2">
+              <div className="flex flex-col gap-0.5">
+                <button type="button" onClick={() => moveItem(i, i - 1)} disabled={i === 0}
+                  className="text-[0.95em] text-gray-300 hover:text-gray-500 disabled:opacity-20 leading-none" title="Move up">▲</button>
+                <button type="button" onClick={() => moveItem(i, i + 1)} disabled={i === items.length - 1}
+                  className="text-[0.95em] text-gray-300 hover:text-gray-500 disabled:opacity-20 leading-none" title="Move down">▼</button>
+              </div>
+              <input
+                type="text"
+                value={item.label}
+                placeholder="Label"
+                onChange={(e) => updateItem(i, 'label', e.target.value)}
+                className="flex-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-[12px] text-gray-800 focus:outline-none focus:ring-1 focus:ring-gray-300"
+              />
+              <button type="button" onClick={() => removeItem(i)} disabled={items.length <= 1}
+                className="text-gray-300 hover:text-red-400 disabled:opacity-20 transition-colors" title="Remove">
+                <Trash2 size={13} />
+              </button>
+            </div>
+            <div className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5">
+              <span className="text-[9px] text-gray-300 font-mono shrink-0">URL</span>
+              <input
+                type="url"
+                value={item.url}
+                placeholder="https://…"
+                onChange={(e) => updateItem(i, 'url', e.target.value)}
+                className="flex-1 text-[11px] text-gray-700 font-mono focus:outline-none min-w-0"
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+      <button
+        type="button"
+        onClick={addItem}
+        className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-gray-300 py-2 text-[11px] text-gray-400 hover:border-gray-400 hover:text-gray-600 transition-colors"
+      >
+        <Plus size={12} />
+        Add link
+      </button>
+    </div>
+  )
+}
+
 // ─── Tab: Block ────────────────────────────────────────────────────────────────
 
 function BlockTab({ block, onPatch }: { block: CanvasBlock; onPatch: (p: Partial<CanvasBlock>) => void }) {
@@ -404,6 +490,11 @@ function BlockTab({ block, onPatch }: { block: CanvasBlock; onPatch: (p: Partial
       {/* Link Bar items — only shown for link-bar blocks */}
       {block.type === 'link-bar' && (
         <LinkBarEditor block={block} onPatch={onPatch} />
+      )}
+
+      {/* Footer links — only shown for footer blocks */}
+      {block.type === 'footer' && (
+        <FooterEditor block={block} onPatch={onPatch} />
       )}
 
       {/* Background */}

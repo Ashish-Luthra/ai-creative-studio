@@ -58,6 +58,8 @@ export interface CanvasBlock {
   contentButton?: { position: 'below-text' | 'on-image'; label: string } | null
   // Link bar
   linkBarItems?: { label: string; url: string }[]
+  // Footer
+  footerLinks?: { label: string; url: string }[]
   // Content block inner layout
   contentLayout?: '2col-text' | '3col-text' | 'image' | 'image-text'
   // Link
@@ -768,6 +770,7 @@ function BlockContent({
   onContentLayoutSelect,
   spacerHeight,
   linkBarItems,
+  footerLinks,
   contentHeight,
   contentButton,
   isDraggingButton,
@@ -804,6 +807,7 @@ function BlockContent({
   onContentLayoutSelect?: (layout: string) => void
   spacerHeight?: number
   linkBarItems?: { label: string; url: string }[]
+  footerLinks?: { label: string; url: string }[]
   contentHeight?: number
   contentButton?: { position: 'below-text' | 'on-image'; label: string } | null
   isDraggingButton?: boolean
@@ -1387,13 +1391,26 @@ function BlockContent({
   }
 
   if (type === 'footer') {
+    const DEFAULT_FOOTER_LINKS = [
+      { label: 'Privacy Policy', url: '' },
+      { label: 'Unsubscribe',    url: '' },
+      { label: 'View in Browser', url: '' },
+      { label: 'Contact Us',     url: '' },
+    ]
+    const fLinks = (footerLinks && footerLinks.length > 0) ? footerLinks : DEFAULT_FOOTER_LINKS
     return (
       <div className="bg-gray-50 px-12 py-6 text-center" style={bg}>
         <div className="mb-3 flex items-center justify-center gap-4 text-[11px] text-gray-500">
-          {['Privacy Policy', 'Unsubscribe', 'View in Browser', 'Contact Us'].map((link, i, arr) => (
-            <React.Fragment key={link}>
-              <span className="cursor-pointer hover:text-gray-800 hover:underline">{link}</span>
-              {i < arr.length - 1 && <span className="text-gray-300">·</span>}
+          {fLinks.map((link, i) => (
+            <React.Fragment key={i}>
+              <a
+                href={link.url || '#'}
+                onClick={(e) => e.preventDefault()}
+                className="cursor-pointer hover:text-gray-800 hover:underline transition-colors"
+              >
+                {link.label}
+              </a>
+              {i < fLinks.length - 1 && <span className="text-gray-300">·</span>}
             </React.Fragment>
           ))}
         </div>
@@ -2230,6 +2247,7 @@ export const EmailEditorPanel: React.FC = () => {
                         }
                         spacerHeight={block.spacerHeight}
                         linkBarItems={block.linkBarItems}
+                        footerLinks={block.footerLinks}
                         contentHeight={block.contentHeight}
                         contentButton={block.contentButton}
                         isDraggingButton={draggedBlockType === 'button'}
