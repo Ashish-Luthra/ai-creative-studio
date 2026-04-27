@@ -7,6 +7,7 @@ import {
   Type, Plus, X, MousePointer2, ChevronsUpDown,
   Star, Link2, Share2, MapPin, Mail, Layout,
   Save, FolderOpen, ChevronDown as ChevronDownIcon, Check, Loader2, PlusCircle,
+  Image as ImageIcon,
 } from 'lucide-react'
 import type { EmailerMeta } from '@/lib/supabase'
 import { nanoid } from 'nanoid'
@@ -17,6 +18,7 @@ import { FloatingActionBar } from './FloatingActionBar'
 import { FloatingTextToolbar } from './FloatingTextToolbar'
 import { TextEditPanel } from './TextEditPanel'
 import { ApprovedImagesPanel } from '@/components/canvas/ApprovedImagesPanel'
+import { AllyvateAssistant, type AllyContext } from '@/components/ai/AllyvateAssistant'
 import { EmailRightNav } from './EmailRightNav'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -668,10 +670,11 @@ interface ResizableImageSlotProps {
   style?: React.CSSProperties  // e.g. clip-path for image shape
   onDoubleClick: () => void
   onResize: (newHeight: number) => void
+  onImageClick?: (e: React.MouseEvent) => void
 }
 
 function ResizableImageSlot({
-  src, alt, height, className, style, onDoubleClick, onResize,
+  src, alt, height, className, style, onDoubleClick, onResize, onImageClick,
 }: ResizableImageSlotProps) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const dragRef = useRef<{ startY: number; startH: number } | null>(null)
@@ -711,6 +714,7 @@ function ResizableImageSlot({
         src={src}
         alt={alt}
         className="h-full w-full object-cover"
+        onClick={(e) => { e.stopPropagation(); onImageClick?.(e) }}
         onDoubleClick={(e) => { e.stopPropagation(); onDoubleClick() }}
         draggable={false}
       />
@@ -744,6 +748,7 @@ function BlockContent({
   imageSizes = {},
   onImageDoubleClick,
   onImageResize,
+  onImageClick,
   // Button settings
   buttonShapeVariant,
   buttonFillColor,
@@ -784,6 +789,7 @@ function BlockContent({
   imageSizes?: Record<string, number>
   onImageDoubleClick: (key: string) => void
   onImageResize: (key: string, height: number) => void
+  onImageClick?: (e: React.MouseEvent) => void
   buttonShapeVariant?: number
   buttonFillColor?: string
   buttonBorderColor?: string
@@ -1169,6 +1175,7 @@ function BlockContent({
                 height={imageSizes['content-img'] ?? 320}
                 onDoubleClick={() => onImageDoubleClick('content-img')}
                 onResize={(h) => onImageResize('content-img', h)}
+                onImageClick={onImageClick}
               />
             ) : (
               <button
@@ -1249,6 +1256,7 @@ function BlockContent({
                   className="w-full self-stretch"
                   onDoubleClick={() => onImageDoubleClick('content-img')}
                   onResize={(h) => onImageResize('content-img', h)}
+                  onImageClick={onImageClick}
                 />
               ) : (
                 <button
@@ -1483,6 +1491,7 @@ function BlockContent({
           className="w-1/2 self-stretch"
           onDoubleClick={() => onImageDoubleClick('main')}
           onResize={(h) => onImageResize('main', h)}
+          onImageClick={onImageClick}
         />
         <div className="flex w-1/2 flex-col items-center justify-center gap-4 p-12">
           <p {...editable} className={`${editable.className} text-sm italic text-gray-500`}>
@@ -1547,6 +1556,7 @@ function BlockContent({
           height={imageSizes['bg'] ?? 256}
           onDoubleClick={() => onImageDoubleClick('bg')}
           onResize={(h) => onImageResize('bg', h)}
+          onImageClick={onImageClick}
         />
       </div>
     )
@@ -1572,6 +1582,7 @@ function BlockContent({
           className="w-2/3"
           onDoubleClick={() => onImageDoubleClick('bg')}
           onResize={(h) => onImageResize('bg', h)}
+          onImageClick={onImageClick}
         />
       </div>
     )
@@ -1588,6 +1599,7 @@ function BlockContent({
           style={imgClip}
           onDoubleClick={() => onImageDoubleClick('main')}
           onResize={(h) => onImageResize('main', h)}
+          onImageClick={onImageClick}
         />
         <div className="flex w-1/2 flex-col justify-center gap-3 px-4">
           <p {...editable} className={`${editable.className} text-sm italic text-gray-500`}>One</p>
@@ -1616,6 +1628,7 @@ function BlockContent({
           height={imageSizes['main'] ?? 384}
           onDoubleClick={() => onImageDoubleClick('main')}
           onResize={(h) => onImageResize('main', h)}
+          onImageClick={onImageClick}
         />
         <div className="bg-gray-100 p-12 text-center">
           <h3 {...editable} className={`${editable.className} mb-3 font-serif text-2xl`}>
@@ -1645,6 +1658,7 @@ function BlockContent({
           style={imgClip}
           onDoubleClick={() => onImageDoubleClick('avatar')}
           onResize={(h) => onImageResize('avatar', h)}
+          onImageClick={onImageClick}
         />
         <div className="flex flex-1 flex-col justify-center gap-3">
           <h4 {...editable} className={`${editable.className} text-sm font-bold tracking-widest`}>
@@ -1685,6 +1699,19 @@ export const EmailEditorPanel: React.FC = () => {
   const [focusTab, setFocusTab] = useState<{ tab: string; seq: number } | undefined>()
   // Tracks which block type is currently being dragged from the sections panel
   const [draggedBlockType, setDraggedBlockType] = useState<string | null>(null)
+
+  // ── Allyvate AI assistant ───────────────────────────────────────────────────
+  const [allyVisible,  setAllyVisible]  = useState(false)
+  const [allyContext,  setAllyContext]  = useState<AllyContext>('text')
+  const [allyAnchorX, setAllyAnchorX]  = useState(0)
+  const [allyAnchorY, setAllyAnchorY]  = useState(0)
+
+  const showAlly = useCallback((ctx: AllyContext, e: React.MouseEvent) => {
+    setAllyContext(ctx)
+    setAllyAnchorX(e.clientX)
+    setAllyAnchorY(e.clientY)
+    setAllyVisible(true)
+  }, [])
 
   // ── Persistence state ───────────────────────────────────────────────────────
   const [currentEmailerId, setCurrentEmailerId] = useState<string | null>(null)
@@ -1894,7 +1921,8 @@ export const EmailEditorPanel: React.FC = () => {
     setTextToolbarPosition({ top: e.clientY - 50, left: e.clientX - 60 })
     setShowTextEdit(true)
     setFocusTab((prev) => ({ tab: 'font', seq: (prev?.seq ?? 0) + 1 }))
-  }, [])
+    showAlly('text', e)
+  }, [showAlly])
 
   // Clicking the styled button element inside a layout block → show Button tab
   const handleButtonAreaClick = useCallback(() => {
@@ -1914,15 +1942,17 @@ export const EmailEditorPanel: React.FC = () => {
   }, [])
 
   const handleImageSelect = useCallback((src: string) => {
-    if (!pendingImageTarget) return
-    const { blockId, imageKey } = pendingImageTarget
-    setCanvasBlocks((prev) =>
-      prev.map((b) =>
-        b.id === blockId
-          ? { ...b, imageSrcs: { ...(b.imageSrcs ?? {}), [imageKey]: src } }
-          : b,
-      ),
-    )
+    if (pendingImageTarget) {
+      const { blockId, imageKey } = pendingImageTarget
+      setCanvasBlocks((prev) =>
+        prev.map((b) =>
+          b.id === blockId
+            ? { ...b, imageSrcs: { ...(b.imageSrcs ?? {}), [imageKey]: src } }
+            : b,
+        ),
+      )
+    }
+    // Always close — covers both "pick for block" and "browse from rail" modes
     setShowApprovedImages(false)
     setPendingImageTarget(null)
   }, [pendingImageTarget])
@@ -1989,6 +2019,20 @@ export const EmailEditorPanel: React.FC = () => {
             onClick={() => handleTabClick(item.id)}
           />
         ))}
+
+        {/* Divider */}
+        <div className="my-1 w-7 border-t border-gray-200" />
+
+        {/* Image Library shortcut */}
+        <RailBtn
+          icon={<ImageIcon size={14} />}
+          label="Images"
+          active={showApprovedImages && !pendingImageTarget}
+          onClick={() => {
+            setPendingImageTarget(null)
+            setShowApprovedImages(true)
+          }}
+        />
       </aside>
 
       {/* ── Slide-out Sub-panel ──────────────────────────── */}
@@ -2256,6 +2300,7 @@ export const EmailEditorPanel: React.FC = () => {
                         imageSizes={block.imageSizes}
                         onImageDoubleClick={(key) => handleOpenImagePicker(block.id, key)}
                         onImageResize={(key, h) => handleImageResize(block.id, key, h)}
+                        onImageClick={(e) => showAlly('image', e)}
                         buttonShapeVariant={block.buttonShapeVariant}
                         buttonFillColor={block.buttonFillColor}
                         buttonBorderColor={block.buttonBorderColor}
@@ -2351,6 +2396,19 @@ export const EmailEditorPanel: React.FC = () => {
           onClose={() => { setShowApprovedImages(false); setPendingImageTarget(null) }}
           onSelect={handleImageSelect}
         />
+
+        {/* ── Persistent Allyvate trigger button (bottom-right of canvas) ── */}
+        {!allyVisible && (
+          <button
+            type="button"
+            onClick={(e) => showAlly('text', e)}
+            title="Ask Allyvate"
+            className="absolute bottom-6 right-6 z-[80] flex h-11 w-11 items-center justify-center rounded-full shadow-lg transition-transform hover:scale-110 hover:shadow-xl overflow-hidden"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/allyvate-icon.svg" alt="Ask Allyvate" width={44} height={44} />
+          </button>
+        )}
       </div>
 
       {/* ── Right Nav: EmailRightNav (when block selected) → Block Library ─ */}
@@ -2371,6 +2429,15 @@ export const EmailEditorPanel: React.FC = () => {
           />
         )}
       </aside>
+
+      {/* ── Allyvate AI Assistant (pill → expanded card) ─────────────────── */}
+      <AllyvateAssistant
+        visible={allyVisible}
+        context={allyContext}
+        anchorX={allyAnchorX}
+        anchorY={allyAnchorY}
+        onClose={() => setAllyVisible(false)}
+      />
 
     </div>
   )
