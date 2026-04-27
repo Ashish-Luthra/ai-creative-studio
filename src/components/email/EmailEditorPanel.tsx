@@ -51,6 +51,8 @@ export interface CanvasBlock {
   letterSpacing?: number
   // Spacer
   spacerHeight?: number
+  // Link bar
+  linkBarItems?: { label: string; url: string }[]
   // Content block inner layout
   contentLayout?: '2col-text' | '3col-text' | 'image' | 'image-text'
   // Link
@@ -745,6 +747,7 @@ function BlockContent({
   contentLayout,
   onContentLayoutSelect,
   spacerHeight,
+  linkBarItems,
 }: {
   type: string
   backgroundColor?: string
@@ -775,6 +778,7 @@ function BlockContent({
   contentLayout?: string
   onContentLayoutSelect?: (layout: string) => void
   spacerHeight?: number
+  linkBarItems?: { label: string; url: string }[]
 }) {
   // ── Button style derivation ──────────────────────────────────────────────────
   const BTN_SHAPES = [
@@ -857,16 +861,25 @@ function BlockContent({
   }
 
   if (type === 'link-bar') {
+    const DEFAULT_LINKS = [
+      { label: 'Home',     url: '' },
+      { label: 'About',    url: '' },
+      { label: 'Products', url: '' },
+      { label: 'Blog',     url: '' },
+      { label: 'Contact',  url: '' },
+    ]
+    const items = (linkBarItems && linkBarItems.length > 0) ? linkBarItems : DEFAULT_LINKS
     return (
       <div className="flex items-center justify-center gap-6 border-b border-gray-100 bg-white px-8 py-3" style={bg}>
-        {['Home', 'About', 'Products', 'Contact'].map((link) => (
-          <span
-            key={link}
-            {...editable}
-            className={`${editable.className} text-[11px] font-medium tracking-wide text-gray-600 hover:text-gray-900`}
+        {items.map((item, i) => (
+          <a
+            key={i}
+            href={item.url || '#'}
+            onClick={(e) => e.preventDefault()}
+            className="text-[11px] font-medium tracking-wide text-gray-600 hover:text-gray-900 hover:underline transition-colors"
           >
-            {link}
-          </span>
+            {item.label}
+          </a>
         ))}
       </div>
     )
@@ -1771,6 +1784,7 @@ export const EmailEditorPanel: React.FC = () => {
                           handleBlockPatch(block.id, { contentLayout: (layout || undefined) as CanvasBlock['contentLayout'] })
                         }
                         spacerHeight={block.spacerHeight}
+                        linkBarItems={block.linkBarItems}
                       />
                     </div>
 
