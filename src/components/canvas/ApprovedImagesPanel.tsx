@@ -16,10 +16,10 @@ interface ImageEntry {
 }
 
 const PRESET_IMAGES: ImageEntry[] = [
-  { id: 'coffee-1', name: 'Coffee Product',  category: 'Photorealism', src: '/CoffeeInsta.png', uploadedAt: '2025-03-10T08:00:00Z', deletable: false },
-  { id: 'coffee-2', name: 'Latte Table',     category: 'Photorealism', src: '/coffee.png',       uploadedAt: '2025-03-10T08:00:00Z', deletable: false },
-  { id: 'coffee-3', name: 'Studio Portrait', category: 'Photorealism', src: '/CoffeeInsta.png',  uploadedAt: '2025-03-12T09:30:00Z', deletable: false },
-  { id: 'coffee-4', name: 'Urban Mood',      category: 'Photorealism', src: '/coffee.png',       uploadedAt: '2025-03-14T11:00:00Z', deletable: false },
+  { id: 'coffee-1', name: 'Coffee Product',  category: 'Preset', src: '/CoffeeInsta.png', uploadedAt: '2025-03-10T08:00:00Z', deletable: false },
+  { id: 'coffee-2', name: 'Latte Table',     category: 'Preset', src: '/coffee.png',       uploadedAt: '2025-03-10T08:00:00Z', deletable: false },
+  { id: 'coffee-3', name: 'Studio Portrait', category: 'Preset', src: '/CoffeeInsta.png',  uploadedAt: '2025-03-12T09:30:00Z', deletable: false },
+  { id: 'coffee-4', name: 'Urban Mood',      category: 'Preset', src: '/coffee.png',       uploadedAt: '2025-03-14T11:00:00Z', deletable: false },
 ]
 
 function formatDate(iso: string) {
@@ -145,10 +145,10 @@ export const ApprovedImagesPanel: React.FC<ApprovedImagesPanelProps> = ({ open, 
                   <button
                     type="button"
                     onClick={(e) => handleDelete(image.id, e)}
-                    className="rounded p-0.5 text-gray-300 opacity-0 transition-all hover:bg-red-50 hover:text-red-400 group-hover:opacity-100"
+                    className="rounded p-0.5 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500"
                     title="Delete image"
                   >
-                    <Trash2 size={11} />
+                    <Trash2 size={12} />
                   </button>
                 )}
               </div>
