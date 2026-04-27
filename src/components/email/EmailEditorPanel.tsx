@@ -49,6 +49,8 @@ export interface CanvasBlock {
   textAlign?: 'left' | 'center' | 'right'
   lineHeight?: number
   letterSpacing?: number
+  // Content block inner layout
+  contentLayout?: '2col-text' | '3col-text' | 'image' | 'image-text'
   // Link
   linkType?: 'url' | 'file' | 'checkout'
   linkUrl?: string
@@ -737,6 +739,9 @@ function BlockContent({
   // Image settings
   imageShape,
   onButtonAreaClick,
+  // Content block
+  contentLayout,
+  onContentLayoutSelect,
 }: {
   type: string
   backgroundColor?: string
@@ -764,6 +769,8 @@ function BlockContent({
   imageShape?: string
   /** Separate handler for button elements so they route to the Button tab, not Font tab */
   onButtonAreaClick?: (e: React.MouseEvent) => void
+  contentLayout?: string
+  onContentLayoutSelect?: (layout: string) => void
 }) {
   // ── Button style derivation ──────────────────────────────────────────────────
   const BTN_SHAPES = [
@@ -862,17 +869,246 @@ function BlockContent({
   }
 
   if (type === 'content') {
-    return (
-      <div className="flex min-h-[160px] items-center justify-center border-2 border-dashed border-gray-200 bg-gray-50 p-8" style={bg}>
-        <div className="text-center">
-          <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-gray-200">
-            <Layout size={16} className="text-gray-400" />
+    // ── Layout picker — shown when no inner layout is chosen yet ─────────────
+    if (!contentLayout) {
+      const OPTIONS = [
+        {
+          id: '2col-text', label: '2 Column Text',
+          preview: (
+            <div className="grid grid-cols-2 gap-1 w-full h-full p-2">
+              <div className="flex flex-col gap-0.5">
+                <div className="h-1.5 w-3/4 rounded-sm bg-gray-400" />
+                <div className="h-1 rounded-sm bg-gray-200" />
+                <div className="h-1 rounded-sm bg-gray-200" />
+                <div className="h-1 w-2/3 rounded-sm bg-gray-200" />
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <div className="h-1.5 w-3/4 rounded-sm bg-gray-400" />
+                <div className="h-1 rounded-sm bg-gray-200" />
+                <div className="h-1 rounded-sm bg-gray-200" />
+                <div className="h-1 w-2/3 rounded-sm bg-gray-200" />
+              </div>
+            </div>
+          ),
+        },
+        {
+          id: '3col-text', label: '3 Column Text',
+          preview: (
+            <div className="grid grid-cols-3 gap-1 w-full h-full p-2">
+              {[0,1,2].map((i) => (
+                <div key={i} className="flex flex-col gap-0.5">
+                  <div className="h-1.5 rounded-sm bg-gray-400" />
+                  <div className="h-1 rounded-sm bg-gray-200" />
+                  <div className="h-1 rounded-sm bg-gray-200" />
+                </div>
+              ))}
+            </div>
+          ),
+        },
+        {
+          id: 'image', label: 'Image',
+          preview: (
+            <div className="flex h-full w-full items-center justify-center bg-gray-100 rounded-sm m-2 overflow-hidden">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <rect x="3" y="3" width="18" height="18" rx="2" stroke="#9CA3AF" strokeWidth="1.5"/>
+                <circle cx="8.5" cy="8.5" r="1.5" fill="#9CA3AF"/>
+                <path d="M21 15l-5-5L5 21" stroke="#9CA3AF" strokeWidth="1.5" strokeLinecap="round"/>
+              </svg>
+            </div>
+          ),
+        },
+        {
+          id: 'image-text', label: 'Image + Text',
+          preview: (
+            <div className="flex gap-1.5 w-full h-full p-2">
+              <div className="w-1/2 flex items-center justify-center bg-gray-100 rounded-sm">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                  <rect x="3" y="3" width="18" height="18" rx="2" stroke="#9CA3AF" strokeWidth="1.5"/>
+                  <circle cx="8.5" cy="8.5" r="1.5" fill="#9CA3AF"/>
+                  <path d="M21 15l-5-5L5 21" stroke="#9CA3AF" strokeWidth="1.5" strokeLinecap="round"/>
+                </svg>
+              </div>
+              <div className="flex flex-1 flex-col justify-center gap-0.5">
+                <div className="h-1.5 w-full rounded-sm bg-gray-400" />
+                <div className="h-1 rounded-sm bg-gray-200" />
+                <div className="h-1 w-3/4 rounded-sm bg-gray-200" />
+              </div>
+            </div>
+          ),
+        },
+      ]
+      return (
+        <div className="bg-white px-8 py-6" style={bg}>
+          <p className="mb-4 text-center text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+            Choose content layout
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            {OPTIONS.map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onContentLayoutSelect?.(opt.id) }}
+                className="group flex flex-col overflow-hidden rounded-xl border-2 border-gray-200 bg-gray-50 transition-all hover:border-blue-400 hover:bg-blue-50"
+              >
+                <div className="h-16 w-full">{opt.preview}</div>
+                <p className="border-t border-gray-200 py-1.5 text-center text-[10px] font-medium text-gray-500 group-hover:text-blue-600">
+                  {opt.label}
+                </p>
+              </button>
+            ))}
           </div>
-          <p className="text-[12px] font-medium text-gray-400">Content Block</p>
-          <p className="mt-1 text-[10px] text-gray-300">Select a design from the right panel</p>
         </div>
-      </div>
-    )
+      )
+    }
+
+    // ── 2-column text ────────────────────────────────────────────────────────
+    if (contentLayout === '2col-text') {
+      return (
+        <div className="bg-white" style={bg}>
+          <div className="grid grid-cols-2 divide-x divide-gray-100 px-2 py-8">
+            <div className="flex flex-col gap-2 px-8">
+              <h4 {...editable} className={`${editable.className} text-sm font-semibold`} style={fontStyle}>
+                Column One Heading
+              </h4>
+              <p {...editable} className={`${editable.className} text-sm leading-relaxed text-gray-600`} style={fontStyle}>
+                Add your text here. Click to edit this column and tell your story.
+              </p>
+            </div>
+            <div className="flex flex-col gap-2 px-8">
+              <h4 {...editable} className={`${editable.className} text-sm font-semibold`} style={fontStyle}>
+                Column Two Heading
+              </h4>
+              <p {...editable} className={`${editable.className} text-sm leading-relaxed text-gray-600`} style={fontStyle}>
+                Add your text here. Click to edit this column and share more details.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onContentLayoutSelect?.('') }}
+            className="w-full border-t border-gray-100 py-1 text-[9px] font-medium uppercase tracking-wider text-gray-300 hover:text-blue-500 transition-colors"
+          >
+            ↺ Change layout
+          </button>
+        </div>
+      )
+    }
+
+    // ── 3-column text ────────────────────────────────────────────────────────
+    if (contentLayout === '3col-text') {
+      return (
+        <div className="bg-white" style={bg}>
+          <div className="grid grid-cols-3 divide-x divide-gray-100 px-2 py-8">
+            {(['One', 'Two', 'Three'] as const).map((col) => (
+              <div key={col} className="flex flex-col gap-2 px-6">
+                <h4 {...editable} className={`${editable.className} text-sm font-semibold`} style={fontStyle}>
+                  Column {col}
+                </h4>
+                <p {...editable} className={`${editable.className} text-xs leading-relaxed text-gray-600`} style={fontStyle}>
+                  Click to edit this column.
+                </p>
+              </div>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onContentLayoutSelect?.('') }}
+            className="w-full border-t border-gray-100 py-1 text-[9px] font-medium uppercase tracking-wider text-gray-300 hover:text-blue-500 transition-colors"
+          >
+            ↺ Change layout
+          </button>
+        </div>
+      )
+    }
+
+    // ── Image only ───────────────────────────────────────────────────────────
+    if (contentLayout === 'image') {
+      const imgSrc = imageSrcs['content-img']
+      return (
+        <div className="bg-white" style={bg}>
+          {imgSrc ? (
+            <ResizableImageSlot
+              src={imgSrc}
+              alt="Content"
+              height={imageSizes['content-img'] ?? 320}
+              onDoubleClick={() => onImageDoubleClick('content-img')}
+              onResize={(h) => onImageResize('content-img', h)}
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onImageDoubleClick('content-img') }}
+              className="flex w-full flex-col items-center justify-center gap-3 border-2 border-dashed border-gray-200 bg-gray-50 py-16 transition-all hover:border-blue-400 hover:bg-blue-50"
+            >
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" className="text-gray-300">
+                <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="1.5"/>
+                <circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/>
+                <path d="M21 15l-5-5L5 21" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              </svg>
+              <span className="text-[11px] font-medium text-gray-400">Click to add image</span>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onContentLayoutSelect?.('') }}
+            className="w-full border-t border-gray-100 py-1 text-[9px] font-medium uppercase tracking-wider text-gray-300 hover:text-blue-500 transition-colors"
+          >
+            ↺ Change layout
+          </button>
+        </div>
+      )
+    }
+
+    // ── Image + Text ─────────────────────────────────────────────────────────
+    if (contentLayout === 'image-text') {
+      const imgSrc = imageSrcs['content-img']
+      return (
+        <div className="bg-white" style={bg}>
+          <div className="flex min-h-[200px]">
+            {/* Image half */}
+            {imgSrc ? (
+              <ResizableImageSlot
+                src={imgSrc}
+                alt="Content"
+                height={imageSizes['content-img'] ?? 240}
+                className="w-1/2 self-stretch"
+                onDoubleClick={() => onImageDoubleClick('content-img')}
+                onResize={(h) => onImageResize('content-img', h)}
+              />
+            ) : (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onImageDoubleClick('content-img') }}
+                className="flex w-1/2 flex-col items-center justify-center gap-2 border-2 border-dashed border-gray-200 bg-gray-50 transition-all hover:border-blue-400 hover:bg-blue-50"
+              >
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" className="text-gray-300">
+                  <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="1.5"/>
+                  <circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/>
+                  <path d="M21 15l-5-5L5 21" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                </svg>
+                <span className="text-[10px] font-medium text-gray-400">Click to add image</span>
+              </button>
+            )}
+            {/* Text half */}
+            <div className="flex w-1/2 flex-col justify-center gap-3 px-8 py-8">
+              <h4 {...editable} className={`${editable.className} font-semibold text-sm`} style={fontStyle}>
+                Content Heading
+              </h4>
+              <p {...editable} className={`${editable.className} text-sm leading-relaxed text-gray-600`} style={fontStyle}>
+                Click to edit this text. Tell your story alongside the image.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onContentLayoutSelect?.('') }}
+            className="w-full border-t border-gray-100 py-1 text-[9px] font-medium uppercase tracking-wider text-gray-300 hover:text-blue-500 transition-colors"
+          >
+            ↺ Change layout
+          </button>
+        </div>
+      )
+    }
   }
 
   if (type === 'text') {
@@ -1486,6 +1722,10 @@ export const EmailEditorPanel: React.FC = () => {
                         letterSpacing={block.letterSpacing}
                         imageShape={block.imageShape}
                         onButtonAreaClick={handleButtonAreaClick}
+                        contentLayout={block.contentLayout}
+                        onContentLayoutSelect={(layout) =>
+                          handleBlockPatch(block.id, { contentLayout: (layout || undefined) as CanvasBlock['contentLayout'] })
+                        }
                       />
                     </div>
 
