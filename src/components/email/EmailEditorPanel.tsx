@@ -1,12 +1,14 @@
 'use client'
 
-import React, { useState, useCallback, useRef } from 'react'
+import React, { useState, useCallback, useRef, useEffect } from 'react'
 import {
   Layers, LayoutGrid, Palette, FileText,
   Monitor, Smartphone, ChevronUp, ChevronDown, Trash2,
   Type, Plus, X, MousePointer2, ChevronsUpDown,
   Star, Link2, Share2, MapPin, Mail, Layout,
+  Save, FolderOpen, ChevronDown as ChevronDownIcon, Check, Loader2, PlusCircle,
 } from 'lucide-react'
+import type { EmailerMeta } from '@/lib/supabase'
 import { nanoid } from 'nanoid'
 import { cn } from '@/lib/utils'
 import { useEmailStore } from '@/lib/email/emailStore'
@@ -1634,7 +1636,109 @@ export const EmailEditorPanel: React.FC = () => {
   // Tracks which block type is currently being dragged from the sections panel
   const [draggedBlockType, setDraggedBlockType] = useState<string | null>(null)
 
+  // ── Persistence state ───────────────────────────────────────────────────────
+  const [currentEmailerId, setCurrentEmailerId] = useState<string | null>(null)
+  const [savedEmailers, setSavedEmailers] = useState<EmailerMeta[]>([])
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [showEmailerDropdown, setShowEmailerDropdown] = useState(false)
+  const [showSaveModal, setShowSaveModal] = useState(false)
+  const [saveModalMode, setSaveModalMode] = useState<'new' | 'fork'>('new')
+  const [emailerNameInput, setEmailerNameInput] = useState('')
+  const dropdownRef = useRef<HTMLDivElement>(null)
+
   const { document: doc, previewMode, setPreviewMode } = useEmailStore()
+
+  // Fetch emailer list on mount
+  useEffect(() => {
+    fetch('/api/emailers')
+      .then((r) => r.ok ? r.json() : [])
+      .then((list) => setSavedEmailers(list as EmailerMeta[]))
+      .catch(() => {})
+  }, [])
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setShowEmailerDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const buildPayload = useCallback(() => ({
+    subject: doc.subject ?? null,
+    blocks:  canvasBlocks,
+  }), [doc.subject, canvasBlocks])
+
+  // Save (update) the current emailer
+  const handleSave = useCallback(async () => {
+    if (!currentEmailerId) {
+      // No ID yet → open "save as new" modal
+      setSaveModalMode('new')
+      setEmailerNameInput(doc.subject || 'Untitled')
+      setShowSaveModal(true)
+      return
+    }
+    setSaveStatus('saving')
+    try {
+      const res = await fetch(`/api/emailers/${currentEmailerId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(buildPayload()),
+      })
+      if (!res.ok) throw new Error(await res.text())
+      const updated = await res.json() as EmailerMeta
+      setSavedEmailers((prev) => prev.map((e) => e.id === updated.id ? updated : e))
+      setSaveStatus('saved')
+      setTimeout(() => setSaveStatus('idle'), 2000)
+    } catch {
+      setSaveStatus('error')
+      setTimeout(() => setSaveStatus('idle'), 3000)
+    }
+  }, [currentEmailerId, buildPayload, doc.subject])
+
+  // Confirm save (new or fork) from modal
+  const handleSaveConfirm = useCallback(async () => {
+    const name = emailerNameInput.trim() || 'Untitled'
+    setShowSaveModal(false)
+    setSaveStatus('saving')
+    try {
+      const res = await fetch('/api/emailers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, ...buildPayload() }),
+      })
+      if (!res.ok) throw new Error(await res.text())
+      const created = await res.json() as EmailerMeta
+      if (saveModalMode === 'new') setCurrentEmailerId(created.id)
+      setSavedEmailers((prev) => [created, ...prev])
+      setSaveStatus('saved')
+      setTimeout(() => setSaveStatus('idle'), 2000)
+    } catch {
+      setSaveStatus('error')
+      setTimeout(() => setSaveStatus('idle'), 3000)
+    }
+  }, [emailerNameInput, buildPayload, saveModalMode])
+
+  // Load an emailer from Supabase into the canvas
+  const handleLoadEmailer = useCallback(async (id: string) => {
+    setShowEmailerDropdown(false)
+    setSaveStatus('saving') // reuse spinner while loading
+    try {
+      const res = await fetch(`/api/emailers/${id}`)
+      if (!res.ok) throw new Error()
+      const row = await res.json() as { id: string; name: string; subject: string | null; blocks: CanvasBlock[] }
+      setCanvasBlocks(Array.isArray(row.blocks) ? row.blocks : [])
+      setCurrentEmailerId(row.id)
+      setSaveStatus('saved')
+      setTimeout(() => setSaveStatus('idle'), 1500)
+    } catch {
+      setSaveStatus('error')
+      setTimeout(() => setSaveStatus('idle'), 3000)
+    }
+  }, [])
 
   const handleTabClick = (tab: EmailTab) => {
     if (activeTab === tab) setPanelOpen((o) => !o)
@@ -1774,7 +1878,8 @@ export const EmailEditorPanel: React.FC = () => {
   }, [])
 
   /** Direct upload from "My computer" in the Image tab — no ApprovedImagesPanel needed */
-  const handleDirectImageUpload = useCallback((blockId: string, imageKey: string, src: string) => {
+  const handleDirectImageUpload = useCallback(async (blockId: string, imageKey: string, src: string) => {
+    // Optimistically store the base64 src while uploading
     setCanvasBlocks((prev) =>
       prev.map((b) =>
         b.id === blockId
@@ -1782,6 +1887,26 @@ export const EmailEditorPanel: React.FC = () => {
           : b,
       ),
     )
+    // Upload to Minio in the background and replace with durable URL
+    try {
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dataUrl: src }),
+      })
+      if (res.ok) {
+        const { url } = await res.json() as { url: string }
+        setCanvasBlocks((prev) =>
+          prev.map((b) =>
+            b.id === blockId
+              ? { ...b, imageSrcs: { ...(b.imageSrcs ?? {}), [imageKey]: url } }
+              : b,
+          ),
+        )
+      }
+    } catch {
+      // keep base64 if upload fails
+    }
   }, [])
 
   const handleBlockPatch = useCallback((id: string, patch: Partial<CanvasBlock>) => {
@@ -1843,10 +1968,114 @@ export const EmailEditorPanel: React.FC = () => {
       <div className="relative flex flex-1 flex-col overflow-hidden bg-[#F3F4F6]">
 
         {/* Top toolbar strip */}
-        <div className="flex h-10 shrink-0 items-center justify-between border-b border-gray-200 bg-white px-4">
-          <span className="truncate text-[11px] text-gray-400">
-            {doc.subject || 'Untitled email'}
+        <div className="flex h-10 shrink-0 items-center gap-3 border-b border-gray-200 bg-white px-4">
+
+          {/* Subject / emailer name */}
+          <span className="min-w-0 flex-1 truncate text-[11px] text-gray-400">
+            {savedEmailers.find((e) => e.id === currentEmailerId)?.name
+              ? savedEmailers.find((e) => e.id === currentEmailerId)!.name
+              : (doc.subject || 'Untitled email')}
           </span>
+
+          {/* ── Open existing emailer dropdown ── */}
+          <div className="relative" ref={dropdownRef}>
+            <button
+              onClick={() => setShowEmailerDropdown((o) => !o)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-[11px] font-medium text-gray-600 transition-colors hover:bg-gray-50"
+            >
+              <FolderOpen size={12} />
+              Open
+              <ChevronDownIcon size={10} className={cn('transition-transform', showEmailerDropdown && 'rotate-180')} />
+            </button>
+
+            {showEmailerDropdown && (
+              <div className="absolute left-0 top-[calc(100%+4px)] z-50 w-64 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl">
+                <div className="border-b border-gray-100 px-3 py-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">Saved Emailers</p>
+                </div>
+                <div className="max-h-64 overflow-auto">
+                  {savedEmailers.length === 0 ? (
+                    <p className="px-3 py-4 text-center text-[11px] text-gray-400">No saved emailers yet</p>
+                  ) : (
+                    savedEmailers.map((em) => (
+                      <button
+                        key={em.id}
+                        onClick={() => handleLoadEmailer(em.id)}
+                        className={cn(
+                          'flex w-full items-start gap-2 px-3 py-2.5 text-left transition-colors hover:bg-gray-50',
+                          em.id === currentEmailerId && 'bg-blue-50',
+                        )}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[12px] font-medium text-gray-800">{em.name}</p>
+                          {em.subject && (
+                            <p className="truncate text-[10px] text-gray-400">{em.subject}</p>
+                          )}
+                          <p className="text-[9px] text-gray-300">
+                            {new Date(em.updated_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                          </p>
+                        </div>
+                        {em.id === currentEmailerId && <Check size={12} className="mt-0.5 shrink-0 text-blue-500" />}
+                      </button>
+                    ))
+                  )}
+                </div>
+                <div className="border-t border-gray-100 px-3 py-2">
+                  <button
+                    onClick={() => {
+                      setShowEmailerDropdown(false)
+                      setCanvasBlocks(makeDefaultBlocks())
+                      setCurrentEmailerId(null)
+                    }}
+                    className="inline-flex items-center gap-1.5 text-[11px] text-gray-400 hover:text-gray-700 transition-colors"
+                  >
+                    <PlusCircle size={11} /> New emailer
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* ── Save / Save as New ── */}
+          <div className="inline-flex items-center gap-1">
+            <button
+              onClick={handleSave}
+              disabled={saveStatus === 'saving'}
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-medium transition-colors',
+                saveStatus === 'saved'
+                  ? 'bg-green-50 text-green-600'
+                  : saveStatus === 'error'
+                  ? 'bg-red-50 text-red-600'
+                  : 'bg-gray-900 text-white hover:bg-gray-700',
+              )}
+            >
+              {saveStatus === 'saving' ? (
+                <Loader2 size={11} className="animate-spin" />
+              ) : saveStatus === 'saved' ? (
+                <Check size={11} />
+              ) : (
+                <Save size={11} />
+              )}
+              {saveStatus === 'saving' ? 'Saving…' : saveStatus === 'saved' ? 'Saved' : saveStatus === 'error' ? 'Error' : 'Save'}
+            </button>
+
+            {currentEmailerId && (
+              <button
+                onClick={() => {
+                  setSaveModalMode('fork')
+                  setEmailerNameInput((savedEmailers.find((e) => e.id === currentEmailerId)?.name ?? 'Untitled') + ' (copy)')
+                  setShowSaveModal(true)
+                }}
+                className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1 text-[11px] font-medium text-gray-600 transition-colors hover:bg-gray-50"
+                title="Save as new emailer"
+              >
+                <PlusCircle size={11} /> Save as New
+              </button>
+            )}
+          </div>
+
+          {/* ── Desktop / Mobile toggle ── */}
           <div className="inline-flex rounded-lg bg-gray-100 p-0.5">
             <button
               onClick={() => setPreviewMode('desktop')}
@@ -1868,6 +2097,45 @@ export const EmailEditorPanel: React.FC = () => {
             </button>
           </div>
         </div>
+
+        {/* ── Save / Name modal ── */}
+        {showSaveModal && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+            <div className="w-80 rounded-2xl bg-white p-6 shadow-2xl">
+              <h3 className="mb-1 text-[14px] font-semibold text-gray-900">
+                {saveModalMode === 'fork' ? 'Save as New Emailer' : 'Name Your Emailer'}
+              </h3>
+              <p className="mb-4 text-[11px] text-gray-400">
+                {saveModalMode === 'fork'
+                  ? 'Creates a duplicate with a new name — the original is untouched.'
+                  : 'Give this emailer a name so you can find it later.'}
+              </p>
+              <input
+                autoFocus
+                type="text"
+                value={emailerNameInput}
+                onChange={(e) => setEmailerNameInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleSaveConfirm() }}
+                placeholder="e.g. Summer Sale 2025"
+                className="mb-4 w-full rounded-xl border border-gray-200 px-3 py-2.5 text-[13px] text-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-900"
+              />
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={() => setShowSaveModal(false)}
+                  className="rounded-lg px-3 py-2 text-[12px] text-gray-500 hover:bg-gray-100 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveConfirm}
+                  className="rounded-lg bg-gray-900 px-4 py-2 text-[12px] font-medium text-white hover:bg-gray-700 transition-colors"
+                >
+                  {saveModalMode === 'fork' ? 'Save Copy' : 'Save'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Scrollable canvas */}
         <div
