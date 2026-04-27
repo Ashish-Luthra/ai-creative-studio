@@ -274,7 +274,7 @@ function LinkBarEditor({ block, onPatch }: { block: CanvasBlock; onPatch: (p: Pa
                   type="button"
                   onClick={() => moveItem(i, i - 1)}
                   disabled={i === 0}
-                  className="text-[8px] text-gray-300 hover:text-gray-500 disabled:opacity-20 leading-none"
+                  className="text-[0.95em] text-gray-300 hover:text-gray-500 disabled:opacity-20 leading-none"
                   title="Move up"
                 >
                   ▲
@@ -283,7 +283,7 @@ function LinkBarEditor({ block, onPatch }: { block: CanvasBlock; onPatch: (p: Pa
                   type="button"
                   onClick={() => moveItem(i, i + 1)}
                   disabled={i === items.length - 1}
-                  className="text-[8px] text-gray-300 hover:text-gray-500 disabled:opacity-20 leading-none"
+                  className="text-[0.95em] text-gray-300 hover:text-gray-500 disabled:opacity-20 leading-none"
                   title="Move down"
                 >
                   ▼
