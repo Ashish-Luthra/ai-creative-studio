@@ -160,29 +160,41 @@ function convertSpacer(cb: CanvasBlock): EmailSection {
 }
 
 function convertSocial(cb: CanvasBlock): EmailSection {
-  const SOCIAL_ICONS: { name: string; svg: string }[] = [
-    {
-      name: 'Facebook',
-      svg: `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#1877F2"/><path d="M21 16h-3v9h-4v-9h-2v-3h2v-2c0-2.2 1.3-4 4-4h3v3h-2c-.6 0-1 .4-1 1v2h3l-.5 3z" fill="#fff"/></svg>`,
-    },
-    {
-      name: 'Instagram',
-      svg: `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><defs><radialGradient id="ig" cx="30%" cy="107%" r="150%"><stop offset="0%" stop-color="#ffd600"/><stop offset="50%" stop-color="#ff0069"/><stop offset="100%" stop-color="#7638fa"/></radialGradient></defs><circle cx="16" cy="16" r="16" fill="url(#ig)"/><rect x="9" y="9" width="14" height="14" rx="4" fill="none" stroke="#fff" stroke-width="1.5"/><circle cx="16" cy="16" r="3.5" fill="none" stroke="#fff" stroke-width="1.5"/><circle cx="20.5" cy="11.5" r="1" fill="#fff"/></svg>`,
-    },
-    {
-      name: 'Pinterest',
-      svg: `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#E60023"/><path d="M16 6C10.5 6 6 10.5 6 16c0 4.2 2.6 7.8 6.3 9.3-.1-.8-.1-2 .2-2.9l1.3-5.5s-.3-.7-.3-1.7c0-1.6.9-2.8 2.3-2.8 1.1 0 1.6.8 1.6 1.8 0 1.1-.7 2.7-1.1 4.2-.3 1.2.6 2.2 1.8 2.2 2.2 0 3.7-2.8 3.7-6.2 0-2.6-1.8-4.5-4.4-4.5-3 0-4.8 2.3-4.8 4.6 0 .9.4 1.9.8 2.4.1.1.1.2.1.3l-.3 1.3c-.1.3-.3.4-.6.3-1.7-.8-2.7-3.2-2.7-5.2 0-4.2 3-8 8.7-8 4.6 0 8.1 3.3 8.1 7.6 0 4.6-2.9 8.2-6.8 8.2-1.4 0-2.6-.7-3-1.5l-.8 3c-.3 1.1-1 2.5-1.5 3.3.8.3 1.6.4 2.5.4 5.5 0 10-4.5 10-10S21.5 6 16 6z" fill="#fff"/></svg>`,
-    },
-    {
-      name: 'X',
-      svg: `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#000"/><path d="M18.2 14.8L23.5 9h-1.3l-4.5 5.2L14 9H9.5l5.6 8.1-5.6 6.4H11l4.8-5.5L19.7 23H24l-5.8-8.2zm-1.7 2l-.6-.8-4.6-6.6h2l3.7 5.3.6.8 4.8 6.8h-2l-3.9-5.5z" fill="#fff"/></svg>`,
-    },
+  // All supported platforms with brand-coloured circular SVG icons
+  const ALL_SOCIAL_ICONS: { key: string; name: string; svg: string }[] = [
+    { key: 'facebook',  name: 'Facebook',  svg: `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#1877F2"/><path d="M21 16h-3v9h-4v-9h-2v-3h2v-2c0-2.2 1.3-4 4-4h3v3h-2c-.6 0-1 .4-1 1v2h3l-.5 3z" fill="#fff"/></svg>` },
+    { key: 'instagram', name: 'Instagram', svg: `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><defs><radialGradient id="ig" cx="30%" cy="107%" r="150%"><stop offset="0%" stop-color="#ffd600"/><stop offset="50%" stop-color="#ff0069"/><stop offset="100%" stop-color="#7638fa"/></radialGradient></defs><circle cx="16" cy="16" r="16" fill="url(#ig)"/><rect x="9" y="9" width="14" height="14" rx="4" fill="none" stroke="#fff" stroke-width="1.5"/><circle cx="16" cy="16" r="3.5" fill="none" stroke="#fff" stroke-width="1.5"/><circle cx="20.5" cy="11.5" r="1" fill="#fff"/></svg>` },
+    { key: 'pinterest', name: 'Pinterest', svg: `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#E60023"/><path d="M16 6C10.5 6 6 10.5 6 16c0 4.2 2.6 7.8 6.3 9.3-.1-.8-.1-2 .2-2.9l1.3-5.5s-.3-.7-.3-1.7c0-1.6.9-2.8 2.3-2.8 1.1 0 1.6.8 1.6 1.8 0 1.1-.7 2.7-1.1 4.2-.3 1.2.6 2.2 1.8 2.2 2.2 0 3.7-2.8 3.7-6.2 0-2.6-1.8-4.5-4.4-4.5-3 0-4.8 2.3-4.8 4.6 0 .9.4 1.9.8 2.4.1.1.1.2.1.3l-.3 1.3c-.1.3-.3.4-.6.3-1.7-.8-2.7-3.2-2.7-5.2 0-4.2 3-8 8.7-8 4.6 0 8.1 3.3 8.1 7.6 0 4.6-2.9 8.2-6.8 8.2-1.4 0-2.6-.7-3-1.5l-.8 3c-.3 1.1-1 2.5-1.5 3.3.8.3 1.6.4 2.5.4 5.5 0 10-4.5 10-10S21.5 6 16 6z" fill="#fff"/></svg>` },
+    { key: 'twitter',   name: 'X',         svg: `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#000"/><path d="M18.2 14.8L23.5 9h-1.3l-4.5 5.2L14 9H9.5l5.6 8.1-5.6 6.4H11l4.8-5.5L19.7 23H24l-5.8-8.2zm-1.7 2l-.6-.8-4.6-6.6h2l3.7 5.3.6.8 4.8 6.8h-2l-3.9-5.5z" fill="#fff"/></svg>` },
+    { key: 'youtube',   name: 'YouTube',   svg: `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#FF0000"/><path d="M23.5 11.5s-.2-1.4-.8-2c-.8-.8-1.6-.8-2-.9C18.2 8.4 16 8.4 16 8.4s-2.2 0-4.7.2c-.4.1-1.2.1-2 .9-.6.6-.8 2-.8 2S8.3 13.1 8.3 14.6v1.4c0 1.5.2 3 .2 3s.2 1.4.8 2c.8.8 1.8.8 2.2.9 1.6.2 6.5.2 6.5.2s2.2 0 4.7-.2c.4-.1 1.2-.1 2-.9.6-.6.8-2 .8-2s.2-1.5.2-3v-1.4c0-1.5-.2-3-.2-3zm-9.2 6.1v-5.3l5.4 2.7-5.4 2.6z" fill="#fff"/></svg>` },
+    { key: 'linkedin',  name: 'LinkedIn',  svg: `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#0A66C2"/><path d="M10.5 13h-3v9h3v-9zm-1.5-1.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zm16 10.5h-3v-4.5c0-1.1-.4-1.9-1.5-1.9-1.5 0-1.8 1.1-1.8 1.9V22h-3v-9h3v1.3c.4-.8 1.4-1.3 2.6-1.3 2 0 3.7 1.3 3.7 4.2V22z" fill="#fff"/></svg>` },
+    { key: 'tiktok',    name: 'TikTok',    svg: `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#000"/><path d="M21.5 9.5c-.8-.5-1.4-1.3-1.7-2.2h-2.3v10.1c-.1 1.1-1 2-2.2 2a2.2 2.2 0 0 1-2.2-2.2c0-1.2 1-2.2 2.2-2.2.2 0 .4 0 .6.1v-2.4c-.2 0-.4-.1-.6-.1-2.5 0-4.5 2-4.5 4.5s2 4.5 4.5 4.5 4.5-2 4.5-4.5V12c.9.6 2 1 3.2 1V10.8c-.6 0-1.1-.6-1.5-1.3z" fill="#fff"/></svg>` },
+    { key: 'twitter_x', name: 'X',        svg: `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#000"/><path d="M18.2 14.8L23.5 9h-1.3l-4.5 5.2L14 9H9.5l5.6 8.1-5.6 6.4H11l4.8-5.5L19.7 23H24l-5.8-8.2zm-1.7 2l-.6-.8-4.6-6.6h2l3.7 5.3.6.8 4.8 6.8h-2l-3.9-5.5z" fill="#fff"/></svg>` },
+    { key: 'spotify',   name: 'Spotify',   svg: `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#1DB954"/><path d="M22 18.5c-3-1.8-6.7-2-9.3-1.1-.4.1-.6-.1-.7-.5-.1-.4.1-.6.5-.7 3-.9 7.1-.7 10.4 1.2.3.2.4.6.2.9-.2.4-.7.5-1.1.2zm1-2.8c-3.4-2-8.5-2.5-12.2-1.4-.4.1-.9-.1-1-.5-.1-.4.1-.9.5-1 4.1-1.2 9.7-.6 13.5 1.6.4.2.5.7.3 1.1-.2.4-.7.5-1.1.2zm.1-2.9C18.8 10.6 11.8 10.4 8 11.6c-.5.2-1-.1-1.2-.6-.2-.5.1-1 .6-1.2 4.3-1.3 11.9-1 16.5 1.5.5.3.6.9.4 1.4-.3.4-.9.6-1.4.3z" fill="#fff"/></svg>` },
+    { key: 'github',    name: 'GitHub',    svg: `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#24292e"/><path d="M16 7.5C11.3 7.5 7.5 11.3 7.5 16c0 3.8 2.4 7 5.8 8.1.4.1.6-.2.6-.4v-1.4c-2.4.5-2.9-1.2-2.9-1.2-.4-1-1-1.3-1-1.3-.8-.5.1-.5.1-.5.9.1 1.4.9 1.4.9.8 1.4 2.1 1 2.6.8.1-.6.3-1 .6-1.2-2-.2-4-1-4-4.4 0-1 .4-1.8.9-2.4-.1-.2-.4-1.1.1-2.3 0 0 .8-.2 2.5.9.7-.2 1.5-.3 2.3-.3s1.6.1 2.3.3c1.7-1.1 2.5-.9 2.5-.9.5 1.2.2 2.1.1 2.3.6.6.9 1.4.9 2.4 0 3.4-2 4.2-4 4.4.3.3.6.8.6 1.7v2.5c0 .2.2.5.6.4 3.4-1.1 5.8-4.3 5.8-8.1 0-4.7-3.8-8.5-8.5-8.5z" fill="#fff"/></svg>` },
+    { key: 'telegram',  name: 'Telegram',  svg: `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#26A5E4"/><path d="M22.8 10.2l-2.7 12.7c-.2.9-.7 1.1-1.4.7l-3.9-2.9-1.9 1.8c-.2.2-.4.3-.8.3l.3-4 7.3-6.6c.3-.3-.1-.4-.5-.2L9.6 18l-3.8-1.2c-.8-.3-.8-.8.2-1.2l14.7-5.7c.7-.2 1.4.2 1.1 1.3z" fill="#fff"/></svg>` },
+    { key: 'discord',   name: 'Discord',   svg: `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#5865F2"/><path d="M21.6 11.5c-1.1-.5-2.3-.9-3.5-1.1l-.2.4c1.1.3 2.1.7 3 1.3-1.3-.7-2.7-1.2-4.9-1.2s-3.6.5-4.9 1.2c.9-.6 1.9-1 3-1.3l-.2-.4c-1.2.2-2.4.6-3.5 1.1-2.5 3.8-3.2 7.4-2.9 11 1.3 1 2.9 1.8 4.7 2.4l.7-.9c-.8-.3-1.6-.7-2.3-1.2.2.1.4.2.5.3l.5-.5c-1.5-.7-2.2-1.6-2.2-1.6s2.9 1.4 7 1.4 7-1.4 7-1.4-.7.9-2.2 1.6l.5.5c.2-.1.3-.2.5-.3-.7.5-1.5.9-2.3 1.2l.7.9c1.8-.6 3.4-1.4 4.7-2.4.3-3.6-.5-7.2-2.9-11zm-8.1 9.3c-.9 0-1.7-.8-1.7-1.9s.7-1.9 1.7-1.9 1.7.8 1.7 1.9-.7 1.9-1.7 1.9zm5 0c-.9 0-1.7-.8-1.7-1.9s.7-1.9 1.7-1.9 1.7.8 1.7 1.9-.8 1.9-1.7 1.9z" fill="#fff"/></svg>` },
+    { key: 'threads',   name: 'Threads',   svg: `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#000"/><path d="M20.8 15.4c-.1-.1-.3-.1-.4-.2-.6-2.8-2.3-4.4-4.8-4.4-1.6 0-3 .7-3.8 1.9l1.4.9c.6-.9 1.5-1.4 2.4-1.4 1.1 0 2.1.7 2.5 1.8-.7-.1-1.4-.1-2.2 0-2.1.1-3.5 1.3-3.4 3 0 .8.4 1.5.9 2 .6.5 1.4.8 2.2.8.5 0 1.1-.1 1.6-.3.6-.3 1.1-.7 1.4-1.2.3.3.5.6.6.9.1.3.2.7.2 1.1 0 .6-.1 1.1-.4 1.5-.3.5-.8.8-1.4 1-.7.2-1.4.3-2.2.3-1.8 0-3.1-.6-4-1.7-.9-1.1-1.3-2.6-1.3-4.4 0-1.8.5-3.3 1.4-4.4.9-1.1 2.3-1.7 4-1.7 1.7 0 3.1.5 4 1.5.6.6 1 1.4 1.2 2.3l1.7-.5c-.3-1.2-.8-2.2-1.6-3-.5-.5-1.1-.9-1.7-1.2-.6-.3-1.3-.5-2-.6-.7-.1-1.1-.1-1.6-.1-2.3 0-4.1.8-5.4 2.3-1.2 1.5-1.9 3.5-1.9 5.9 0 2.4.6 4.4 1.9 5.9 1.3 1.5 3.1 2.3 5.4 2.3 1 0 2-.2 2.9-.5 1-.4 1.7-.9 2.2-1.7.5-.8.8-1.7.8-2.7 0-.9-.2-1.7-.5-2.3-.3-.6-.7-1.1-1.2-1.4zm-4.2 2.5c-.8.5-1.6.5-2 .2-.3-.2-.5-.5-.5-.9-.1-.8.6-1.3 1.8-1.3.6 0 1.2 0 1.7.1-.1.8-.4 1.5-1 1.9z" fill="#fff"/></svg>` },
+    { key: 'medium',    name: 'Medium',    svg: `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#000"/><path d="M9.5 11.5l-.9-.9v-.1h3.1l2.4 5.3 2.1-5.3h3v.1l-.8.8c-.1.1-.1.2-.1.3v7.8c0 .1 0 .2.1.3l.8.8v.1h-3.9v-.1l.8-.8c.1-.1.1-.1.1-.3v-6.3l-2.4 6.2h-.2l-2.8-6.2v4.1c0 .2 0 .5.2.6l1 1.2v.1H9.3v-.1l1-1.2c.2-.2.2-.4.2-.6v-4.7c0-.1 0-.3-.2-.4zm11.6-.1l-1 .8c-.1.1-.1.2-.1.3v5.7c0 .1 0 .2.1.3l1 .8v.1h-3.9v-.1l1-.8c.1-.1.1-.1.1-.3v-5.8c0-.1 0-.2-.1-.3l-1-.8v-.1h3.9v.2z" fill="#fff"/></svg>` },
+    { key: 'substack',  name: 'Substack',  svg: `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#FF6719"/><path d="M8 11.5h16v2H8zm0 4.5h16v2H8zM8 21l8 3.5 8-3.5v-3H8z" fill="#fff"/></svg>` },
+    { key: 'website',   name: 'Website',   svg: `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#374151"/><path d="M16 8a8 8 0 1 0 0 16A8 8 0 0 0 16 8zm-1 13.9c-2.4-.5-4.3-2.4-4.8-4.9H14v4.9zm2 0V17h3.8c-.5 2.5-2.4 4.4-3.8 4.9zm4-6.9H17V11.1c1.4.5 3.3 2.4 3.8 4.9H21zm-6 0H11c.5-2.5 2.4-4.4 3.8-4.9V15h.2z" fill="#fff"/></svg>` },
+    { key: 'linktree',  name: 'Linktree',  svg: `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#43E660"/><path d="M16 8l4 4h-3v3h4l-2 2 2 2H17v5h-2v-5h-4l2-2-2-2h4v-3h-3l4-4z" fill="#fff"/></svg>` },
   ]
 
-  const iconCells = SOCIAL_ICONS.map(({ name, svg }) => {
+  const links = cb.socialLinks ?? {}
+  const linkedKeys = Object.keys(links).filter((k) => links[k])
+
+  // Use linked platforms if any, otherwise show default set
+  const DEFAULT_KEYS = ['facebook', 'instagram', 'pinterest', 'twitter']
+  const iconsToRender = linkedKeys.length > 0
+    ? ALL_SOCIAL_ICONS.filter((icon) => links[icon.key])
+    : ALL_SOCIAL_ICONS.filter((icon) => DEFAULT_KEYS.includes(icon.key))
+
+  const iconCells = iconsToRender.map(({ key, name, svg }) => {
+    const url = links[key] || '#'
     const dataUri = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
     return `<td align="center" style="padding:0 6px">` +
-      `<a href="#" style="text-decoration:none;display:inline-block" title="${name}">` +
+      `<a href="${url}" style="text-decoration:none;display:inline-block" title="${name}">` +
       `<img src="${dataUri}" width="32" height="32" alt="${name}" style="display:block;border:none;width:32px;height:32px">` +
       `</a></td>`
   }).join('')

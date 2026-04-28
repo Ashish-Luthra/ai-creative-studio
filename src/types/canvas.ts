@@ -16,6 +16,8 @@ export interface CanvasBlock {
   imageSrcs?: Record<string, string>
   imageSizes?: Record<string, number>
   imageShape?: 'circle' | 'square' | 'rounded' | 'arch' | 'diamond' | 'hexagon'
+  // Social links — keyed by platform (e.g. 'instagram', 'facebook')
+  socialLinks?: Record<string, string>
   // Button
   buttonShapeVariant?: number
   buttonFillColor?: string
