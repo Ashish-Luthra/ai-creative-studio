@@ -20,9 +20,11 @@ import type {
   SectionLayout, AddSectionPayload, AddBlockPayload,
   UpdateBlockPayload, MoveBlockPayload,
 } from '@/types/email'
+import type { CanvasBlock } from '@/types/canvas'
 import { compileEmail } from './compiler'
 import { createDefaultDocument, makeSection, makeUnsubscribeBlock } from './templates'
 import { layoutToColumnWidths } from './styleUtils'
+import { canvasBlocksToEmailDocument } from './canvasConverter'
 
 // ─── State shape ──────────────────────────────────────────────────────────────
 
@@ -71,6 +73,10 @@ interface EmailEditorState {
 
   // ── Compiler ──
   recompile: () => Promise<void>
+
+  // ── Canvas sync ──
+  /** Convert canvas blocks → EmailDocument and recompile. Called on every canvas change. */
+  syncFromCanvas: (canvasBlocks: CanvasBlock[]) => Promise<void>
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -359,6 +365,17 @@ export const useEmailStore = create<EmailEditorState>((set, get) => ({
   // ── Compiler ───────────────────────────────────────────────────────────────
   recompile: async () => {
     const result = await compileEmail(get().document)
+    set({
+      compiledHtml: result.html,
+      compileErrors: result.errors.map((e) => e.message),
+    })
+  },
+
+  // ── Canvas sync ────────────────────────────────────────────────────────────
+  syncFromCanvas: async (canvasBlocks: CanvasBlock[]) => {
+    const newDoc = canvasBlocksToEmailDocument(canvasBlocks, get().document)
+    set({ document: newDoc })
+    const result = await compileEmail(newDoc)
     set({
       compiledHtml: result.html,
       compileErrors: result.errors.map((e) => e.message),

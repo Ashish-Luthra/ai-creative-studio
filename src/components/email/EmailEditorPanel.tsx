@@ -10,6 +10,7 @@ import {
   Image as ImageIcon,
 } from 'lucide-react'
 import type { EmailerMeta } from '@/lib/supabase'
+import type { CanvasBlock } from '@/types/canvas'
 import { nanoid } from 'nanoid'
 import { cn } from '@/lib/utils'
 import { useEmailStore } from '@/lib/email/emailStore'
@@ -22,53 +23,11 @@ import { AllyvateAssistant, type AllyContext } from '@/components/ai/AllyvateAss
 import { EmailRightNav } from './EmailRightNav'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+// CanvasBlock is imported from @/types/canvas (shared with canvasConverter)
+// Re-export so existing imports of CanvasBlock from this file continue to work.
+export type { CanvasBlock } from '@/types/canvas'
 
 type EmailTab = 'tree' | 'sections' | 'text' | 'content' | 'style'
-
-export interface CanvasBlock {
-  id: string
-  type: string
-  // Block
-  backgroundColor?: string
-  padding?: { top: number; right: number; bottom: number; left: number }
-  // Image
-  imageSrcs?: Record<string, string>
-  imageSizes?: Record<string, number>
-  imageShape?: 'circle' | 'square' | 'rounded' | 'arch' | 'diamond' | 'hexagon'
-  // Button
-  buttonShapeVariant?: number
-  buttonFillColor?: string
-  buttonBorderColor?: string
-  buttonPosition?: 'left' | 'center' | 'right'
-  buttonBorderWidth?: number
-  buttonWidth?: number
-  buttonHeight?: number
-  // Font
-  fontFamily?: string
-  fontSize?: number
-  fontBold?: boolean
-  fontItalic?: boolean
-  fontUnderline?: boolean
-  fontColor?: string
-  textAlign?: 'left' | 'center' | 'right'
-  lineHeight?: number
-  letterSpacing?: number
-  // Spacer
-  spacerHeight?: number
-  // Content block
-  contentHeight?: number
-  contentButton?: { position: 'below-text' | 'on-image'; label: string } | null
-  // Link bar
-  linkBarItems?: { label: string; url: string }[]
-  // Footer
-  footerLinks?: { label: string; url: string }[]
-  // Content block inner layout
-  contentLayout?: '2col-text' | '3col-text' | 'image' | 'image-text'
-  // Link
-  linkType?: 'url' | 'file' | 'checkout'
-  linkUrl?: string
-  linkAction?: string
-}
 
 // afterId: null = insert at very top; string = insert after that block id
 type InsertState = { afterId: string | null } | null
@@ -1729,7 +1688,16 @@ export const EmailEditorPanel: React.FC = () => {
   const [emailerNameInput, setEmailerNameInput] = useState('')
   const dropdownRef = useRef<HTMLDivElement>(null)
 
-  const { document: doc, previewMode, setPreviewMode, updateSubject } = useEmailStore()
+  const { document: doc, previewMode, setPreviewMode, updateSubject, syncFromCanvas } = useEmailStore()
+
+  // ── Sync canvas → emailStore on every canvas change ─────────────────────────
+  // This bridges the CanvasBlock[] visual model with the EmailDocument compiler
+  // model so that compiled HTML always reflects what the user sees on canvas.
+  useEffect(() => {
+    void syncFromCanvas(canvasBlocks)
+    // syncFromCanvas is stable (Zustand action ref never changes)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canvasBlocks])
 
   // Fetch emailer list on mount — only replace dummy data if real rows come back
   useEffect(() => {
