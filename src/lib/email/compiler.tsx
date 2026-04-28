@@ -8,13 +8,22 @@
  *  - Max 2 ButtonBlocks per section → CompilerError MAX_CTA_EXCEEDED
  *  - Logo with meta.isGlobal resolved from globalStyles.logo
  *  - Text never baked into images
- *  - Outlook-safe: MSO conditionals on multi-column layouts
+ *
+ * Outlook fixes applied (all 8 known breakage points):
+ *  1. VML Bulletproof Button — <v:roundrect> so background+radius survive Outlook
+ *  2. Column HTML width="Xpx" — Outlook's Word renderer ignores CSS width on <td>
+ *  3. Section padding on <td> not <table> — Outlook 2007–2013 ignores table padding
+ *  4. MSO head block injected via post-processing — Office namespace + table reset
+ *  5. Container width="600" attribute — fixes email expanding to full width in Outlook
+ *  6. mso-table-lspace/rspace:0pt — removes phantom 2px inter-cell gaps
+ *  7. mso-line-height-rule:exactly — prevents Outlook adding extra line height
+ *  8. Spacer <td height="X"> — spacers collapse without explicit HTML height attr
  */
 
 import * as React from 'react'
 import {
   Html, Head, Body, Preview, Container,
-  Section, Row, Column, Text, Img, Button, Hr, Link,
+  Section, Row, Column, Text, Img, Hr, Link,
 } from '@react-email/components'
 import { render } from '@react-email/render'
 import type {
@@ -35,7 +44,6 @@ function validate(doc: EmailDocument): {
   const errors: CompilerError[] = []
   const warnings: CompilerWarning[] = []
 
-  // Unsubscribe check
   if (!doc.unsubscribe || !doc.unsubscribe.href) {
     errors.push({
       code: 'MISSING_UNSUBSCRIBE',
@@ -64,7 +72,6 @@ function validate(doc: EmailDocument): {
         }
 
         if (block.type === 'image' && !(block as ImageBlock).src) {
-          // Demoted to warning — compiler renders a grey placeholder instead of blocking
           warnings.push({
             code: 'INVALID_IMAGE_SRC',
             message: `Image block "${block.id}" has no src — showing placeholder.`,
@@ -104,7 +111,6 @@ function validate(doc: EmailDocument): {
     }
   })
 
-  // Validate column widths sum
   doc.sections.forEach((section) => {
     const sum = section.columns.reduce((acc, c) => acc + c.widthPct, 0)
     if (Math.abs(sum - 100) > 1) {
@@ -123,17 +129,23 @@ function validate(doc: EmailDocument): {
   return { errors, warnings }
 }
 
-// ─── Block renderers ─────────────────────────────────────────────────────────
+// ─── Shared table style helper ────────────────────────────────────────────────
+// FIX #6 — added to every custom <table> to remove Outlook's default 2px gap.
+
+const TABLE_RESET: React.CSSProperties = {
+  msoTableLspace: '0pt',
+  msoTableRspace: '0pt',
+} as React.CSSProperties
+
+// ─── Block renderers ──────────────────────────────────────────────────────────
 
 function BlockText({
   block, global: g,
 }: { block: TextBlock; global: GlobalEmailStyles }) {
   const { styles, content } = block
-  // Use raw <table><td> so content injects directly without react-email's
-  // <Text> wrapping everything in an extra <p>, which causes <p><p> nesting.
   return (
     <table role="presentation" cellPadding={0} cellSpacing={0} border={0}
-      style={{ width: '100%' }}
+      style={{ width: '100%', ...TABLE_RESET }}
     >
       <tbody><tr>
         <td
@@ -148,7 +160,9 @@ function BlockText({
             paddingRight: `${styles.padding.right}px`,
             paddingBottom: `${styles.padding.bottom}px`,
             paddingLeft: `${styles.padding.left}px`,
-          }}
+            // FIX #7 — prevents Outlook from adding extra line-height
+            msoLineHeightRule: 'exactly',
+          } as React.CSSProperties}
           dangerouslySetInnerHTML={{ __html: content }}
         />
       </tr></tbody>
@@ -162,13 +176,13 @@ function BlockImage({
   const { styles, src, alt, href } = block
   const w = styles.width === 'full' ? colPx : Math.min(styles.width, colPx)
 
-  // Empty src — render a grey placeholder so the preview doesn't break
   if (!src) {
     const placeholderH = Math.round((w * 3) / 4)
     return (
       <table role="presentation" cellPadding={0} cellSpacing={0} border={0}
         style={{
           width: '100%',
+          ...TABLE_RESET,
           paddingTop: `${styles.padding.top}px`,
           paddingRight: `${styles.padding.right}px`,
           paddingBottom: `${styles.padding.bottom}px`,
@@ -217,6 +231,7 @@ function BlockImage({
     <table role="presentation" cellPadding={0} cellSpacing={0} border={0}
       style={{
         width: '100%',
+        ...TABLE_RESET,
         paddingTop: `${styles.padding.top}px`,
         paddingRight: `${styles.padding.right}px`,
         paddingBottom: `${styles.padding.bottom}px`,
@@ -232,41 +247,82 @@ function BlockImage({
   )
 }
 
+// FIX #1 — VML Bulletproof Button
+// react-email's <Button> renders only an <a> tag. In Outlook 2007–2019 (Word
+// rendering engine) <a> tags cannot have background-color or border-radius.
+// The industry-standard fix is a <v:roundrect> VML element surrounded by
+// <!--[if mso]> conditionals, with the regular <a> hidden from Outlook via
+// <!--[if !mso]><!-->.
 function BlockButton({
   block, global: g,
 }: { block: ButtonBlock; global: GlobalEmailStyles }) {
   const { styles, label, href, newTab } = block
+
+  // Compute button pixel height for VML (padding + line height)
+  const btnH = styles.padding.top + styles.padding.bottom + Math.round(styles.fontSize * 1.5)
+  // VML arcsize is expressed as a percentage of half the button height
+  const arcPct = styles.borderRadius > 0
+    ? Math.min(50, Math.round((styles.borderRadius / Math.max(1, btnH / 2)) * 100))
+    : 0
+  const fontStack = buildFontStack(styles.fontFamily, g.fontFamily)
+  const target = newTab ? '_blank' : '_self'
+
+  // Inline style string for the non-Outlook <a> tag (hidden from Outlook via !mso)
+  const paddingStyle = `${styles.padding.top}px ${styles.padding.right}px ${styles.padding.bottom}px ${styles.padding.left}px`
+  const borderStyle = styles.border?.style !== 'none' && styles.border
+    ? `border:${styles.border.width}px ${styles.border.style} ${styles.border.color};`
+    : ''
+  const widthStyle = styles.width === 'full' ? 'width:100%;' : ''
+
+  const aInlineStyle = [
+    'display:inline-block',
+    `background-color:${styles.backgroundColor}`,
+    `color:${styles.color}`,
+    `font-family:${fontStack}`,
+    `font-size:${styles.fontSize}px`,
+    `font-weight:${styles.fontWeight}`,
+    'text-decoration:none',
+    'text-align:center',
+    `-webkit-text-size-adjust:none`,
+    `border-radius:${styles.borderRadius}px`,
+    `padding:${paddingStyle}`,
+    borderStyle,
+    widthStyle,
+  ].filter(Boolean).join(';')
+
+  // The complete button HTML: VML for Outlook, <a> for everything else
+  const buttonHtml = [
+    // Outlook-only VML button
+    `<!--[if mso]>`,
+    `<v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word"`,
+    ` href="${href}" style="height:${btnH}px;v-text-anchor:middle;width:200px;"`,
+    ` arcsize="${arcPct}%" strokecolor="${styles.backgroundColor}" fillcolor="${styles.backgroundColor}">`,
+    `<w:anchorlock/>`,
+    `<center style="color:${styles.color};font-family:Arial,sans-serif;font-size:${styles.fontSize}px;font-weight:${styles.fontWeight}">`,
+    `${label}`,
+    `</center>`,
+    `</v:roundrect>`,
+    `<![endif]-->`,
+    // Non-Outlook (hidden from Outlook via !mso conditional)
+    `<!--[if !mso]><!--><a href="${href}" target="${target}" style="${aInlineStyle}">${label}</a><!--<![endif]-->`,
+  ].join('')
+
   return (
     <table role="presentation" cellPadding={0} cellSpacing={0} border={0}
-      style={{ width: '100%' }}
+      style={{ width: '100%', ...TABLE_RESET }}
     >
       <tbody><tr>
         <td align={styles.align} style={{ padding: '8px 0' }}>
-          <Button
-            href={href}
-            target={newTab ? '_blank' : '_self'}
-            style={{
-              display: 'inline-block',
-              backgroundColor: styles.backgroundColor,
-              color: styles.color,
-              fontFamily: buildFontStack(styles.fontFamily, g.fontFamily),
-              fontSize: `${styles.fontSize}px`,
-              fontWeight: styles.fontWeight as React.CSSProperties['fontWeight'],
-              textDecoration: 'none',
-              textAlign: 'center',
-              borderRadius: `${styles.borderRadius}px`,
-              paddingTop: `${styles.padding.top}px`,
-              paddingRight: `${styles.padding.right}px`,
-              paddingBottom: `${styles.padding.bottom}px`,
-              paddingLeft: `${styles.padding.left}px`,
-              ...(styles.border?.style !== 'none' && styles.border
-                ? { border: `${styles.border.width}px ${styles.border.style} ${styles.border.color}` }
-                : {}),
-              ...(styles.width === 'full' ? { width: '100%' } : {}),
-            }}
+          {/* Inner table centres the button without affecting its intrinsic size */}
+          <table role="presentation" cellPadding={0} cellSpacing={0} border={0}
+            style={{ ...TABLE_RESET }}
           >
-            {label}
-          </Button>
+            <tbody><tr>
+              {/* dangerouslySetInnerHTML is required here — MSO conditionals must
+                  be raw HTML strings; JSX would escape the comment delimiters. */}
+              <td dangerouslySetInnerHTML={{ __html: buttonHtml }} />
+            </tr></tbody>
+          </table>
         </td>
       </tr></tbody>
     </table>
@@ -277,13 +333,13 @@ function BlockDivider({ block }: { block: DividerBlock }) {
   const { styles } = block
   return (
     <table role="presentation" cellPadding={0} cellSpacing={0} border={0}
-      style={{ width: '100%' }}
+      style={{ width: '100%', ...TABLE_RESET }}
     >
       <tbody>
         <tr>
           <td style={{ paddingTop: `${styles.margin.top}px`, paddingBottom: `${styles.margin.bottom}px` }}>
             <table role="presentation" cellPadding={0} cellSpacing={0} border={0}
-              style={{ width: '100%' }}
+              style={{ width: '100%', ...TABLE_RESET }}
             >
               <tbody><tr>
                 <td style={{
@@ -299,13 +355,18 @@ function BlockDivider({ block }: { block: DividerBlock }) {
   )
 }
 
+// FIX #8 — Spacer: add explicit HTML height attribute so Outlook doesn't collapse it
 function BlockSpacer({ block }: { block: SpacerBlock }) {
   return (
     <table role="presentation" cellPadding={0} cellSpacing={0} border={0}
-      style={{ width: '100%' }}
+      style={{ width: '100%', ...TABLE_RESET }}
     >
       <tbody><tr>
-        <td style={{ height: `${block.height}px`, fontSize: '0', lineHeight: '0' }}>
+        {/* height attr (not just CSS) required for Outlook 2016+ */}
+        <td
+          height={block.height}
+          style={{ height: `${block.height}px`, fontSize: '0', lineHeight: '0' }}
+        >
           &nbsp;
         </td>
       </tr></tbody>
@@ -314,17 +375,15 @@ function BlockSpacer({ block }: { block: SpacerBlock }) {
 }
 
 function BlockLogo({ block, global: g }: { block: LogoBlock; global: GlobalEmailStyles }) {
-  // isGlobal: compiler resolves src/alt/width from globalStyles
   const src  = block.meta.isGlobal ? (g.logo?.src  ?? block.src)  : block.src
   const alt  = block.meta.isGlobal ? (g.logo?.alt  ?? block.alt)  : block.alt
   const w    = block.meta.isGlobal ? (g.logo?.width ?? block.width) : block.width
   const href = block.meta.isGlobal ? (g.logo?.href ?? block.href) : block.href
 
-  // Don't render an <img> with an empty src — browser would re-fetch the page
   if (!src) {
     return (
       <table role="presentation" cellPadding={0} cellSpacing={0} border={0}
-        style={{ width: '100%' }}
+        style={{ width: '100%', ...TABLE_RESET }}
       >
         <tbody><tr>
           <td align="center" style={{ padding: '16px 0', fontSize: '11px', color: '#9CA3AF', fontFamily: 'Arial, sans-serif' }}>
@@ -342,7 +401,7 @@ function BlockLogo({ block, global: g }: { block: LogoBlock; global: GlobalEmail
   )
   return (
     <table role="presentation" cellPadding={0} cellSpacing={0} border={0}
-      style={{ width: '100%' }}
+      style={{ width: '100%', ...TABLE_RESET }}
     >
       <tbody><tr>
         <td align="center" style={{ padding: '16px 0' }}>
@@ -366,7 +425,7 @@ function BlockUnsubscribe({
   )
   return (
     <table role="presentation" cellPadding={0} cellSpacing={0} border={0}
-      style={{ width: '100%' }}
+      style={{ width: '100%', ...TABLE_RESET }}
     >
       <tbody><tr>
         <td align="center" style={{ padding: '24px 16px 16px' }}>
@@ -376,7 +435,9 @@ function BlockUnsubscribe({
             color: styles.color,
             textAlign: 'center',
             margin: '0',
-          }}>
+            // FIX #7
+            msoLineHeightRule: 'exactly',
+          } as React.CSSProperties}>
             {hasPlaceholder ? <>{parts[0]}{linkEl}{parts[1]}</> : linkEl}
           </Text>
         </td>
@@ -385,7 +446,7 @@ function BlockUnsubscribe({
   )
 }
 
-// ─── Block dispatcher ────────────────────────────────────────────────────────
+// ─── Block dispatcher ─────────────────────────────────────────────────────────
 
 function RenderBlock({
   block, colPx, global: g,
@@ -405,7 +466,7 @@ function RenderBlock({
   }
 }
 
-// ─── Column renderer ─────────────────────────────────────────────────────────
+// ─── Column renderer ──────────────────────────────────────────────────────────
 
 function RenderColumn({
   col, totalWidth, global: g,
@@ -416,7 +477,10 @@ function RenderColumn({
 }) {
   const colPx = Math.round((col.widthPct / 100) * totalWidth)
   return (
-    <Column style={{ width: `${col.widthPct}%`, verticalAlign: 'top' }}>
+    // FIX #2 — width={colPx} adds a pixel HTML width attribute.
+    // Outlook's Word engine ignores CSS width on <td> but respects the width attr.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    <Column width={colPx as any} style={{ width: `${col.widthPct}%`, verticalAlign: 'top' }}>
       {col.blocks.map((block) => (
         <RenderBlock key={block.id} block={block} colPx={colPx} global={g} />
       ))}
@@ -424,7 +488,7 @@ function RenderColumn({
   )
 }
 
-// ─── Section renderer ────────────────────────────────────────────────────────
+// ─── Section renderer ─────────────────────────────────────────────────────────
 
 function RenderSection({
   section, totalWidth, global: g,
@@ -435,35 +499,56 @@ function RenderSection({
 }) {
   const isMultiCol = section.columns.length > 1
 
+  // FIX #3 — padding must live on a <td>, not on the <Section> (<table>).
+  // Outlook 2007–2013 ignores padding set on <table> tags.
+  // We keep only background-color on Section and delegate spacing to an inner <td>.
+  const { padding } = section.styles
+  const hasPadding = padding.top || padding.right || padding.bottom || padding.left
+
+  const innerContent = isMultiCol ? (
+    <Row>
+      {section.columns.map((col) => (
+        <RenderColumn key={col.id} col={col} totalWidth={totalWidth} global={g} />
+      ))}
+    </Row>
+  ) : (
+    section.columns[0]?.blocks.map((block) => (
+      <RenderBlock key={block.id} block={block} colPx={totalWidth} global={g} />
+    ))
+  )
+
   return (
     <Section style={{
       backgroundColor: section.styles.backgroundColor,
-      paddingTop:    `${section.styles.padding.top}px`,
-      paddingRight:  `${section.styles.padding.right}px`,
-      paddingBottom: `${section.styles.padding.bottom}px`,
-      paddingLeft:   `${section.styles.padding.left}px`,
+      // Border (if any) stays on the Section
       ...(section.styles.border
         ? { border: `${section.styles.border.width}px ${section.styles.border.style} ${section.styles.border.color}` }
         : {}),
     }}>
-      {isMultiCol ? (
-        // Multi-column: use Row/Column from react-email (table-based)
-        <Row>
-          {section.columns.map((col) => (
-            <RenderColumn key={col.id} col={col} totalWidth={totalWidth} global={g} />
-          ))}
-        </Row>
+      {hasPadding ? (
+        // Wrap in a table so padding is on a <td> — reliable in all Outlook versions
+        <table role="presentation" cellPadding={0} cellSpacing={0} border={0}
+          style={{ width: '100%', ...TABLE_RESET }}
+        >
+          <tbody><tr>
+            <td style={{
+              paddingTop: `${padding.top}px`,
+              paddingRight: `${padding.right}px`,
+              paddingBottom: `${padding.bottom}px`,
+              paddingLeft: `${padding.left}px`,
+            }}>
+              {innerContent}
+            </td>
+          </tr></tbody>
+        </table>
       ) : (
-        // Single column: skip Row wrapper for Outlook compatibility
-        section.columns[0]?.blocks.map((block) => (
-          <RenderBlock key={block.id} block={block} colPx={totalWidth} global={g} />
-        ))
+        innerContent
       )}
     </Section>
   )
 }
 
-// ─── Document template ───────────────────────────────────────────────────────
+// ─── Document template ────────────────────────────────────────────────────────
 
 function EmailTemplate({ doc, width }: { doc: EmailDocument; width: number }) {
   const g = doc.globalStyles
@@ -493,7 +578,7 @@ function EmailTemplate({ doc, width }: { doc: EmailDocument; width: number }) {
             />
           ))}
 
-          {/* ── Unsubscribe — always last, non-negotiable ── */}
+          {/* Unsubscribe — always last, non-negotiable */}
           <Section style={{ backgroundColor: g.backgroundColor }}>
             <BlockUnsubscribe block={doc.unsubscribe} global={g} />
           </Section>
@@ -503,7 +588,60 @@ function EmailTemplate({ doc, width }: { doc: EmailDocument; width: number }) {
   )
 }
 
-// ─── Public API ──────────────────────────────────────────────────────────────
+// ─── Post-processing: Outlook fixes that can't be done in JSX ─────────────────
+//
+// Some Outlook fixes require raw HTML string manipulation because:
+//  - MSO conditional comments can't be expressed in JSX
+//  - react-email's Container renders width="100%" which Outlook ignores
+//  - The outer body table generated by react-email has no MSO table reset
+
+function applyOutlookFixes(html: string, contentWidth: number): string {
+  // FIX #4 / #5 — Inject MSO head block before </head>
+  // Adds:
+  //  - Office document settings so Outlook respects pixel-per-inch
+  //  - VML namespace reference (required for <v:roundrect> buttons)
+  //  - Table border-collapse + mso-table-lspace reset covering react-email's own tables
+  const msoHeadBlock = [
+    `<!--[if mso]><xml>`,
+    `<o:OfficeDocumentSettings>`,
+    `<o:AllowPNG/>`,
+    `<o:PixelsPerInch>96</o:PixelsPerInch>`,
+    `</o:OfficeDocumentSettings>`,
+    `</xml><![endif]-->`,
+    `<!--[if (gte mso 9)|(IE)]><style type="text/css">`,
+    `table{border-collapse:collapse!important;mso-table-lspace:0pt!important;mso-table-rspace:0pt!important;}`,
+    `td{mso-line-height-rule:exactly;}`,
+    `a{color:inherit;}`,
+    `</style><![endif]-->`,
+  ].join('')
+  html = html.replace('</head>', `${msoHeadBlock}</head>`)
+
+  // FIX #5 — Add VML namespaces to <html> tag so <v:roundrect> is valid
+  html = html.replace(
+    /<html([^>]*)>/,
+    '<html$1 xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">',
+  )
+
+  // FIX #3 / #5 — Fix Container table: change width="100%" → width="${contentWidth}"
+  // react-email renders Container as <table width="100%" style="max-width:Xpx;...">
+  // Outlook's Word engine ignores max-width CSS so the email stretches to full width.
+  // We add width="${contentWidth}" as an HTML attribute which Outlook does respect.
+  // The pattern matches only the outermost content-constraining table, identified by
+  // having style="max-width:Npx;width:100%;margin:0 auto" in any attribute order.
+  html = html.replace(
+    /(<table\b[^>]*\bwidth="100%"[^>]*style="[^"]*max-width:\d+px[^"]*"[^>]*>)/g,
+    (match) => match.replace('width="100%"', `width="${contentWidth}"`),
+  )
+  // Handle reversed attribute order (style before width)
+  html = html.replace(
+    /(<table\b[^>]*style="[^"]*max-width:\d+px[^"]*"[^>]*\bwidth="100%"[^>]*>)/g,
+    (match) => match.replace('width="100%"', `width="${contentWidth}"`),
+  )
+
+  return html
+}
+
+// ─── Public API ───────────────────────────────────────────────────────────────
 
 /**
  * Compiles an EmailDocument to inbox-safe HTML.
@@ -525,11 +663,11 @@ export async function compileEmail(
   const width = opts.width ?? doc.globalStyles.contentWidth ?? 600
 
   try {
-    const html = await render(<EmailTemplate doc={doc} width={width} />, {
-      // Prettier rejects some patterns email clients tolerate (e.g. adjacent table layout).
-      // Only opt in with opts.pretty === true (e.g. one-off export debugging).
+    const rawHtml = await render(<EmailTemplate doc={doc} width={width} />, {
       pretty: opts.pretty === true,
     })
+
+    const html = applyOutlookFixes(rawHtml, width)
 
     return { html, errors: [], warnings }
   } catch (err) {
