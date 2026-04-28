@@ -75,11 +75,27 @@ const SYSTEM_FONTS_EMAIL = [
 
 // ─── Default canvas (email content flow) ─────────────────────────────────────
 
+const DEFAULT_LINK_BAR: { label: string; url: string }[] = [
+  { label: 'Home',     url: '' },
+  { label: 'About',    url: '' },
+  { label: 'Products', url: '' },
+  { label: 'Blog',     url: '' },
+  { label: 'Contact',  url: '' },
+]
+
+/** Creates a new CanvasBlock with sensible defaults pre-populated for block types that need them. */
+function makeNewBlock(type: string): CanvasBlock {
+  const base: CanvasBlock = { id: nanoid(), type }
+  if (type === 'link-bar') return { ...base, linkBarItems: [...DEFAULT_LINK_BAR] }
+  if (type === 'spacer')   return { ...base, spacerHeight: 64 }
+  return base
+}
+
 function makeDefaultBlocks(): CanvasBlock[] {
   return [
     { id: nanoid(), type: 'logo' },
-    { id: nanoid(), type: 'link-bar' },
-    { id: nanoid(), type: 'spacer' },
+    { id: nanoid(), type: 'link-bar', linkBarItems: [...DEFAULT_LINK_BAR] },
+    { id: nanoid(), type: 'spacer', spacerHeight: 64 },
     { id: nanoid(), type: 'footer' },
   ]
 }
@@ -904,14 +920,7 @@ function BlockContent({
   }
 
   if (type === 'link-bar') {
-    const DEFAULT_LINKS = [
-      { label: 'Home',     url: '' },
-      { label: 'About',    url: '' },
-      { label: 'Products', url: '' },
-      { label: 'Blog',     url: '' },
-      { label: 'Contact',  url: '' },
-    ]
-    const items = (linkBarItems && linkBarItems.length > 0) ? linkBarItems : DEFAULT_LINKS
+    const items = (linkBarItems && linkBarItems.length > 0) ? linkBarItems : DEFAULT_LINK_BAR
     return (
       <div className="flex items-center justify-center gap-6 border-b border-gray-100 bg-white px-8 py-3" style={bg}>
         {items.map((item, i) => (
@@ -1429,7 +1438,7 @@ function BlockContent({
           {...editable}
           className={`${editable.className} text-[10px] text-gray-400`}
         >
-          © 2024 Your Company Name. All rights reserved.
+          © {new Date().getFullYear()} Your Company Name. All rights reserved.
         </p>
       </div>
     )
@@ -1860,7 +1869,7 @@ export const EmailEditorPanel: React.FC = () => {
     setCanvasBlocks((prev) => {
       const idx = prev.findIndex((b) => b.id === id)
       if (idx < 0) return prev
-      const copy: CanvasBlock = { id: nanoid(), type: prev[idx].type }
+      const copy: CanvasBlock = { ...prev[idx], id: nanoid() }
       const next = [...prev]
       next.splice(idx + 1, 0, copy)
       return next
@@ -1881,7 +1890,7 @@ export const EmailEditorPanel: React.FC = () => {
 
   // Insert a block inline (from "+" button)
   const handleInlineInsert = useCallback((type: string, afterId: string | null) => {
-    const newBlock: CanvasBlock = { id: nanoid(), type }
+    const newBlock: CanvasBlock = makeNewBlock(type)
     setCanvasBlocks((prev) => {
       if (afterId === null) return [newBlock, ...prev]
       const idx = prev.findIndex((b) => b.id === afterId)
@@ -1896,7 +1905,7 @@ export const EmailEditorPanel: React.FC = () => {
 
   // Insert after selected (or append) — used by Sections panel + right nav
   const handleAppendInsert = useCallback((type: string) => {
-    const newBlock: CanvasBlock = { id: nanoid(), type }
+    const newBlock: CanvasBlock = makeNewBlock(type)
     setCanvasBlocks((prev) => {
       if (!selectedId) return [...prev, newBlock]
       const idx = prev.findIndex((b) => b.id === selectedId)

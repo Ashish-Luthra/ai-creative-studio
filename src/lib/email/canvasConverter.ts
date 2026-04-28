@@ -5,13 +5,17 @@
  * EmailDocument that can be compiled to email-safe HTML.
  *
  * Design notes:
- *  - Each CanvasBlock maps to one EmailSection with a single full-width column.
- *  - Multi-column prebuilt blocks (image-left-text-right, etc.) map to
- *    two-column sections using the 'image-left' or 'image-right' layouts.
- *  - Font/colour settings from the canvas block are forwarded to the block's
- *    styles object so the compiled HTML faithfully reflects what the user sees.
- *  - An existing EmailDocument can be passed in; when supplied, its
- *    globalStyles, subject, preheader, and unsubscribe block are preserved.
+ *  - Each CanvasBlock maps to one or more EmailSections (some prebuilt blocks
+ *    need two sections to replicate their split background treatment).
+ *  - Font/colour/spacing settings from the canvas block are forwarded faithfully
+ *    so the compiled HTML matches what the user designed in the canvas.
+ *  - Tailwind class equivalents used in this file:
+ *      text-sm  = 14px    text-xl   = 20px    text-2xl  = 24px
+ *      text-3xl = 30px    text-4xl  = 36px    text-5xl  = 48px
+ *      p-8  = 32px    p-12 = 48px
+ *      bg-gray-50  = #F9FAFB    bg-gray-100 = #F3F4F6
+ *      text-gray-400 = #9CA3AF   text-gray-500 = #6B7280
+ *      text-gray-600 = #4B5563   text-gray-700 = #374151
  */
 
 import { nanoid } from 'nanoid'
@@ -22,15 +26,24 @@ import type {
 } from '@/types/email'
 import {
   makeTextBlock, makeImageBlock, makeButtonBlock, makeSpacerBlock,
-  makeLogoBlock, makeDividerBlock, makeSection, makeUnsubscribeBlock,
+  makeLogoBlock, makeSection, makeUnsubscribeBlock,
   DEFAULT_GLOBAL_STYLES,
 } from './templates'
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Style helpers ─────────────────────────────────────────────────────────────
 
-function sectionStyles(cb: CanvasBlock, overridePadding?: SectionStyles['padding']): SectionStyles {
+/**
+ * Section-level styles. `defaultBg` lets prebuilt blocks specify their
+ * canvas-hardcoded background colour (e.g. bg-gray-50) as a default, while
+ * still respecting any explicit background the user set in the right nav.
+ */
+function sectionStyles(
+  cb: CanvasBlock,
+  overridePadding?: SectionStyles['padding'],
+  defaultBg = '#FFFFFF',
+): SectionStyles {
   return {
-    backgroundColor: cb.backgroundColor ?? '#FFFFFF',
+    backgroundColor: cb.backgroundColor ?? defaultBg,
     padding: overridePadding ?? { top: 16, right: 24, bottom: 16, left: 24 },
   }
 }
@@ -81,6 +94,16 @@ function firstImageSrc(cb: CanvasBlock, fallback = ''): string {
   return keys.length ? (cb.imageSrcs[keys[0]] ?? fallback) : fallback
 }
 
+/**
+ * Build a narrow centred decorative line matching the canvas `h-px w-16 bg-{color}`.
+ * Returns an HTML string safe for use inside a dangerouslySetInnerHTML text block.
+ */
+function narrowLine(color = '#9CA3AF'): string {
+  return `<p style="margin:8px 0;text-align:center">` +
+    `<span style="display:inline-block;width:64px;height:1px;` +
+    `background-color:${color};line-height:1px;font-size:1px">&nbsp;</span></p>`
+}
+
 // ─── Per-block-type converters ────────────────────────────────────────────────
 
 function convertLogo(cb: CanvasBlock): EmailSection {
@@ -93,9 +116,11 @@ function convertLogo(cb: CanvasBlock): EmailSection {
 
 function convertLinkBar(cb: CanvasBlock): EmailSection {
   const DEFAULT_LINKS = [
-    { label: 'Home', url: '#' },
-    { label: 'About', url: '#' },
-    { label: 'Shop', url: '#' },
+    { label: 'Home',     url: '#' },
+    { label: 'About',    url: '#' },
+    { label: 'Products', url: '#' },
+    { label: 'Blog',     url: '#' },
+    { label: 'Contact',  url: '#' },
   ]
   const links = cb.linkBarItems && cb.linkBarItems.length > 0 ? cb.linkBarItems : DEFAULT_LINKS
   const linkHtml = links
@@ -111,9 +136,7 @@ function convertLinkBar(cb: CanvasBlock): EmailSection {
 }
 
 function convertText(cb: CanvasBlock): EmailSection {
-  const block = makeTextBlock({
-    styles: textStyles(cb),
-  })
+  const block = makeTextBlock({ styles: textStyles(cb) })
   return makeSection('full', [[block]], { styles: sectionStyles(cb) })
 }
 
@@ -124,16 +147,14 @@ function convertButton(cb: CanvasBlock): EmailSection {
 }
 
 function convertSpacer(cb: CanvasBlock): EmailSection {
-  const block = makeSpacerBlock(cb.spacerHeight ?? 32)
+  // Canvas defaults spacer height to 64 px; match that here.
+  const block = makeSpacerBlock(cb.spacerHeight ?? 64)
   return makeSection('full', [[block]], {
     styles: sectionStyles(cb, { top: 0, right: 0, bottom: 0, left: 0 }),
   })
 }
 
 function convertSocial(cb: CanvasBlock): EmailSection {
-  // Use inline SVG icons embedded as data-URIs so they work in all email clients
-  // without requiring external image hosting. Each icon is a 32×32 circle with
-  // the platform logo inside, matching the canvas block's visual style.
   const SOCIAL_ICONS: { name: string; svg: string }[] = [
     {
       name: 'Facebook',
@@ -173,26 +194,32 @@ function convertAddress(cb: CanvasBlock): EmailSection {
     content: `<p style="margin:0;text-align:center;color:#6B7280">123 Main Street, Suite 100 · City, State 12345 · United States</p>`,
     styles: textStyles(cb, { textAlign: 'center', fontSize: 11, color: '#6B7280' }),
   })
-  return makeSection('full', [[block]], { styles: sectionStyles(cb) })
+  return makeSection('full', [[block]], {
+    styles: sectionStyles(cb, { top: 8, right: 24, bottom: 8, left: 24 }),
+  })
 }
 
 function convertFooter(cb: CanvasBlock): EmailSection {
+  // Canvas: bg-gray-50 px-12 py-6 → #F9FAFB background, 48px horiz padding, 24px vert
   const DEFAULT_FOOTER_LINKS = [
     { label: 'Privacy Policy', url: '#' },
-    { label: 'Unsubscribe', url: '#' },
+    { label: 'Unsubscribe',    url: '#' },
     { label: 'View in Browser', url: '#' },
-    { label: 'Contact Us', url: '#' },
+    { label: 'Contact Us',     url: '#' },
   ]
   const fLinks = cb.footerLinks && cb.footerLinks.length > 0 ? cb.footerLinks : DEFAULT_FOOTER_LINKS
   const linkHtml = fLinks
-    .map((l) => `<a href="${l.url || '#'}" style="color:#9CA3AF;text-decoration:none">${l.label}</a>`)
+    .map((l) => `<a href="${l.url || '#'}" style="color:#6B7280;text-decoration:none">${l.label}</a>`)
     .join('<span style="color:#D1D5DB"> · </span>')
   const block = makeTextBlock({
-    content: `<p style="margin:0 0 8px 0;text-align:center">${linkHtml}</p><p style="margin:0;text-align:center;color:#9CA3AF">© ${new Date().getFullYear()} Your Company Name. All rights reserved.</p>`,
-    styles: textStyles(cb, { textAlign: 'center', fontSize: 11, color: '#9CA3AF' }),
+    content: `<p style="margin:0 0 12px 0;text-align:center">${linkHtml}</p>` +
+      `<p style="margin:0;text-align:center;color:#9CA3AF;font-size:10px">` +
+      `© ${new Date().getFullYear()} Your Company Name. All rights reserved.</p>`,
+    styles: textStyles(cb, { textAlign: 'center', fontSize: 11, color: '#6B7280' }),
   })
   return makeSection('full', [[block]], {
-    styles: sectionStyles(cb, { top: 24, right: 24, bottom: 24, left: 24 }),
+    // bg-gray-50 = #F9FAFB  ·  px-12 py-6 → 24px vert, 48px horiz
+    styles: sectionStyles(cb, { top: 24, right: 48, bottom: 24, left: 48 }, '#F9FAFB'),
   })
 }
 
@@ -205,19 +232,17 @@ function convertContent(cb: CanvasBlock): EmailSection {
     const img = makeImageBlock(imgSrc, 'Content image')
     img.styles = imageStyles()
     const blocks: EmailBlock[] = [img]
-    if (cb.contentButton) {
-      blocks.push(makeButtonBlock(btnLabel, '#'))
-    }
+    if (cb.contentButton) blocks.push(makeButtonBlock(btnLabel, '#'))
     return makeSection('full', [blocks], { styles: sectionStyles(cb) })
   }
 
   if (layout === 'image-text') {
     const heading = makeTextBlock({
-      content: '<p style="margin:0;font-size:22px;font-weight:700">Featured Content</p>',
+      content: '<p style="margin:0;font-size:22px;font-weight:700">Content Heading</p>',
       styles: textStyles(cb, { fontSize: 22, fontWeight: 'bold' }),
     })
     const body = makeTextBlock({
-      content: '<p style="margin:0">Add your content copy here.</p>',
+      content: '<p style="margin:0">Click to edit this text. Tell your story alongside the image.</p>',
       styles: textStyles(cb),
     })
     const imgBlock = makeImageBlock(imgSrc, 'Content image')
@@ -229,167 +254,297 @@ function convertContent(cb: CanvasBlock): EmailSection {
 
   if (layout === '2col-text') {
     const col1 = [
-      makeTextBlock({ content: '<p style="margin:0;font-weight:700">Column One</p>', styles: textStyles(cb) }),
-      makeTextBlock({ content: '<p style="margin:0">Content for the first column.</p>', styles: textStyles(cb) }),
+      makeTextBlock({ content: '<p style="margin:0;font-weight:700">Column One Heading</p>', styles: textStyles(cb) }),
+      makeTextBlock({ content: '<p style="margin:0">Add your text here. Click to edit this column and tell your story.</p>', styles: textStyles(cb) }),
     ]
     const col2 = [
-      makeTextBlock({ content: '<p style="margin:0;font-weight:700">Column Two</p>', styles: textStyles(cb) }),
-      makeTextBlock({ content: '<p style="margin:0">Content for the second column.</p>', styles: textStyles(cb) }),
+      makeTextBlock({ content: '<p style="margin:0;font-weight:700">Column Two Heading</p>', styles: textStyles(cb) }),
+      makeTextBlock({ content: '<p style="margin:0">Add your text here. Click to edit this column and share more details.</p>', styles: textStyles(cb) }),
     ]
     return makeSection('two-col', [col1, col2], { styles: sectionStyles(cb) })
   }
 
   if (layout === '3col-text') {
     const col = (label: string) => [
-      makeTextBlock({ content: `<p style="margin:0;font-weight:700">${label}</p>`, styles: textStyles(cb) }),
-      makeTextBlock({ content: '<p style="margin:0">Short description here.</p>', styles: textStyles(cb) }),
+      makeTextBlock({ content: `<p style="margin:0;font-weight:700">Column ${label}</p>`, styles: textStyles(cb) }),
+      makeTextBlock({ content: '<p style="margin:0">Click to edit this column.</p>', styles: textStyles(cb) }),
     ]
-    return makeSection('three-col', [col('Column 1'), col('Column 2'), col('Column 3')], { styles: sectionStyles(cb) })
+    return makeSection('three-col', [col('One'), col('Two'), col('Three')], { styles: sectionStyles(cb) })
   }
 
-  // Fallback
   return makeSection('full', [[makeTextBlock()]], { styles: sectionStyles(cb) })
 }
 
 // ── Prebuilt layout blocks ────────────────────────────────────────────────────
 
 function convertImageLeftTextRight(cb: CanvasBlock): EmailSection {
+  // Canvas: flex 50/50, image left (self-stretch), text right (p-12, items-center gap-4)
+  // Text: tagline (14px italic gray-500), heading (30px bold), narrow line, button
   const imgSrc = cb.imageSrcs?.['main'] ?? ''
   const imgBlock = makeImageBlock(imgSrc, 'Feature image')
   imgBlock.styles = imageStyles()
+
   const tagline = makeTextBlock({
-    content: '<p style="margin:0;font-style:italic;color:#9CA3AF">From The &lsquo;Gram</p>',
-    styles: textStyles(cb, { fontSize: 13, color: '#9CA3AF', textAlign: 'center' }),
+    content: `<p style="margin:0;font-style:italic;color:#6B7280;text-align:center">From The &apos;Gram</p>`,
+    styles: textStyles(cb, { fontSize: 14, color: '#6B7280', textAlign: 'center' }),
   })
   const heading = makeTextBlock({
-    content: '<p style="margin:0;font-size:24px;font-weight:700;text-align:center">The Post That Got Everyone Talking</p>',
-    styles: textStyles(cb, { fontSize: 24, fontWeight: 'bold', textAlign: 'center' }),
+    // text-3xl = 30px
+    content: `<p style="margin:0;font-size:30px;font-weight:700;text-align:center">The Post That Got Everyone Talking</p>`,
+    styles: textStyles(cb, { fontSize: 30, fontWeight: 'bold', textAlign: 'center' }),
   })
-  const divider = makeDividerBlock()
+  // Narrow 64px centred decorative line (matches canvas h-px w-16 bg-gray-400)
+  const dividerBlock = makeTextBlock({
+    content: narrowLine('#9CA3AF'),
+    styles: textStyles(cb, { textAlign: 'center', fontSize: 1 }),
+  })
   const btn = makeButtonBlock('SEE IT', '#')
   btn.styles = buttonStyles(cb, { align: 'center' })
-  return makeSection('image-left', [[imgBlock], [tagline, heading, divider, btn]], { styles: sectionStyles(cb) })
+
+  // two-col = 50/50, matching canvas w-1/2 on each side
+  // No outer section padding so the image bleeds edge-to-edge; text has inner padding via block styles
+  return {
+    id: nanoid(),
+    layout: 'two-col',
+    columns: [
+      { id: nanoid(), widthPct: 50, blocks: [imgBlock] },
+      {
+        id: nanoid(), widthPct: 50,
+        blocks: [makeSpacerBlock(24), tagline, heading, dividerBlock, btn, makeSpacerBlock(24)],
+      },
+    ],
+    styles: sectionStyles(cb, { top: 0, right: 0, bottom: 0, left: 0 }),
+  }
 }
 
 function convertCenteredContent(cb: CanvasBlock): EmailSection {
-  const heading = makeTextBlock({
-    content: '<p style="margin:0;font-size:28px;font-weight:700;text-align:center">6</p><p style="margin:8px 0 0;font-size:20px;text-align:center">Tips to Photograph Food</p>',
-    styles: textStyles(cb, { textAlign: 'center', fontSize: 20, fontWeight: 'bold' }),
-  })
-  const body = makeTextBlock({
-    content: '<p style="margin:0;text-align:center">I created this guide to help you get started without making all the mistakes I did.</p>',
-    styles: textStyles(cb, { textAlign: 'center', fontSize: 14, color: '#374151' }),
+  // Canvas: outer bg-gray-100 p-12, inner white rounded card p-8
+  //         "6" (text-5xl=48px, text-gray-600), heading (text-2xl=24px),
+  //         body (text-sm=14px, text-gray-600, max-w-xs), "001" label + "READ IT" button
+
+  // We embed the card as a nested HTML table inside a text block so the white-on-gray
+  // effect works across email clients without requiring CSS box-shadows.
+  const fontFamily = cb.fontFamily ? `${cb.fontFamily}, Arial, sans-serif` : 'Arial, sans-serif'
+  const bodyColor  = cb.fontColor ?? '#4B5563'
+
+  const cardHtml =
+    `<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" ` +
+    `style="background-color:#ffffff;border-radius:8px;margin:0 auto;width:100%">` +
+    `<tr><td style="padding:32px;text-align:center">` +
+    `<p style="margin:0;font-size:48px;font-weight:700;color:#4B5563;line-height:1;font-family:${fontFamily}">6</p>` +
+    `<p style="margin:8px 0 0;font-size:24px;font-weight:700;font-family:${fontFamily}">Tips to Photograph Food</p>` +
+    `<p style="margin:12px auto 0;font-size:14px;color:${bodyColor};max-width:280px;line-height:1.6;font-family:${fontFamily}">` +
+    `I remember my first try at food photography. I created this guide to help you get started without making all the mistakes I did.</p>` +
+    `<p style="margin:16px 0 0;font-size:14px;color:#9CA3AF;font-family:${fontFamily}">001</p>` +
+    `</td></tr></table>`
+
+  const cardBlock = makeTextBlock({
+    content: cardHtml,
+    styles: textStyles(cb, { textAlign: 'center', fontSize: 14 }),
   })
   const btn = makeButtonBlock('READ IT', '#')
   btn.styles = buttonStyles(cb, { align: 'center' })
-  return makeSection('full', [[heading, body, btn]], { styles: sectionStyles(cb) })
+
+  return makeSection('full', [[cardBlock, btn]], {
+    // bg-gray-100 = #F3F4F6 · p-12 = 48px padding
+    styles: sectionStyles(cb, { top: 48, right: 48, bottom: 48, left: 48 }, '#F3F4F6'),
+  })
 }
 
 function convertTextOverImage(cb: CanvasBlock): EmailSection {
+  // Canvas: bg-white p-12 text-center
+  //         narrow black line · heading (text-2xl=24px, bold, uppercase, tracking-widest)
+  //         narrow black line · button (mt-6) · image
+
+  const headingHtml =
+    narrowLine('#000000') +
+    `<p style="margin:0;font-size:24px;font-weight:700;letter-spacing:0.1em;` +
+    `text-align:center;text-transform:uppercase">` +
+    `A Little Gift of Thanks for Joining the List.</p>` +
+    narrowLine('#000000')
+
   const heading = makeTextBlock({
-    content: '<p style="margin:0;font-size:18px;font-weight:700;letter-spacing:0.06em;text-align:center;text-transform:uppercase">A Little Gift of Thanks for Joining the List.</p>',
-    styles: textStyles(cb, { textAlign: 'center', fontSize: 18, fontWeight: 'bold' }),
+    content: headingHtml,
+    styles: textStyles(cb, { textAlign: 'center', fontSize: 24, fontWeight: 'bold' }),
   })
   const imgSrc = firstImageSrc(cb, '')
   const imgBlock = makeImageBlock(imgSrc, 'Feature image')
   imgBlock.styles = imageStyles()
   const btn = makeButtonBlock('CLAIM GIFT', '#')
-  btn.styles = buttonStyles(cb, { align: 'center' })
-  return makeSection('full', [[heading, btn, imgBlock]], { styles: sectionStyles(cb) })
+  btn.styles = buttonStyles(cb, { align: 'center', padding: { top: 10, right: 32, bottom: 10, left: 32 } })
+
+  return makeSection('full', [[heading, btn, makeSpacerBlock(16), imgBlock]], {
+    // bg-white · p-12 but only on the text area; image gets no side padding
+    styles: sectionStyles(cb, { top: 48, right: 48, bottom: 0, left: 48 }),
+  })
 }
 
 function convertTextLeftImageRight(cb: CanvasBlock): EmailSection {
+  // Canvas: flex, text w-1/3 (p-12, items-center gap-6), image w-2/3
+  //         heading: text-4xl=36px, font-bold, "WEL—COME"
+  //         button: "EXPLORE"
   const heading = makeTextBlock({
-    content: '<p style="margin:0;font-size:28px;font-weight:700;line-height:1.1">WEL—<br/>COME</p>',
-    styles: textStyles(cb, { fontSize: 28, fontWeight: 'bold', lineHeight: 1.1 }),
+    content: `<p style="margin:0;font-size:36px;font-weight:700;line-height:1.25">WEL&mdash;COME</p>`,
+    styles: textStyles(cb, { fontSize: 36, fontWeight: 'bold', lineHeight: 1.25 }),
   })
-  const imgSrc = cb.imageSrcs?.['right'] ?? firstImageSrc(cb, '')
+  const btn = makeButtonBlock('EXPLORE', '#')
+  btn.styles = buttonStyles(cb, { align: 'left' })
+
+  // Canvas uses imageSrcs['bg'] for the right image
+  const imgSrc = cb.imageSrcs?.['bg'] ?? firstImageSrc(cb, '')
   const imgBlock = makeImageBlock(imgSrc, 'Welcome image')
   imgBlock.styles = imageStyles()
-  return makeSection('image-right', [[makeSpacerBlock(16), heading, makeSpacerBlock(16)], [imgBlock]], {
-    styles: sectionStyles(cb),
-  })
+
+  // 33/67 split matching canvas w-1/3 / w-2/3 — constructed manually
+  return {
+    id: nanoid(),
+    layout: 'image-right',
+    columns: [
+      {
+        id: nanoid(), widthPct: 33,
+        blocks: [makeSpacerBlock(24), heading, makeSpacerBlock(16), btn, makeSpacerBlock(24)],
+      },
+      { id: nanoid(), widthPct: 67, blocks: [imgBlock] },
+    ],
+    styles: sectionStyles(cb, { top: 0, right: 0, bottom: 0, left: 0 }),
+  }
 }
 
 function convertRecipeCard(cb: CanvasBlock): EmailSection {
-  const imgSrc = cb.imageSrcs?.['recipe'] ?? firstImageSrc(cb, '')
+  // Canvas: flex 50/50, gap-8, p-8 bg-white
+  //         Left: image (w-1/2, imgClip)
+  //         Right: "One" (14px italic gray-500), heading (20px), description (14px italic gray-500), button
+  const imgSrc = cb.imageSrcs?.['main'] ?? firstImageSrc(cb, '')
   const imgBlock = makeImageBlock(imgSrc, 'Recipe image')
   imgBlock.styles = imageStyles()
-  const heading = makeTextBlock({
-    content: '<p style="margin:0;font-size:20px;font-weight:700;text-align:center">Recipe Title</p>',
-    styles: textStyles(cb, { textAlign: 'center', fontSize: 20, fontWeight: 'bold' }),
+
+  const label = makeTextBlock({
+    content: `<p style="margin:0;font-style:italic;color:#6B7280">One</p>`,
+    styles: textStyles(cb, { fontSize: 14, color: '#6B7280' }),
   })
-  const details = makeTextBlock({
-    content: '<p style="margin:0;text-align:center;color:#6B7280;font-size:12px">Prep: 20 min · Cook: 30 min · Servings: 4</p>',
-    styles: textStyles(cb, { textAlign: 'center', fontSize: 12, color: '#6B7280' }),
+  const heading = makeTextBlock({
+    content: `<p style="margin:0;font-size:20px;font-weight:700">Click here for my creamy butternut squash soup</p>`,
+    styles: textStyles(cb, { fontSize: 20, fontWeight: 'bold' }),
+  })
+  const description = makeTextBlock({
+    content: `<p style="margin:0;font-style:italic;color:#6B7280">A warming recipe perfect for fall evenings.</p>`,
+    styles: textStyles(cb, { fontSize: 14, color: '#6B7280' }),
   })
   const btn = makeButtonBlock('GET RECIPE', '#')
-  btn.styles = buttonStyles(cb, { align: 'center' })
-  return makeSection('full', [[imgBlock, heading, details, btn]], { styles: sectionStyles(cb) })
+  btn.styles = buttonStyles(cb, { align: 'left' })
+
+  // two-col = 50/50 matching canvas w-1/2 on each side · p-8 = 32px padding
+  return {
+    id: nanoid(),
+    layout: 'two-col',
+    columns: [
+      { id: nanoid(), widthPct: 50, blocks: [imgBlock] },
+      {
+        id: nanoid(), widthPct: 50,
+        blocks: [makeSpacerBlock(16), label, heading, description, btn, makeSpacerBlock(16)],
+      },
+    ],
+    styles: sectionStyles(cb, { top: 0, right: 0, bottom: 0, left: 0 }),
+  }
 }
 
-function convertImageTopTextBottom(cb: CanvasBlock): EmailSection {
-  const imgSrc = cb.imageSrcs?.['top'] ?? firstImageSrc(cb, '')
+function convertImageTopTextBottom(cb: CanvasBlock): EmailSection[] {
+  // Canvas: image full-width (bg-white), then bg-gray-100 p-12 text-center below:
+  //         heading (text-2xl=24px, font-serif), italic body text (gray-500), button (mt-6)
+  // Two separate sections so each gets its own background colour.
+
+  const imgSrc = cb.imageSrcs?.['main'] ?? firstImageSrc(cb, '')
   const imgBlock = makeImageBlock(imgSrc, 'Feature image')
   imgBlock.styles = imageStyles()
+
+  const imageSection = makeSection('full', [[imgBlock]], {
+    styles: sectionStyles(cb, { top: 0, right: 0, bottom: 0, left: 0 }),
+  })
+
   const heading = makeTextBlock({
-    content: '<p style="margin:0;font-size:20px;font-weight:700;text-align:center">This Week\'s Highlight</p>',
-    styles: textStyles(cb, { textAlign: 'center', fontSize: 20, fontWeight: 'bold' }),
+    content: `<p style="margin:0 0 12px;font-size:24px;font-weight:700;text-align:center">Get 25% off when you book my services</p>`,
+    styles: textStyles(cb, { textAlign: 'center', fontSize: 24, fontWeight: 'bold' }),
   })
   const body = makeTextBlock({
-    content: '<p style="margin:0;text-align:center">Your caption or description goes here.</p>',
-    styles: textStyles(cb, { textAlign: 'center', fontSize: 14, color: '#374151' }),
+    content: `<p style="margin:0;font-style:italic;color:#6B7280;text-align:center">for the next 24 hours only.</p>`,
+    styles: textStyles(cb, { textAlign: 'center', fontSize: 14, color: '#6B7280' }),
   })
-  return makeSection('full', [[imgBlock, heading, body]], { styles: sectionStyles(cb) })
+  const btn = makeButtonBlock('BOOK NOW', '#')
+  btn.styles = buttonStyles(cb, { align: 'center', padding: { top: 10, right: 32, bottom: 10, left: 32 } })
+
+  const textSection = makeSection('full', [[heading, body, makeSpacerBlock(8), btn]], {
+    // bg-gray-100 = #F3F4F6 · p-12 = 48px
+    styles: { backgroundColor: cb.backgroundColor ?? '#F3F4F6', padding: { top: 48, right: 48, bottom: 48, left: 48 } },
+  })
+
+  return [imageSection, textSection]
 }
 
 function convertTestimonial(cb: CanvasBlock): EmailSection {
+  // Canvas: flex min-h-[200px] gap-8 bg-gray-50 p-12
+  //         Left: avatar image w-32 (128px), circular
+  //         Right: name (14px bold tracking-widest uppercase), quote (14px leading-relaxed gray-600),
+  //                star rating "★★★★☆" (20px yellow)
+
   const avatarSrc = cb.imageSrcs?.['avatar'] ?? ''
   const avatarBlock = makeImageBlock(avatarSrc, 'Testimonial avatar')
   avatarBlock.styles = {
-    width: 96,
+    width: 128,       // canvas: w-32 = 128px
     align: 'center',
     padding: { top: 0, right: 0, bottom: 0, left: 0 },
-    borderRadius: 48,
+    borderRadius: 64, // circular
   }
+
   const name = makeTextBlock({
-    content: '<p style="margin:0;font-weight:700;font-size:13px;letter-spacing:0.08em;text-transform:uppercase">TESTIMONIAL NAME</p>',
-    styles: textStyles(cb, { fontSize: 13, fontWeight: 'bold' }),
+    content: `<p style="margin:0;font-weight:700;font-size:14px;letter-spacing:0.1em;text-transform:uppercase">TESTIMONIAL NAME</p>`,
+    styles: textStyles(cb, { fontSize: 14, fontWeight: 'bold' }),
   })
   const quote = makeTextBlock({
-    content: '<p style="margin:0;font-size:14px;color:#374151;line-height:1.6">Since joining, my email list has grown 4x and I\'ve finally found a system that works for my creative business.</p>',
-    styles: textStyles(cb, { fontSize: 14, color: '#374151', lineHeight: 1.6 }),
+    content: `<p style="margin:0;font-size:14px;color:#4B5563;line-height:1.6">Since joining, my email list has grown 4x and I&apos;ve finally found a system that works for my creative business.</p>`,
+    styles: textStyles(cb, { fontSize: 14, color: '#4B5563', lineHeight: 1.6 }),
   })
-  return makeSection('image-left', [[avatarBlock], [name, quote]], { styles: sectionStyles(cb) })
+  // Star rating: ★★★★☆ in yellow (text-yellow-400 = #FBBF24)
+  const stars = makeTextBlock({
+    content: `<p style="margin:8px 0 0;font-size:20px;color:#FBBF24">&#9733;&#9733;&#9733;&#9733;&#9734;</p>`,
+    styles: textStyles(cb, { fontSize: 20, color: '#FBBF24' }),
+  })
+
+  // image-left = 40/60 for avatar vs text; bg-gray-50 = #F9FAFB · p-12 = 48px
+  return makeSection('image-left', [[avatarBlock], [name, quote, stars]], {
+    styles: sectionStyles(cb, { top: 48, right: 48, bottom: 48, left: 48 }, '#F9FAFB'),
+  })
 }
 
 // ─── Main converter ───────────────────────────────────────────────────────────
 
-function canvasBlockToSection(cb: CanvasBlock): EmailSection | null {
+/**
+ * Converts one CanvasBlock to one or more EmailSections.
+ * Most blocks produce one section; image-top-text-bottom produces two (split bg).
+ */
+function canvasBlockToSections(cb: CanvasBlock): EmailSection[] {
   switch (cb.type) {
-    case 'logo':                  return convertLogo(cb)
-    case 'link-bar':              return convertLinkBar(cb)
-    case 'text':                  return convertText(cb)
-    case 'button':                return convertButton(cb)
-    case 'spacer':                return convertSpacer(cb)
-    case 'social':                return convertSocial(cb)
-    case 'address':               return convertAddress(cb)
-    case 'footer':                return convertFooter(cb)
-    case 'content':               return convertContent(cb)
-    case 'image-left-text-right': return convertImageLeftTextRight(cb)
-    case 'centered-content':      return convertCenteredContent(cb)
-    case 'text-over-image':       return convertTextOverImage(cb)
-    case 'text-left-image-right': return convertTextLeftImageRight(cb)
-    case 'recipe-card':           return convertRecipeCard(cb)
-    case 'image-top-text-bottom': return convertImageTopTextBottom(cb)
-    case 'testimonial':           return convertTestimonial(cb)
+    case 'logo':                  return [convertLogo(cb)]
+    case 'link-bar':              return [convertLinkBar(cb)]
+    case 'text':                  return [convertText(cb)]
+    case 'button':                return [convertButton(cb)]
+    case 'spacer':                return [convertSpacer(cb)]
+    case 'social':                return [convertSocial(cb)]
+    case 'address':               return [convertAddress(cb)]
+    case 'footer':                return [convertFooter(cb)]
+    case 'content':               return [convertContent(cb)]
+    case 'image-left-text-right': return [convertImageLeftTextRight(cb)]
+    case 'centered-content':      return [convertCenteredContent(cb)]
+    case 'text-over-image':       return [convertTextOverImage(cb)]
+    case 'text-left-image-right': return [convertTextLeftImageRight(cb)]
+    case 'recipe-card':           return [convertRecipeCard(cb)]
+    case 'image-top-text-bottom': return convertImageTopTextBottom(cb)   // returns 2
+    case 'testimonial':           return [convertTestimonial(cb)]
     default: {
-      // Unknown block type — emit a placeholder so something renders
       const placeholder = makeTextBlock({
         content: `<p style="margin:0;color:#9CA3AF;font-size:11px;text-align:center">[${cb.type}]</p>`,
         styles: textStyles(cb, { textAlign: 'center', fontSize: 11, color: '#9CA3AF' }),
       })
-      return makeSection('full', [[placeholder]], { styles: sectionStyles(cb) })
+      return [makeSection('full', [[placeholder]], { styles: sectionStyles(cb) })]
     }
   }
 }
@@ -408,9 +563,8 @@ export function canvasBlocksToEmailDocument(
 ): EmailDocument {
   const g = existingDoc?.globalStyles ?? DEFAULT_GLOBAL_STYLES
 
-  const sections = canvasBlocks
-    .map(canvasBlockToSection)
-    .filter((s): s is EmailSection => s !== null)
+  // Flatten — most blocks yield one section, image-top-text-bottom yields two
+  const sections = canvasBlocks.flatMap(canvasBlockToSections)
 
   return {
     id: existingDoc?.id ?? nanoid(),
