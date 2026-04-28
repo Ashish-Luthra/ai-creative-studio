@@ -22,6 +22,7 @@ import { ApprovedImagesPanel } from '@/components/canvas/ApprovedImagesPanel'
 import { AllyvateAssistant, type AllyContext } from '@/components/ai/AllyvateAssistant'
 import { EmailRightNav } from './EmailRightNav'
 import { GOOGLE_FONT_FAMILIES, getGoogleFontStylesheetHrefs } from '@/lib/canvas/googleFonts'
+import { SPECS } from '@/lib/email/blockSpecs'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 // CanvasBlock is imported from @/types/canvas (shared with canvasConverter)
@@ -1461,28 +1462,35 @@ function BlockContent({
   // ── Prebuilt design blocks (from right nav) ────────────────────────────────
 
   if (type === 'image-left-text-right') {
+    const S = SPECS.IMAGE_LEFT_TEXT_RIGHT
     return (
       <div className="flex min-h-[300px]" style={bg}>
         <ResizableImageSlot
-          src={imageSrcs['main'] ?? 'https://images.unsplash.com/photo-1523381210434-271e8be1f52b?w=400&h=500&fit=crop'}
+          src={imageSrcs[S.imageKey] ?? S.defaultImageSrc}
           alt="Fashion"
-          height={imageSizes['main']}
-          className="w-1/2 self-stretch"
-          onDoubleClick={() => onImageDoubleClick('main')}
-          onResize={(h) => onImageResize('main', h)}
+          height={imageSizes[S.imageKey]}
+          className="self-stretch"
+          style={{ width: `${S.imageColPct}%` }}
+          onDoubleClick={() => onImageDoubleClick(S.imageKey)}
+          onResize={(h) => onImageResize(S.imageKey, h)}
           onImageClick={onImageClick}
         />
-        <div className="flex w-1/2 flex-col items-center justify-center gap-4 p-12">
-          <p {...editable} style={fontStyle} className={`${editable.className} text-sm italic text-gray-500`}>
+        <div className="flex flex-col items-center justify-center gap-4"
+          style={{ width: `${S.textColPct}%`, padding: S.textPaddingH }}>
+          <p {...editable}
+            style={{ ...fontStyle, fontSize: S.taglineFontSize, color: S.taglineColor, fontStyle: 'italic', textAlign: 'center' }}
+            className={editable.className}>
             From The &apos;Gram
           </p>
-          <h2 {...editable} style={fontStyle} className={`${editable.className} text-center font-serif text-3xl`}>
+          <h2 {...editable}
+            style={{ ...fontStyle, fontSize: S.headingFontSize, fontWeight: S.headingWeight, textAlign: 'center' }}
+            className={editable.className}>
             The Post That Got Everyone Talking
           </h2>
-          <div className="h-px w-16 bg-gray-400" />
+          <div style={{ height: 1, width: 64, backgroundColor: S.dividerColor }} />
           <div style={{ display: 'flex', justifyContent: btnJustify }}>
             <div {...buttonEditable} style={btnStyle} className={`${buttonEditable.className} px-6 py-2 text-xs font-semibold tracking-widest`}>
-              SEE IT
+              {S.buttonLabel}
             </div>
           </div>
         </div>
@@ -1491,22 +1499,29 @@ function BlockContent({
   }
 
   if (type === 'centered-content') {
+    const S = SPECS.CENTERED_CONTENT
     return (
-      <div className="bg-gray-100 p-12 text-center" style={bg}>
-        <div className="inline-block rounded bg-white p-8 shadow-sm">
-          <div {...editable} style={fontStyle} className={`${editable.className} font-serif text-5xl text-gray-600`}>
+      <div className="text-center" style={{ backgroundColor: bg.backgroundColor ?? S.outerBg, padding: S.outerPadding.top }}>
+        <div className="inline-block rounded shadow-sm" style={{ backgroundColor: S.cardBg, borderRadius: S.cardBorderRadius, padding: S.cardPadding }}>
+          <div {...editable}
+            style={{ ...fontStyle, fontSize: S.numberFontSize, color: S.numberColor, lineHeight: S.numberLineHeight }}
+            className={editable.className}>
             6
           </div>
-          <h3 {...editable} style={fontStyle} className={`${editable.className} mt-2 font-serif text-2xl`}>
+          <h3 {...editable}
+            style={{ ...fontStyle, fontSize: S.headingFontSize, fontWeight: S.headingWeight, marginTop: 8 }}
+            className={editable.className}>
             Tips to Photograph Food
           </h3>
-          <p {...editable} style={fontStyle} className={`${editable.className} mx-auto mt-3 max-w-xs text-sm text-gray-600`}>
+          <p {...editable}
+            style={{ ...fontStyle, fontSize: S.bodyFontSize, color: S.bodyColor, maxWidth: S.bodyMaxWidthPx, margin: '12px auto 0', lineHeight: S.bodyLineHeight }}
+            className={editable.className}>
             I remember my first try at food photography. I created this guide to help you get started without making all the mistakes I did.
           </p>
-          <div className="mt-4" style={{ display: 'flex', alignItems: 'center', justifyContent: btnJustify, gap: 12 }}>
-            <span className="text-sm text-gray-400">001</span>
+          <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', justifyContent: btnJustify, gap: 12 }}>
+            <span style={{ fontSize: S.labelFontSize, color: S.labelColor }}>001</span>
             <div {...buttonEditable} style={btnStyle} className={`${buttonEditable.className} px-6 py-2 text-xs font-semibold tracking-widest`}>
-              READ IT
+              {S.buttonLabel}
             </div>
           </div>
         </div>
@@ -1515,26 +1530,31 @@ function BlockContent({
   }
 
   if (type === 'text-over-image') {
+    const S = SPECS.TEXT_OVER_IMAGE
     return (
-      <div className="bg-white" style={bg}>
-        <div className="p-12 text-center">
-          <div className="mx-auto mb-4 h-px w-16 bg-black" />
-          <h3 {...editable} style={fontStyle} className={`${editable.className} text-2xl font-bold uppercase tracking-widest`}>
+      <div style={{ backgroundColor: bg.backgroundColor ?? S.bgColor }}>
+        <div className="text-center" style={{ padding: S.sectionPadding.top }}>
+          <div style={{ margin: '0 auto 16px', height: 1, width: 64, backgroundColor: S.dividerColor }} />
+          <h3 {...editable}
+            style={{ ...fontStyle, fontSize: S.headingFontSize, fontWeight: S.headingWeight, letterSpacing: S.headingTracking, textTransform: 'uppercase', textAlign: 'center' }}
+            className={editable.className}>
             A Little Gift of Thanks for Joining the List.
           </h3>
-          <div className="mx-auto mt-4 h-px w-16 bg-black" />
-          <div className="mt-6" style={{ display: 'flex', justifyContent: btnJustify }}>
-            <div {...buttonEditable} style={btnStyle} className={`${buttonEditable.className} px-8 py-2.5 text-xs font-semibold tracking-widest`}>
-              CLAIM GIFT
+          <div style={{ margin: '16px auto 0', height: 1, width: 64, backgroundColor: S.dividerColor }} />
+          <div style={{ marginTop: 24, display: 'flex', justifyContent: btnJustify }}>
+            <div {...buttonEditable}
+              className={`${buttonEditable.className} text-xs font-semibold tracking-widest`}
+              style={{ ...btnStyle, paddingTop: S.buttonPadding.top, paddingBottom: S.buttonPadding.top, paddingLeft: S.buttonPadding.right, paddingRight: S.buttonPadding.right }}>
+              {S.buttonLabel}
             </div>
           </div>
         </div>
         <ResizableImageSlot
-          src={imageSrcs['bg'] ?? 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=680&h=400&fit=crop'}
+          src={imageSrcs[S.imageKey] ?? S.defaultImageSrc}
           alt="Background"
-          height={imageSizes['bg'] ?? 256}
-          onDoubleClick={() => onImageDoubleClick('bg')}
-          onResize={(h) => onImageResize('bg', h)}
+          height={imageSizes[S.imageKey] ?? S.defaultImageHeight}
+          onDoubleClick={() => onImageDoubleClick(S.imageKey)}
+          onResize={(h) => onImageResize(S.imageKey, h)}
           onImageClick={onImageClick}
         />
       </div>
@@ -1542,25 +1562,29 @@ function BlockContent({
   }
 
   if (type === 'text-left-image-right') {
+    const S = SPECS.TEXT_LEFT_IMAGE_RIGHT
     return (
       <div className="flex min-h-[300px]" style={bg}>
-        <div className="flex w-1/3 flex-col items-center justify-center gap-6 p-12">
-          <h3 {...editable} style={fontStyle} className={`${editable.className} text-4xl font-bold leading-tight`}>
+        <div className="flex flex-col items-center justify-center gap-6"
+          style={{ width: `${S.textColPct}%`, padding: S.textPaddingH }}>
+          <h3 {...editable}
+            style={{ ...fontStyle, fontSize: S.headingFontSize, fontWeight: S.headingWeight, lineHeight: S.headingLineHeight }}
+            className={editable.className}>
             WEL—COME
           </h3>
           <div style={{ display: 'flex', justifyContent: btnJustify }}>
             <div {...buttonEditable} style={btnStyle} className={`${buttonEditable.className} px-6 py-2 text-xs font-semibold tracking-widest`}>
-              EXPLORE
+              {S.buttonLabel}
             </div>
           </div>
         </div>
         <ResizableImageSlot
-          src={imageSrcs['bg'] ?? 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=500&h=400&fit=crop'}
+          src={imageSrcs[S.imageKey] ?? S.defaultImageSrc}
           alt="Background"
-          height={imageSizes['bg'] ?? 300}
-          className="w-2/3"
-          onDoubleClick={() => onImageDoubleClick('bg')}
-          onResize={(h) => onImageResize('bg', h)}
+          height={imageSizes[S.imageKey] ?? S.defaultImageHeight}
+          style={{ width: `${S.imageColPct}%` }}
+          onDoubleClick={() => onImageDoubleClick(S.imageKey)}
+          onResize={(h) => onImageResize(S.imageKey, h)}
           onImageClick={onImageClick}
         />
       </div>
@@ -1568,29 +1592,35 @@ function BlockContent({
   }
 
   if (type === 'recipe-card') {
+    const S = SPECS.RECIPE_CARD
     return (
-      <div className="flex min-h-[280px] gap-8 bg-white p-8" style={bg}>
+      <div className="flex min-h-[280px] gap-8" style={{ backgroundColor: bg.backgroundColor ?? S.bgColor }}>
         <ResizableImageSlot
-          src={imageSrcs['main'] ?? 'https://images.unsplash.com/photo-1547592166-23ac45744acd?w=400&h=400&fit=crop'}
+          src={imageSrcs[S.imageKey] ?? S.defaultImageSrc}
           alt="Recipe"
-          height={imageSizes['main'] ?? 240}
-          className="w-1/2"
-          style={imgClip}
-          onDoubleClick={() => onImageDoubleClick('main')}
-          onResize={(h) => onImageResize('main', h)}
+          height={imageSizes[S.imageKey] ?? S.defaultImageHeight}
+          style={{ width: `${S.imageColPct}%`, ...imgClip }}
+          onDoubleClick={() => onImageDoubleClick(S.imageKey)}
+          onResize={(h) => onImageResize(S.imageKey, h)}
           onImageClick={onImageClick}
         />
-        <div className="flex w-1/2 flex-col justify-center gap-3 px-4">
-          <p {...editable} style={fontStyle} className={`${editable.className} text-sm italic text-gray-500`}>One</p>
-          <h3 {...editable} style={fontStyle} className={`${editable.className} font-serif text-xl`}>
+        <div className="flex flex-col justify-center gap-3 px-4" style={{ width: `${S.textColPct}%` }}>
+          <p {...editable}
+            style={{ ...fontStyle, fontSize: S.labelFontSize, color: S.labelColor, fontStyle: 'italic' }}
+            className={editable.className}>One</p>
+          <h3 {...editable}
+            style={{ ...fontStyle, fontSize: S.headingFontSize, fontWeight: S.headingWeight }}
+            className={editable.className}>
             Click here for my creamy butternut squash soup
           </h3>
-          <p {...editable} style={fontStyle} className={`${editable.className} text-sm italic text-gray-500`}>
+          <p {...editable}
+            style={{ ...fontStyle, fontSize: S.descFontSize, color: S.descColor, fontStyle: 'italic' }}
+            className={editable.className}>
             A warming recipe perfect for fall evenings.
           </p>
           <div style={{ display: 'flex', justifyContent: btnJustify }}>
             <div {...buttonEditable} style={btnStyle} className={`${buttonEditable.className} px-6 py-2 text-xs font-semibold tracking-widest`}>
-              GET RECIPE
+              {S.buttonLabel}
             </div>
           </div>
         </div>
@@ -1599,26 +1629,33 @@ function BlockContent({
   }
 
   if (type === 'image-top-text-bottom') {
+    const S = SPECS.IMAGE_TOP_TEXT_BOTTOM
     return (
-      <div className="bg-white" style={bg}>
+      <div style={{ backgroundColor: S.imageSectionBg }}>
         <ResizableImageSlot
-          src={imageSrcs['main'] ?? 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=680&h=400&fit=crop'}
+          src={imageSrcs[S.imageKey] ?? S.defaultImageSrc}
           alt="Main image"
-          height={imageSizes['main'] ?? 384}
-          onDoubleClick={() => onImageDoubleClick('main')}
-          onResize={(h) => onImageResize('main', h)}
+          height={imageSizes[S.imageKey] ?? S.defaultImageHeight}
+          onDoubleClick={() => onImageDoubleClick(S.imageKey)}
+          onResize={(h) => onImageResize(S.imageKey, h)}
           onImageClick={onImageClick}
         />
-        <div className="bg-gray-100 p-12 text-center">
-          <h3 {...editable} style={fontStyle} className={`${editable.className} mb-3 font-serif text-2xl`}>
+        <div className="text-center" style={{ backgroundColor: bg.backgroundColor ?? S.textBg, padding: S.textPadding.top }}>
+          <h3 {...editable}
+            style={{ ...fontStyle, fontSize: S.headingFontSize, fontWeight: S.headingWeight, marginBottom: S.headingBottomMargin }}
+            className={editable.className}>
             Get 25% off when you book my services
           </h3>
-          <p {...editable} style={fontStyle} className={`${editable.className} italic text-gray-500`}>
+          <p {...editable}
+            style={{ ...fontStyle, fontSize: S.bodyFontSize, color: S.bodyColor, fontStyle: 'italic' }}
+            className={editable.className}>
             for the next 24 hours only.
           </p>
-          <div className="mt-6" style={{ display: 'flex', justifyContent: btnJustify }}>
-            <div {...buttonEditable} style={btnStyle} className={`${buttonEditable.className} px-8 py-2.5 text-xs font-semibold tracking-widest`}>
-              BOOK NOW
+          <div style={{ marginTop: 24, display: 'flex', justifyContent: btnJustify }}>
+            <div {...buttonEditable}
+              className={`${buttonEditable.className} text-xs font-semibold tracking-widest`}
+              style={{ ...btnStyle, paddingTop: S.buttonPadding.top, paddingBottom: S.buttonPadding.top, paddingLeft: S.buttonPadding.right, paddingRight: S.buttonPadding.right }}>
+              {S.buttonLabel}
             </div>
           </div>
         </div>
@@ -1627,26 +1664,31 @@ function BlockContent({
   }
 
   if (type === 'testimonial') {
+    const S = SPECS.TESTIMONIAL
     return (
-      <div className="flex min-h-[200px] gap-8 bg-gray-50 p-12" style={bg}>
+      <div className="flex min-h-[200px] gap-8"
+        style={{ backgroundColor: bg.backgroundColor ?? S.bgColor, padding: `${S.sectionPadding.top}px ${S.sectionPadding.right}px` }}>
         <ResizableImageSlot
-          src={imageSrcs['avatar'] ?? 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&h=200&fit=crop'}
+          src={imageSrcs[S.avatarKey] ?? S.defaultAvatarSrc}
           alt="Testimonial"
-          height={imageSizes['avatar'] ?? 128}
-          className="w-32 shrink-0"
-          style={imgClip}
-          onDoubleClick={() => onImageDoubleClick('avatar')}
-          onResize={(h) => onImageResize('avatar', h)}
+          height={imageSizes[S.avatarKey] ?? S.avatarWidth}
+          style={{ width: S.avatarWidth, flexShrink: 0, ...imgClip }}
+          onDoubleClick={() => onImageDoubleClick(S.avatarKey)}
+          onResize={(h) => onImageResize(S.avatarKey, h)}
           onImageClick={onImageClick}
         />
         <div className="flex flex-1 flex-col justify-center gap-3">
-          <h4 {...editable} style={fontStyle} className={`${editable.className} text-sm font-bold tracking-widest`}>
+          <h4 {...editable}
+            style={{ ...fontStyle, fontSize: S.nameFontSize, fontWeight: S.nameWeight, letterSpacing: S.nameTracking, textTransform: 'uppercase' }}
+            className={editable.className}>
             TESTIMONIAL NAME
           </h4>
-          <p {...editable} style={fontStyle} className={`${editable.className} text-sm leading-relaxed text-gray-600`}>
+          <p {...editable}
+            style={{ ...fontStyle, fontSize: S.quoteFontSize, color: S.quoteColor, lineHeight: S.quoteLineHeight }}
+            className={editable.className}>
             Since joining, my email list has grown 4x and I&apos;ve finally found a system that works for my creative business.
           </p>
-          <div className="text-xl text-yellow-400">★★★★☆</div>
+          <div style={{ fontSize: S.starFontSize, color: S.starColor }}>{S.starsText}</div>
         </div>
       </div>
     )
