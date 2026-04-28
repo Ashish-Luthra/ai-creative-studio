@@ -258,4 +258,32 @@ describe('Google Fonts injection', () => {
       expect(set.has(f), `"${f}" missing from GOOGLE_FONT_FAMILIES`).toBe(true)
     })
   })
+
+  it('FONT #7 — global font (Cabin) is first in font-family stack when no per-block font is set', async () => {
+    // Regression test for bug: blocks defaulted fontFamily to "Arial" which put
+    // Arial first in the CSS stack, silently overriding the user's global font choice.
+    const doc = makeDoc()
+    doc.globalStyles.fontFamily = 'Cabin'
+    // Blocks have no explicit fontFamily set (mirrors a real canvas doc where the
+    // user picked a global font but never touched per-block font overrides)
+    doc.sections.forEach((s) =>
+      s.columns.forEach((c) =>
+        c.blocks.forEach((b) => {
+          if ('styles' in b && b.styles && 'fontFamily' in (b.styles as object)) {
+            (b.styles as { fontFamily: string }).fontFamily = ''
+          }
+        }),
+      ),
+    )
+    const r = await compileEmail(doc)
+    // Cabin must be imported
+    expect(r.html).toContain('Cabin')
+    expect(r.html).toContain('fonts.googleapis.com')
+    // The first font in every td's font-family stack must be Cabin, not Arial
+    // (i.e. Cabin appears BEFORE Arial in every font-family declaration)
+    const cabinIdx = r.html.indexOf('Cabin')
+    const arialIdx = r.html.indexOf('Arial')
+    expect(cabinIdx).toBeGreaterThan(-1)
+    expect(cabinIdx).toBeLessThan(arialIdx)
+  })
 })

@@ -58,7 +58,8 @@ function collectUsedFonts(doc: EmailDocument): string[] {
         if (block.type === 'text' || block.type === 'unsubscribe') {
           const b = block as TextBlock | UnsubscribeBlock
           if ('styles' in b && b.styles && 'fontFamily' in b.styles) {
-            families.add((b.styles as { fontFamily: string }).fontFamily)
+            const f = (b.styles as { fontFamily: string }).fontFamily
+            if (f) families.add(f)
           }
         }
         if (block.type === 'button') {

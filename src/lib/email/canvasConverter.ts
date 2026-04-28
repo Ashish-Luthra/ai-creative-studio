@@ -50,7 +50,10 @@ function sectionStyles(
 
 function textStyles(cb: CanvasBlock, overrides: Partial<TextStyles> = {}): TextStyles {
   return {
-    fontFamily: cb.fontFamily ?? 'Arial',
+    // Use the block's explicit font if set; otherwise empty string so
+    // buildFontStack() defers to the document's global font family instead
+    // of hard-coding Arial and accidentally overriding the global choice.
+    fontFamily: cb.fontFamily ?? '',
     fontSize: cb.fontSize ?? 16,
     fontWeight: cb.fontBold ? 'bold' : 'normal',
     lineHeight: cb.lineHeight ?? 1.6,
@@ -65,7 +68,7 @@ function buttonStyles(cb: CanvasBlock, overrides: Partial<ButtonStyles> = {}): B
   return {
     backgroundColor: cb.buttonFillColor ?? '#111827',
     color: '#FFFFFF',
-    fontFamily: cb.fontFamily ?? 'Arial',
+    fontFamily: cb.fontFamily ?? '',
     fontSize: cb.fontSize ?? 14,
     fontWeight: '600',
     padding: { top: 12, right: 24, bottom: 12, left: 24 },
@@ -324,18 +327,20 @@ function convertCenteredContent(cb: CanvasBlock): EmailSection {
 
   // We embed the card as a nested HTML table inside a text block so the white-on-gray
   // effect works across email clients without requiring CSS box-shadows.
-  const fontFamily = cb.fontFamily ? `${cb.fontFamily}, Arial, sans-serif` : 'Arial, sans-serif'
-  const bodyColor  = cb.fontColor ?? '#4B5563'
+  // Do NOT set font-family on the inner <p> tags — the <td> wrapper's font-family
+  // (set by buildFontStack via textStyles) cascades in, which correctly reflects
+  // the global body font the user chose.
+  const bodyColor = cb.fontColor ?? '#4B5563'
 
   const cardHtml =
     `<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" ` +
     `style="background-color:#ffffff;border-radius:8px;margin:0 auto;width:100%">` +
     `<tr><td style="padding:32px;text-align:center">` +
-    `<p style="margin:0;font-size:48px;font-weight:700;color:#4B5563;line-height:1;font-family:${fontFamily}">6</p>` +
-    `<p style="margin:8px 0 0;font-size:24px;font-weight:700;font-family:${fontFamily}">Tips to Photograph Food</p>` +
-    `<p style="margin:12px auto 0;font-size:14px;color:${bodyColor};max-width:280px;line-height:1.6;font-family:${fontFamily}">` +
+    `<p style="margin:0;font-size:48px;font-weight:700;color:#4B5563;line-height:1">6</p>` +
+    `<p style="margin:8px 0 0;font-size:24px;font-weight:700">Tips to Photograph Food</p>` +
+    `<p style="margin:12px auto 0;font-size:14px;color:${bodyColor};max-width:280px;line-height:1.6">` +
     `I remember my first try at food photography. I created this guide to help you get started without making all the mistakes I did.</p>` +
-    `<p style="margin:16px 0 0;font-size:14px;color:#9CA3AF;font-family:${fontFamily}">001</p>` +
+    `<p style="margin:16px 0 0;font-size:14px;color:#9CA3AF">001</p>` +
     `</td></tr></table>`
 
   const cardBlock = makeTextBlock({
