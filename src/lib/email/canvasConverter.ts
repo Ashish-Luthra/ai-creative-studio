@@ -127,8 +127,9 @@ function convertLinkBar(cb: CanvasBlock): EmailSection {
     { label: 'Contact',  url: '#' },
   ]
   const links = cb.linkBarItems && cb.linkBarItems.length > 0 ? cb.linkBarItems : DEFAULT_LINKS
+  const linkColor = cb.fontColor ?? '#4B5563'   // matches canvas text-gray-600 default
   const linkHtml = links
-    .map((l) => `<a href="${l.url || '#'}" style="color:#2563EB;text-decoration:none;margin:0 8px">${l.label}</a>`)
+    .map((l) => `<a href="${l.url || '#'}" style="color:${linkColor};text-decoration:none;margin:0 8px">${l.label}</a>`)
     .join('<span style="color:#D1D5DB"> | </span>')
   const block = makeTextBlock({
     content: `<p style="margin:0;text-align:center">${linkHtml}</p>`,
