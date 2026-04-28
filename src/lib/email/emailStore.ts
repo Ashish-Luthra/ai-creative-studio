@@ -36,6 +36,10 @@ interface EmailEditorState {
   compiledHtml: string
   compileErrors: string[]
 
+  // Current emailer name (used for the HTML export filename)
+  emailerName: string
+  setEmailerName: (name: string) => void
+
   // Selection
   selectedBlockId: string | null
   selectedSectionId: string | null
@@ -133,6 +137,7 @@ export const useEmailStore = create<EmailEditorState>((set, get) => ({
   document: initialDoc,
   compiledHtml: '',
   compileErrors: [],
+  emailerName: '',
   selectedBlockId: null,
   selectedSectionId: null,
   previewMode: 'desktop',
@@ -143,6 +148,7 @@ export const useEmailStore = create<EmailEditorState>((set, get) => ({
   setSelectedBlock: (id) => set({ selectedBlockId: id }),
   setSelectedSection: (id) => set({ selectedSectionId: id }),
   setPreviewMode: (mode) => set({ previewMode: mode }),
+  setEmailerName: (name) => set({ emailerName: name }),
 
   // ── Sections ───────────────────────────────────────────────────────────────
   addSection: ({ layout, afterSectionId }) => {

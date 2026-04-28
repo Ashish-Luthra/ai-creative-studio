@@ -1708,7 +1708,7 @@ export const EmailEditorPanel: React.FC = () => {
   const [emailerNameInput, setEmailerNameInput] = useState('')
   const dropdownRef = useRef<HTMLDivElement>(null)
 
-  const { document: doc, previewMode, setPreviewMode, updateSubject, updatePreheader, syncFromCanvas, compiledHtml } = useEmailStore()
+  const { document: doc, previewMode, setPreviewMode, updateSubject, updatePreheader, syncFromCanvas, compiledHtml, setEmailerName } = useEmailStore()
 
   // Toggle between live canvas editing and iframe-based email HTML preview
   const [showPreview, setShowPreview] = useState(false)
@@ -1770,13 +1770,14 @@ export const EmailEditorPanel: React.FC = () => {
       if (!res.ok) throw new Error(await res.text())
       const updated = await res.json() as EmailerMeta
       setSavedEmailers((prev) => prev.map((e) => e.id === updated.id ? updated : e))
+      setEmailerName(updated.name)
       setSaveStatus('saved')
       setTimeout(() => setSaveStatus('idle'), 2000)
     } catch {
       setSaveStatus('error')
       setTimeout(() => setSaveStatus('idle'), 3000)
     }
-  }, [currentEmailerId, buildPayload, doc.subject])
+  }, [currentEmailerId, buildPayload, doc.subject, setEmailerName])
 
   // Confirm save (new or fork) from modal
   const handleSaveConfirm = useCallback(async () => {
@@ -1793,13 +1794,14 @@ export const EmailEditorPanel: React.FC = () => {
       const created = await res.json() as EmailerMeta
       if (saveModalMode === 'new') setCurrentEmailerId(created.id)
       setSavedEmailers((prev) => [created, ...prev])
+      setEmailerName(created.name)
       setSaveStatus('saved')
       setTimeout(() => setSaveStatus('idle'), 2000)
     } catch {
       setSaveStatus('error')
       setTimeout(() => setSaveStatus('idle'), 3000)
     }
-  }, [emailerNameInput, buildPayload, saveModalMode])
+  }, [emailerNameInput, buildPayload, saveModalMode, setEmailerName])
 
   // Load an emailer from Supabase into the canvas
   const handleLoadEmailer = useCallback(async (id: string) => {
@@ -1822,13 +1824,14 @@ export const EmailEditorPanel: React.FC = () => {
       // and the subject input both reflect the loaded emailer
       updateSubject(row.subject ?? '')
       updatePreheader(row.preheader ?? '')
+      setEmailerName(row.name)
       setSaveStatus('saved')
       setTimeout(() => setSaveStatus('idle'), 1500)
     } catch {
       setSaveStatus('error')
       setTimeout(() => setSaveStatus('idle'), 3000)
     }
-  }, [updateSubject, updatePreheader])
+  }, [updateSubject, updatePreheader, setEmailerName])
 
   const handleTabClick = (tab: EmailTab) => {
     if (activeTab === tab) setPanelOpen((o) => !o)

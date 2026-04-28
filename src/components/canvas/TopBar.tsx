@@ -34,6 +34,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   const emailHistoryLength = useEmailStore((s) => s.history.length)
   const emailFutureLength = useEmailStore((s) => s.future.length)
   const compiledHtml = useEmailStore((s) => s.compiledHtml)
+  const emailerName  = useEmailStore((s) => s.emailerName)
 
   const canUndo = mode === 'email' ? emailHistoryLength > 0 : undoStack.length > 0
   const canRedo = mode === 'email' ? emailFutureLength > 0 : redoStack.length > 0
@@ -56,11 +57,16 @@ export const TopBar: React.FC<TopBarProps> = ({
 
   const handleExport = () => {
     if (mode === 'email') {
+      // Use the saved emailer name as the filename, falling back to a generic name.
+      // Strip characters that are illegal in filenames, collapse whitespace to hyphens.
+      const safeName = emailerName.trim()
+        ? emailerName.trim().replace(/[^\w\s\-()]/g, '').replace(/\s+/g, '-').toLowerCase()
+        : 'email-export'
       const blob = new Blob([compiledHtml], { type: 'text/html;charset=utf-8' })
       const url = URL.createObjectURL(blob)
       const anchor = document.createElement('a')
       anchor.href = url
-      anchor.download = 'email-export.html'
+      anchor.download = `${safeName}.html`
       anchor.click()
       URL.revokeObjectURL(url)
       return
