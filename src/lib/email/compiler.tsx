@@ -209,8 +209,8 @@ function BlockText({
 }
 
 function BlockImage({
-  block, colPx,
-}: { block: ImageBlock; colPx: number }) {
+  block, colPx, global: g,
+}: { block: ImageBlock; colPx: number; global: GlobalEmailStyles }) {
   const { styles, src, alt, href } = block
   const w = styles.width === 'full' ? colPx : Math.min(styles.width, colPx)
 
@@ -232,7 +232,7 @@ function BlockImage({
             backgroundColor: '#F0F0F0',
             width: `${w}px`,
             height: `${placeholderH}px`,
-            fontFamily: 'Arial, sans-serif',
+            fontFamily: buildFontStack(g.fontFamily, 'Arial'),
             fontSize: '11px',
             letterSpacing: '0.08em',
             color: '#BBBBBB',
@@ -427,7 +427,7 @@ function BlockLogo({ block, global: g }: { block: LogoBlock; global: GlobalEmail
         style={{ width: '100%', ...TABLE_RESET }}
       >
         <tbody><tr>
-          <td align="center" style={{ padding: '16px 0', fontSize: '11px', color: '#9CA3AF', fontFamily: 'Arial, sans-serif' }}>
+          <td align="center" style={{ padding: '16px 0', fontSize: '11px', color: '#9CA3AF', fontFamily: buildFontStack(g.fontFamily, 'Arial') }}>
             [ Logo — add URL in Styles ]
           </td>
         </tr></tbody>
@@ -500,7 +500,7 @@ function RenderBlock({
 }) {
   switch (block.type) {
     case 'text':        return <BlockText        block={block} global={g} />
-    case 'image':       return <BlockImage       block={block} colPx={colPx} />
+    case 'image':       return <BlockImage       block={block} colPx={colPx} global={g} />
     case 'button':      return <BlockButton      block={block} global={g} />
     case 'divider':     return <BlockDivider     block={block} />
     case 'spacer':      return <BlockSpacer      block={block} />

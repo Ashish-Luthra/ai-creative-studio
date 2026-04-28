@@ -2374,7 +2374,7 @@ export const EmailEditorPanel: React.FC = () => {
                         buttonBorderWidth={block.buttonBorderWidth}
                         buttonWidth={block.buttonWidth}
                         buttonHeight={block.buttonHeight}
-                        fontFamily={block.fontFamily}
+                        fontFamily={block.fontFamily ?? doc.globalStyles.fontFamily}
                         fontSize={block.fontSize}
                         fontBold={block.fontBold}
                         fontItalic={block.fontItalic}
