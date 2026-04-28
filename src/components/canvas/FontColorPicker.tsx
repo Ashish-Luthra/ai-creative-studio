@@ -249,9 +249,9 @@ export const FontColorPicker: React.FC<FontColorPickerProps> = ({
         <div className="mb-2.5">
           <p className="mb-1 text-[9px] font-semibold uppercase tracking-wide text-gray-400">Brand</p>
           <div className="flex flex-wrap gap-1">
-            {brandColors.map((hex) => (
+            {brandColors.map((hex, i) => (
               <button
-                key={hex}
+                key={`brand-${i}-${hex}`}
                 type="button"
                 title={hex}
                 onClick={() => onColorChange(hex)}

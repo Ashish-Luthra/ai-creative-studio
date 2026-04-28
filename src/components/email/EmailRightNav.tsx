@@ -199,9 +199,9 @@ function ColorSwatch({
           "preset palette options" — clearly different from the rainbow picker above. */}
       <div className="mt-2 flex items-center gap-1.5 px-0.5">
         <span className="mr-0.5 text-[8px] font-semibold uppercase tracking-wider text-gray-300">Palette</span>
-        {QUICK_PRESETS.map((c) => (
+        {QUICK_PRESETS.map((c, i) => (
           <button
-            key={c}
+            key={`quick-${i}-${c}`}
             type="button"
             onClick={() => { onChange(c); setHex(c) }}
             title={c}
@@ -243,9 +243,9 @@ function ColorSwatch({
             <button type="button" onClick={() => setShowPalette(false)} className="text-[13px] leading-none text-gray-400 hover:text-gray-700">✕</button>
           </div>
           <div className="grid grid-cols-11 gap-1">
-            {PRESET_COLORS.map((c) => (
+            {PRESET_COLORS.map((c, i) => (
               <button
-                key={c}
+                key={`preset-${i}-${c}`}
                 type="button"
                 onClick={() => { onChange(c); setHex(c); setShowPalette(false) }}
                 title={c}

@@ -67,9 +67,9 @@ export const FloatPropertiesCard: React.FC<FloatPropertiesCardProps> = ({
       {/* Color */}
       <Section label="Color">
         <div className="mb-1 flex gap-1">
-          {SWATCHES.map((hex) => (
+          {SWATCHES.map((hex, i) => (
             <div
-              key={hex}
+              key={`swatch-${i}-${hex}`}
               style={{ background: hex }}
               className={cn(
                 'h-5 w-5 cursor-pointer rounded-[4px] border-2 transition-transform hover:scale-110',
