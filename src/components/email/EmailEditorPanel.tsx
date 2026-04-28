@@ -1464,10 +1464,10 @@ function BlockContent({
           onImageClick={onImageClick}
         />
         <div className="flex w-1/2 flex-col items-center justify-center gap-4 p-12">
-          <p {...editable} className={`${editable.className} text-sm italic text-gray-500`}>
+          <p {...editable} style={fontStyle} className={`${editable.className} text-sm italic text-gray-500`}>
             From The &apos;Gram
           </p>
-          <h2 {...editable} className={`${editable.className} text-center font-serif text-3xl`}>
+          <h2 {...editable} style={fontStyle} className={`${editable.className} text-center font-serif text-3xl`}>
             The Post That Got Everyone Talking
           </h2>
           <div className="h-px w-16 bg-gray-400" />
@@ -1485,13 +1485,13 @@ function BlockContent({
     return (
       <div className="bg-gray-100 p-12 text-center" style={bg}>
         <div className="inline-block rounded bg-white p-8 shadow-sm">
-          <div {...editable} className={`${editable.className} font-serif text-5xl text-gray-600`}>
+          <div {...editable} style={fontStyle} className={`${editable.className} font-serif text-5xl text-gray-600`}>
             6
           </div>
-          <h3 {...editable} className={`${editable.className} mt-2 font-serif text-2xl`}>
+          <h3 {...editable} style={fontStyle} className={`${editable.className} mt-2 font-serif text-2xl`}>
             Tips to Photograph Food
           </h3>
-          <p {...editable} className={`${editable.className} mx-auto mt-3 max-w-xs text-sm text-gray-600`}>
+          <p {...editable} style={fontStyle} className={`${editable.className} mx-auto mt-3 max-w-xs text-sm text-gray-600`}>
             I remember my first try at food photography. I created this guide to help you get started without making all the mistakes I did.
           </p>
           <div className="mt-4" style={{ display: 'flex', alignItems: 'center', justifyContent: btnJustify, gap: 12 }}>
@@ -1510,7 +1510,7 @@ function BlockContent({
       <div className="bg-white" style={bg}>
         <div className="p-12 text-center">
           <div className="mx-auto mb-4 h-px w-16 bg-black" />
-          <h3 {...editable} className={`${editable.className} text-2xl font-bold uppercase tracking-widest`}>
+          <h3 {...editable} style={fontStyle} className={`${editable.className} text-2xl font-bold uppercase tracking-widest`}>
             A Little Gift of Thanks for Joining the List.
           </h3>
           <div className="mx-auto mt-4 h-px w-16 bg-black" />
@@ -1536,7 +1536,7 @@ function BlockContent({
     return (
       <div className="flex min-h-[300px]" style={bg}>
         <div className="flex w-1/3 flex-col items-center justify-center gap-6 p-12">
-          <h3 {...editable} className={`${editable.className} text-4xl font-bold leading-tight`}>
+          <h3 {...editable} style={fontStyle} className={`${editable.className} text-4xl font-bold leading-tight`}>
             WEL—COME
           </h3>
           <div style={{ display: 'flex', justifyContent: btnJustify }}>
@@ -1572,11 +1572,11 @@ function BlockContent({
           onImageClick={onImageClick}
         />
         <div className="flex w-1/2 flex-col justify-center gap-3 px-4">
-          <p {...editable} className={`${editable.className} text-sm italic text-gray-500`}>One</p>
-          <h3 {...editable} className={`${editable.className} font-serif text-xl`}>
+          <p {...editable} style={fontStyle} className={`${editable.className} text-sm italic text-gray-500`}>One</p>
+          <h3 {...editable} style={fontStyle} className={`${editable.className} font-serif text-xl`}>
             Click here for my creamy butternut squash soup
           </h3>
-          <p {...editable} className={`${editable.className} text-sm italic text-gray-500`}>
+          <p {...editable} style={fontStyle} className={`${editable.className} text-sm italic text-gray-500`}>
             A warming recipe perfect for fall evenings.
           </p>
           <div style={{ display: 'flex', justifyContent: btnJustify }}>
@@ -1601,10 +1601,10 @@ function BlockContent({
           onImageClick={onImageClick}
         />
         <div className="bg-gray-100 p-12 text-center">
-          <h3 {...editable} className={`${editable.className} mb-3 font-serif text-2xl`}>
+          <h3 {...editable} style={fontStyle} className={`${editable.className} mb-3 font-serif text-2xl`}>
             Get 25% off when you book my services
           </h3>
-          <p {...editable} className={`${editable.className} italic text-gray-500`}>
+          <p {...editable} style={fontStyle} className={`${editable.className} italic text-gray-500`}>
             for the next 24 hours only.
           </p>
           <div className="mt-6" style={{ display: 'flex', justifyContent: btnJustify }}>
@@ -1631,10 +1631,10 @@ function BlockContent({
           onImageClick={onImageClick}
         />
         <div className="flex flex-1 flex-col justify-center gap-3">
-          <h4 {...editable} className={`${editable.className} text-sm font-bold tracking-widest`}>
+          <h4 {...editable} style={fontStyle} className={`${editable.className} text-sm font-bold tracking-widest`}>
             TESTIMONIAL NAME
           </h4>
-          <p {...editable} className={`${editable.className} text-sm leading-relaxed text-gray-600`}>
+          <p {...editable} style={fontStyle} className={`${editable.className} text-sm leading-relaxed text-gray-600`}>
             Since joining, my email list has grown 4x and I&apos;ve finally found a system that works for my creative business.
           </p>
           <div className="text-xl text-yellow-400">★★★★☆</div>
