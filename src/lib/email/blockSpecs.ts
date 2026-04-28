@@ -76,7 +76,7 @@ export const SPECS = {
     taglineItalic:        true,
     // Heading  — "The Post That Got Everyone Talking"
     headingFontSize:      30,          // text-3xl
-    headingWeight:        '700',
+    headingWeight:        '400',       // font-serif text-3xl (no font-bold in original)
     // Divider  — h-px w-16
     dividerColor:         '#9CA3AF',   // bg-gray-400
     // Button
@@ -100,7 +100,7 @@ export const SPECS = {
     numberLineHeight:     1,
     // Heading — "Tips to Photograph Food"
     headingFontSize:      24,          // text-2xl
-    headingWeight:        '700',
+    headingWeight:        '400',       // font-serif text-2xl (no font-bold in original)
     // Body
     bodyFontSize:         14,          // text-sm
     bodyColor:            '#4B5563',   // text-gray-600
@@ -179,7 +179,7 @@ export const SPECS = {
     labelItalic:          true,
     // Heading — "Click here for my creamy butternut squash soup"
     headingFontSize:      20,          // text-xl
-    headingWeight:        '700',
+    headingWeight:        '400',       // font-serif text-xl (no font-bold in original)
     // Description
     descFontSize:         14,          // text-sm
     descColor:            '#6B7280',   // text-gray-500
@@ -202,7 +202,7 @@ export const SPECS = {
     textPadding:          pad(48),     // p-12
     // Heading — "Get 25% off when you book my services"
     headingFontSize:      24,          // text-2xl
-    headingWeight:        '700',
+    headingWeight:        '400',       // font-serif text-2xl (no font-bold in original)
     headingBottomMargin:  12,          // mb-3
     // Body
     bodyFontSize:         14,          // text-sm
