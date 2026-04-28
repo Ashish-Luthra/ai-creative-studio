@@ -113,42 +113,49 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   )
 }
 
+// ─── Quick-access preset dots shown inline inside ColorSwatch ─────────────────
+// A curated diverse set — their variety of hues makes it visually obvious
+// these are "preset colour options", not a single-purpose picker control.
+const QUICK_PRESETS = [
+  '#000000', '#ffffff', '#E87B5C', '#5FBC8C',
+  '#0047AB', '#FFCC00', '#9B59B6', '#C9A89C',
+]
+
 function ColorSwatch({
   label, value, onChange,
 }: { label: string; value: string; onChange: (v: string) => void }) {
-  const [open, setOpen] = useState(false)
+  const [showPalette, setShowPalette] = useState(false)
   const [hex, setHex] = useState(value)
   const panelRef = useRef<HTMLDivElement>(null)
 
   // Keep local hex in sync when value changes externally
   useEffect(() => { setHex(value) }, [value])
 
-  // Close panel on outside click
+  // Close full palette on outside click
   useEffect(() => {
-    if (!open) return
+    if (!showPalette) return
     const handler = (e: MouseEvent) => {
       if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
-        setOpen(false)
+        setShowPalette(false)
       }
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
-  }, [open])
+  }, [showPalette])
 
   return (
     <div className="relative" ref={panelRef}>
       {label && <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-gray-400">{label}</p>}
 
-      {/* ── Always-visible row: swatch circle + hex input ── */}
+      {/* ── Row 1: current colour square + hex input + rainbow picker ── */}
       <div className="flex items-center gap-2 rounded-xl border border-gray-200 px-2.5 py-2">
-        {/* Swatch circle — click to toggle palette */}
-        <button
-          type="button"
-          onClick={() => setOpen((o) => !o)}
-          title={open ? 'Close palette' : 'Open palette'}
-          className="relative flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-full border-2 border-gray-200 shadow-sm transition-transform hover:scale-105"
+        {/* Current colour — ROUNDED SQUARE (not a circle).
+            This is purely a value indicator, not a clickable control. */}
+        <div
+          className="h-7 w-7 shrink-0 rounded-[6px] border border-black/10 shadow-sm"
           style={{ backgroundColor: value }}
         />
+
         {/* Hex text input — always editable */}
         <input
           type="text"
@@ -161,9 +168,14 @@ function ColorSwatch({
           placeholder="#000000"
           className="flex-1 font-mono text-[12px] text-gray-700 focus:outline-none"
         />
-        {/* Native colour wheel — opens OS picker */}
-        <label className="relative flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-full border border-gray-200" title="Custom colour">
-          <div className="absolute inset-0 rounded-full" style={{ backgroundColor: value }} />
+
+        {/* Gradient icon = native OS colour picker trigger */}
+        <label
+          className="relative flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center transition-transform hover:scale-105"
+          title="Open colour picker"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/icons/colour-picker.svg" alt="Colour picker" className="h-5 w-5" />
           <input
             type="color"
             value={value}
@@ -173,23 +185,64 @@ function ColorSwatch({
         </label>
       </div>
 
-      {/* ── Palette dropdown — opens below the row ── */}
-      {open && (
+      {/* ── Row 2: preset colour dots (always visible) + "more" expander ──
+          These small, multi-coloured circles are visually unmistakeable as
+          "preset palette options" — clearly different from the rainbow picker above. */}
+      <div className="mt-2 flex items-center gap-1.5 px-0.5">
+        <span className="mr-0.5 text-[8px] font-semibold uppercase tracking-wider text-gray-300">Palette</span>
+        {QUICK_PRESETS.map((c) => (
+          <button
+            key={c}
+            type="button"
+            onClick={() => { onChange(c); setHex(c) }}
+            title={c}
+            className={cn(
+              'h-[14px] w-[14px] shrink-0 rounded-full border-2 transition-all hover:scale-125',
+              value.toLowerCase() === c.toLowerCase()
+                ? 'border-[#1B51B3] scale-110'
+                : 'border-transparent hover:border-gray-300',
+              // White needs a visible border so it doesn't disappear
+              c === '#ffffff' && 'border-gray-200',
+            )}
+            style={{ backgroundColor: c }}
+          />
+        ))}
+        {/* Expand to full palette — ColourPalette icon */}
+        <button
+          type="button"
+          onClick={() => setShowPalette((o) => !o)}
+          title="Colour palette"
+          className={cn(
+            'flex h-5 w-5 shrink-0 items-center justify-center rounded transition-opacity',
+            showPalette ? 'opacity-100' : 'opacity-60 hover:opacity-100',
+          )}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/icons/colour-palette.svg" alt="Colour palette" className="h-4 w-4" />
+        </button>
+      </div>
+
+      {/* ── Full palette dropdown ── */}
+      {showPalette && (
         <div className="absolute left-0 top-[calc(100%+6px)] z-50 w-[268px] max-w-[calc(100vw-2rem)] rounded-2xl border border-gray-200 bg-white p-3 shadow-2xl">
-          <div className="mb-1.5 flex items-center justify-between">
-            <p className="text-[9px] font-semibold uppercase tracking-wider text-gray-400">Palette</p>
-            <button type="button" onClick={() => setOpen(false)} className="text-[13px] leading-none text-gray-400 hover:text-gray-700">✕</button>
+          <div className="mb-2 flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/icons/colour-palette.svg" alt="" className="h-4 w-4 opacity-70" />
+              <p className="text-[9px] font-semibold uppercase tracking-wider text-gray-400">Colour Palette</p>
+            </div>
+            <button type="button" onClick={() => setShowPalette(false)} className="text-[13px] leading-none text-gray-400 hover:text-gray-700">✕</button>
           </div>
           <div className="grid grid-cols-11 gap-1">
             {PRESET_COLORS.map((c) => (
               <button
                 key={c}
                 type="button"
-                onClick={() => { onChange(c); setHex(c); setOpen(false) }}
+                onClick={() => { onChange(c); setHex(c); setShowPalette(false) }}
                 title={c}
                 className={cn(
                   'h-5 w-5 rounded-full border-2 transition-all hover:scale-110',
-                  value === c ? 'border-blue-500 scale-110' : 'border-transparent hover:border-blue-300',
+                  value === c ? 'border-[#1B51B3] scale-110' : 'border-transparent hover:border-blue-300',
                 )}
                 style={{ backgroundColor: c }}
               />

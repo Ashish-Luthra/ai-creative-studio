@@ -11,12 +11,15 @@ export { IMAGE_CATEGORIES, type ImageCategory }
 
 interface ImageEntry {
   id: string
+  /** Filename without extension — shown under the thumbnail */
   name: string
   src: string
   category: ImageCategory
+  /** Image DNA — AI-generated descriptive attributes (subject, style, mood, setting) */
+  tags: string[]
   uploadedAt: string
   deletable: boolean
-  /** true while the AI is categorising this image — not persisted to localStorage */
+  /** true while the AI is analysing this image — not persisted to localStorage */
   categorising?: boolean
 }
 
@@ -26,7 +29,9 @@ function loadFromStorage(): ImageEntry[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return []
-    return JSON.parse(raw) as ImageEntry[]
+    const parsed = JSON.parse(raw) as Partial<ImageEntry>[]
+    // Normalise legacy entries that predate the `tags` field
+    return parsed.map((e) => normaliseTags(e as Parameters<typeof normaliseTags>[0]))
   } catch {
     return []
   }
@@ -40,6 +45,11 @@ function saveToStorage(entries: ImageEntry[]) {
   } catch {
     // localStorage quota exceeded — silently ignore
   }
+}
+
+/** Normalise legacy entries that predate the `tags` field */
+function normaliseTags(entry: Partial<ImageEntry> & { id: string; name: string; src: string; category: ImageCategory; uploadedAt: string; deletable: boolean }): ImageEntry {
+  return { tags: [], ...entry }
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -226,8 +236,9 @@ function ImageGrid({
       {images.map((image) => (
         <div
           key={image.id}
-          className="overflow-hidden rounded-lg border border-gray-200 transition-all hover:border-blue-300 hover:shadow-sm"
+          className="group overflow-hidden rounded-lg border border-gray-200 transition-all hover:border-[#1B51B3]/40 hover:shadow-sm"
         >
+          {/* ── Thumbnail ── */}
           <button
             type="button"
             onClick={() => !image.categorising && onSelect(image.src)}
@@ -240,40 +251,63 @@ function ImageGrid({
               alt={image.name}
               className={cn('h-24 w-full object-cover', image.categorising && 'opacity-50')}
             />
-            {/* AI categorising overlay */}
+            {/* AI analysing overlay */}
             {image.categorising && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-white/70 backdrop-blur-[2px]">
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-white/80 backdrop-blur-[2px]">
                 <Loader2 size={16} className="animate-spin text-[#1B51B3]" />
                 <span className="flex items-center gap-1 text-[9px] font-semibold text-[#1B51B3]">
                   <Sparkles size={8} />
-                  AI categorising…
+                  Analysing…
                 </span>
               </div>
             )}
-            <div className="px-2 pt-2 pb-1">
-              <div className="truncate text-[11px] font-medium text-gray-800">{image.name}</div>
-              <div className="flex items-center gap-1">
-                <span className="truncate text-[9px] text-gray-400">{image.category}</span>
-                {image.categorising && (
-                  <span className="shrink-0 rounded-full bg-[#1B51B3]/10 px-1.5 py-0.5 text-[8px] font-semibold text-[#1B51B3]">
-                    AI
+          </button>
+
+          {/* ── Metadata ── */}
+          <div className="px-2 pt-1.5 pb-2 space-y-1">
+            {/* Filename */}
+            <div className="truncate text-[11px] font-semibold text-gray-800 leading-tight" title={image.name}>
+              {image.name}
+            </div>
+
+            {/* Category pill */}
+            <div className="flex items-center gap-1">
+              <span className="truncate text-[9px] text-gray-400">{image.category}</span>
+            </div>
+
+            {/* Image DNA — attribute tags */}
+            {image.tags && image.tags.length > 0 && (
+              <div className="flex flex-wrap gap-1 pt-0.5">
+                {image.tags.slice(0, 4).map((tag) => (
+                  <span
+                    key={tag}
+                    className="rounded-full bg-gray-100 px-1.5 py-0.5 text-[8px] font-medium text-gray-500 leading-none"
+                  >
+                    {tag}
+                  </span>
+                ))}
+                {image.tags.length > 4 && (
+                  <span className="rounded-full bg-gray-100 px-1.5 py-0.5 text-[8px] font-medium text-gray-400 leading-none">
+                    +{image.tags.length - 4}
                   </span>
                 )}
               </div>
-            </div>
-          </button>
-          <div className="flex items-center justify-between px-2 pb-2">
-            <span className="text-[9px] text-gray-300">{formatDate(image.uploadedAt)}</span>
-            {image.deletable && (
-              <button
-                type="button"
-                onClick={(e) => onDelete(image.id, e)}
-                className="rounded p-0.5 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500"
-                title="Delete image"
-              >
-                <Trash2 size={12} />
-              </button>
             )}
+
+            {/* Date + delete */}
+            <div className="flex items-center justify-between pt-0.5">
+              <span className="text-[9px] text-gray-300">{formatDate(image.uploadedAt)}</span>
+              {image.deletable && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); onDelete(image.id, e) }}
+                  className="rounded p-0.5 text-gray-300 opacity-0 transition-all group-hover:opacity-100 hover:bg-red-50 hover:text-red-500"
+                  title="Delete image"
+                >
+                  <Trash2 size={11} />
+                </button>
+              )}
+            </div>
           </div>
         </div>
       ))}
@@ -289,6 +323,7 @@ export const ApprovedImagesPanel: React.FC<ApprovedImagesPanelProps> = ({ open, 
   const [uploadCategory, setUploadCategory] = useState<ImageCategory>('Uncategorised')
   const [showUploadCategoryMenu, setShowUploadCategoryMenu] = useState(false)
   const [showSourcePicker, setShowSourcePicker] = useState(false)
+  const [recatProgress, setRecatProgress] = useState<{ done: number; total: number } | null>(null)
   // Lazy initialiser — reads localStorage once at mount, before any effect runs.
   const [uploads, setUploads] = useState<ImageEntry[]>(() => loadFromStorage())
 
@@ -301,7 +336,12 @@ export const ApprovedImagesPanel: React.FC<ApprovedImagesPanelProps> = ({ open, 
     const byCat = activeCategory === 'All' ? uploads : uploads.filter((img) => img.category === activeCategory)
     const q = search.trim().toLowerCase()
     if (!q) return byCat
-    return byCat.filter((img) => img.name.toLowerCase().includes(q) || img.category.toLowerCase().includes(q))
+    return byCat.filter(
+      (img) =>
+        img.name.toLowerCase().includes(q) ||
+        img.category.toLowerCase().includes(q) ||
+        (img.tags ?? []).some((tag) => tag.toLowerCase().includes(q)),
+    )
   }, [search, activeCategory, uploads])
 
   const handleDelete = (id: string, e: React.MouseEvent) => {
@@ -310,7 +350,7 @@ export const ApprovedImagesPanel: React.FC<ApprovedImagesPanelProps> = ({ open, 
   }
 
   // Handles bulk file upload — reads each file, adds it immediately with
-  // categorising=true, then calls the AI endpoint to auto-categorise.
+  // categorising=true, then calls the Image Intelligence endpoint.
   const handleComputerFiles = (files: FileList) => {
     Array.from(files).forEach((file) => {
       const reader = new FileReader()
@@ -326,25 +366,27 @@ export const ApprovedImagesPanel: React.FC<ApprovedImagesPanelProps> = ({ open, 
           name: file.name.replace(/\.[^.]+$/, ''),
           src,
           category: uploadCategory,
+          tags: [],
           uploadedAt: new Date().toISOString(),
           deletable: true,
           categorising: true,
         }
         setUploads((prev) => [entry, ...prev])
 
-        // 2. Call AI categorisation endpoint
+        // 2. Call Image Intelligence endpoint (category + tags in one call)
         try {
-          const res = await fetch('/api/categorize-image', {
+          const res = await fetch('/api/analyse-image', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ dataUrl: src }),
           })
-          const data = await res.json() as { category: string }
+          const data = await res.json() as { category: string; tags: string[] }
           const aiCategory = data.category as ImageCategory
+          const aiTags = Array.isArray(data.tags) ? data.tags : []
 
           setUploads((prev) =>
             prev.map((img) =>
-              img.id === id ? { ...img, category: aiCategory, categorising: false } : img,
+              img.id === id ? { ...img, category: aiCategory, tags: aiTags, categorising: false } : img,
             ),
           )
         } catch {
@@ -360,6 +402,44 @@ export const ApprovedImagesPanel: React.FC<ApprovedImagesPanelProps> = ({ open, 
     })
   }
 
+  // Re-analyse every image that is currently 'Uncategorised' — updates category + tags
+  const handleRecategoriseAll = async () => {
+    const targets = uploads.filter((img) => img.category === 'Uncategorised' && !img.categorising)
+    if (targets.length === 0) return
+
+    setRecatProgress({ done: 0, total: targets.length })
+
+    // Mark all targets as analysing
+    setUploads((prev) =>
+      prev.map((img) => targets.find((t) => t.id === img.id) ? { ...img, categorising: true } : img),
+    )
+
+    let done = 0
+    for (const img of targets) {
+      try {
+        const res = await fetch('/api/analyse-image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dataUrl: img.src }),
+        })
+        const data = await res.json() as { category: string; tags: string[] }
+        const aiCategory = data.category as ImageCategory
+        const aiTags = Array.isArray(data.tags) ? data.tags : []
+        setUploads((prev) =>
+          prev.map((u) => u.id === img.id ? { ...u, category: aiCategory, tags: aiTags, categorising: false } : u),
+        )
+      } catch {
+        setUploads((prev) =>
+          prev.map((u) => u.id === img.id ? { ...u, categorising: false } : u),
+        )
+      }
+      done++
+      setRecatProgress({ done, total: targets.length })
+    }
+
+    setRecatProgress(null)
+  }
+
   if (!open) return null
 
   return (
@@ -367,7 +447,30 @@ export const ApprovedImagesPanel: React.FC<ApprovedImagesPanelProps> = ({ open, 
 
       {/* ── Header ── */}
       <div className="flex shrink-0 items-center justify-between border-b border-gray-100 px-5 py-3">
-        <h2 className="text-[14px] font-semibold text-gray-900">Image Library</h2>
+        <div className="flex items-center gap-3">
+          <h2 className="text-[14px] font-semibold text-gray-900">Image Library</h2>
+          {/* Re-categorise button — only shown when there are Uncategorised images */}
+          {uploads.some((img) => img.category === 'Uncategorised') && (
+            <button
+              type="button"
+              onClick={handleRecategoriseAll}
+              disabled={!!recatProgress}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-[#1B51B3] px-2.5 py-1 text-[11px] font-medium text-white transition-colors hover:bg-[#153d8a] disabled:opacity-60"
+            >
+              {recatProgress ? (
+                <>
+                  <Loader2 size={11} className="animate-spin" />
+                  {recatProgress.done} / {recatProgress.total}
+                </>
+              ) : (
+                <>
+                  <Sparkles size={11} />
+                  AI Re-categorise
+                </>
+              )}
+            </button>
+          )}
+        </div>
         <button onClick={onClose} className="rounded p-1 text-gray-400 hover:bg-gray-50 hover:text-gray-700">
           <X size={16} />
         </button>

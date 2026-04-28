@@ -8,27 +8,59 @@
  * Only the server-side (API routes) should import this file.
  */
 
+import { existsSync, readFileSync } from 'fs'
+import { join } from 'path'
+
+// ── Key resolver ──────────────────────────────────────────────────────────────
+// Turbopack (Next.js 16 dev) isolates each route in a worker where .env.local
+// vars may not reach process.env. Read the file directly as a reliable fallback.
+function resolveKey(envVar: string): string | undefined {
+  const fromEnv = process.env[envVar]
+  if (fromEnv) return fromEnv
+  try {
+    const file = join(process.cwd(), '.env.local')
+    if (!existsSync(file)) return undefined
+    const match = readFileSync(file, 'utf8').match(new RegExp(`^${envVar}=(.+)$`, 'm'))
+    return match?.[1]?.trim()
+  } catch {
+    return undefined
+  }
+}
+
 export type LLMProvider = 'anthropic' | 'openai'
 
-export const AI_PROVIDER = (process.env.AI_PROVIDER ?? 'anthropic') as LLMProvider
+export const AI_PROVIDER = ((resolveKey('AI_PROVIDER') ?? 'anthropic')) as LLMProvider
 
 export const AI_MODEL: string =
-  process.env.AI_MODEL ??
+  resolveKey('AI_MODEL') ??
   (AI_PROVIDER === 'openai' ? 'gpt-4o' : 'claude-opus-4-5')
+
+// ── Shared types ─────────────────────────────────────────────────────────────
+
+/**
+ * Image Intelligence — the "DNA" of an image returned by the analyse endpoint.
+ * category  : best matching category from the provided list
+ * tags      : 4–6 short descriptive attributes (subject, style, mood, visual)
+ */
+export interface ImageAnalysis {
+  category: string
+  tags: string[]
+}
 
 // ── Anthropic ────────────────────────────────────────────────────────────────
 
-async function classifyWithAnthropic(
+async function analyseWithAnthropic(
   base64: string,
   mediaType: string,
   categories: string[],
-): Promise<string> {
+): Promise<ImageAnalysis> {
+  const apiKey = resolveKey('ANTHROPIC_API_KEY')
   const Anthropic = (await import('@anthropic-ai/sdk')).default
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  const client = new Anthropic({ apiKey })
 
   const message = await client.messages.create({
     model: AI_MODEL,
-    max_tokens: 64,
+    max_tokens: 256,
     messages: [
       {
         role: 'user',
@@ -39,13 +71,24 @@ async function classifyWithAnthropic(
           },
           {
             type: 'text',
-            text: `You are an image categorisation assistant for a digital asset management system.
+            text: `You are an Image Intelligence engine for a digital asset management system.
 
-Look at this image and pick the SINGLE most appropriate category from the list below.
-Reply with ONLY the exact category name — no explanation, no punctuation, nothing else.
+Analyse this image and return a JSON object with exactly two keys:
+1. "category" — the single best-matching category from this list:
+${categories.map((c) => `   - ${c}`).join('\n')}
 
-Categories:
-${categories.map((c) => `- ${c}`).join('\n')}`,
+2. "tags" — an array of 4 to 6 short, lowercase descriptive attributes covering:
+   • subject matter (e.g. "woman", "shoes", "food", "city")
+   • visual style  (e.g. "editorial", "flat-lay", "portrait", "macro")
+   • mood / tone   (e.g. "luxury", "playful", "energetic", "minimal")
+   • setting       (e.g. "outdoor", "studio", "dark background")
+
+Rules:
+- Each tag must be 1–3 words, lowercase, no punctuation.
+- Return ONLY the raw JSON object — no markdown fences, no explanation.
+
+Example output:
+{"category":"Lifestyle & Campaign","tags":["woman","outdoor","summer","energetic","fashion","lifestyle"]}`,
           },
         ],
       },
@@ -53,18 +96,28 @@ ${categories.map((c) => `- ${c}`).join('\n')}`,
   })
 
   const raw = (message.content[0] as { type: string; text: string }).text.trim()
-  // Validate — fall back to Uncategorised if the model hallucinated
-  return categories.includes(raw) ? raw : 'Uncategorised'
+
+  try {
+    const parsed = JSON.parse(raw) as { category?: string; tags?: unknown }
+    const category = categories.includes(parsed.category ?? '') ? (parsed.category as string) : 'Uncategorised'
+    const tags = Array.isArray(parsed.tags)
+      ? (parsed.tags as unknown[]).filter((t) => typeof t === 'string').slice(0, 6) as string[]
+      : []
+    return { category, tags }
+  } catch {
+    // JSON parse failed — fall back gracefully
+    return { category: 'Uncategorised', tags: [] }
+  }
 }
 
 // ── OpenAI ───────────────────────────────────────────────────────────────────
 // To enable OpenAI support: npm install openai  and set AI_PROVIDER=openai
 
-async function classifyWithOpenAI(
+async function analyseWithOpenAI(
   _base64: string,
   _mediaType: string,
   _categories: string[],
-): Promise<string> {
+): Promise<ImageAnalysis> {
   throw new Error(
     'OpenAI support requires the "openai" package. ' +
     'Run: npm install openai  and set AI_PROVIDER=openai in .env.local',
@@ -74,16 +127,29 @@ async function classifyWithOpenAI(
 // ── Public API ────────────────────────────────────────────────────────────────
 
 /**
- * Classify an image into one of the provided category names.
+ * Analyse an image — returns its best-fit category AND descriptive tags (Image DNA).
  * Uses the configured AI_PROVIDER / AI_MODEL.
+ */
+export async function analyseImage(
+  base64: string,
+  mediaType: string,
+  categories: string[],
+): Promise<ImageAnalysis> {
+  if (AI_PROVIDER === 'openai') {
+    return analyseWithOpenAI(base64, mediaType, categories)
+  }
+  return analyseWithAnthropic(base64, mediaType, categories)
+}
+
+/**
+ * @deprecated Use analyseImage() which also returns tags.
+ * Kept for backward compatibility with /api/categorize-image.
  */
 export async function classifyImage(
   base64: string,
   mediaType: string,
   categories: string[],
 ): Promise<string> {
-  if (AI_PROVIDER === 'openai') {
-    return classifyWithOpenAI(base64, mediaType, categories)
-  }
-  return classifyWithAnthropic(base64, mediaType, categories)
+  const { category } = await analyseImage(base64, mediaType, categories)
+  return category
 }

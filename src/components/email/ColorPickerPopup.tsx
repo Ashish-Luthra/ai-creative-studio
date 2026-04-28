@@ -20,22 +20,57 @@ export function ColorPickerPopup({ onClose, currentColor, onColorChange }: Color
   ]
 
   return (
-    <div className="mt-4 bg-white border border-gray-200 rounded-lg p-4 shadow-lg">
-      <div className="grid grid-cols-11 gap-1.5 mb-4">
+    <div className="mt-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-lg">
+      {/* Preset colour circles — visually a "palette" because of their variety of hues */}
+      <div className="mb-2 flex items-center gap-1.5">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/icons/colour-palette.svg" alt="Colour palette" className="h-4 w-4 opacity-70" />
+        <p className="text-[9px] font-semibold uppercase tracking-wider text-gray-400">Colour Palette</p>
+      </div>
+      <div className="mb-4 grid grid-cols-11 gap-1.5">
         {presetColors.map((color, i) => (
-          <button key={i} onClick={() => { setHexInput(color); onColorChange(color) }}
-            className="w-5 h-5 rounded-full border-2 border-transparent hover:border-blue-400 transition-all"
-            style={{ backgroundColor: color }} title={color}
+          <button
+            key={i}
+            onClick={() => { setHexInput(color); onColorChange(color) }}
+            className="h-5 w-5 rounded-full border-2 border-transparent transition-all hover:scale-110 hover:border-blue-400"
+            style={{ backgroundColor: color }}
+            title={color}
           />
         ))}
       </div>
-      <div className="flex items-center gap-2 border border-gray-300 rounded-lg p-2">
-        <div className="w-8 h-8 rounded-full border border-gray-300 shrink-0" style={{ backgroundColor: currentColor }} />
-        <input type="text" value={hexInput}
-          onChange={(e) => { setHexInput(e.target.value); if (/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) onColorChange(e.target.value) }}
-          className="flex-1 text-sm font-mono outline-none" placeholder="#000000"
+
+      {/* Bottom row: rounded-square swatch + hex input + rainbow picker */}
+      <div className="flex items-center gap-2 rounded-xl border border-gray-200 px-2.5 py-2">
+        {/* Rounded square = current colour indicator (distinguishable from the circles above) */}
+        <div
+          className="h-8 w-8 shrink-0 rounded-[6px] border border-black/10 shadow-sm"
+          style={{ backgroundColor: currentColor }}
         />
-        <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-lg leading-none">×</button>
+        <input
+          type="text"
+          value={hexInput}
+          onChange={(e) => {
+            setHexInput(e.target.value)
+            if (/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) onColorChange(e.target.value)
+          }}
+          className="flex-1 font-mono text-[12px] text-gray-700 outline-none"
+          placeholder="#000000"
+        />
+        {/* Gradient icon = custom colour picker trigger */}
+        <label
+          className="relative flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center transition-transform hover:scale-105"
+          title="Open colour picker"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/icons/colour-picker.svg" alt="Colour picker" className="h-6 w-6" />
+          <input
+            type="color"
+            value={currentColor}
+            onChange={(e) => { setHexInput(e.target.value); onColorChange(e.target.value) }}
+            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+          />
+        </label>
+        <button onClick={onClose} className="text-[16px] leading-none text-gray-400 hover:text-gray-600 transition-colors">×</button>
       </div>
     </div>
   )
