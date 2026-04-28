@@ -36,10 +36,10 @@ export async function GET(_req: Request, { params }: Ctx) {
   return NextResponse.json(row)
 }
 
-// PUT /api/emailers/[id] — update name, subject and/or blocks
+// PUT /api/emailers/[id] — update name, subject, preheader and/or blocks
 export async function PUT(req: Request, { params }: Ctx) {
   const { id } = await params
-  const body = await req.json() as { name?: string; subject?: string; blocks?: unknown }
+  const body = await req.json() as { name?: string; subject?: string; preheader?: string; blocks?: unknown }
   const sb = createServiceClient()
 
   // ── Supabase path ─────────────────────────────────────────────────────────
@@ -47,9 +47,10 @@ export async function PUT(req: Request, { params }: Ctx) {
     const { data, error } = await sb
       .from('emailers')
       .update({
-        ...(body.name    !== undefined && { name:    body.name    }),
-        ...(body.subject !== undefined && { subject: body.subject }),
-        ...(body.blocks  !== undefined && { blocks:  body.blocks  }),
+        ...(body.name      !== undefined && { name:      body.name      }),
+        ...(body.subject   !== undefined && { subject:   body.subject   }),
+        ...(body.preheader !== undefined && { preheader: body.preheader }),
+        ...(body.blocks    !== undefined && { blocks:    body.blocks    }),
       })
       .eq('id', id)
       .select()

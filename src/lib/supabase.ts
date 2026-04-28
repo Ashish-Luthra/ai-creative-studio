@@ -6,6 +6,7 @@ export interface EmailerRow {
   id: string
   name: string
   subject: string | null
+  preheader: string | null
   blocks: unknown        // stored as JSONB; cast to CanvasBlock[] on the client
   created_at: string
   updated_at: string

@@ -1675,11 +1675,11 @@ export const EmailEditorPanel: React.FC = () => {
   // ── Persistence state ───────────────────────────────────────────────────────
   const [currentEmailerId, setCurrentEmailerId] = useState<string | null>(null)
   const [savedEmailers, setSavedEmailers] = useState<EmailerMeta[]>([
-    { id: 'demo-1', name: 'Dormant User — Winter Win-Back Campaign',   subject: 'We miss you! Here\'s 20% off to welcome you back',  created_at: '2025-01-15T10:00:00Z', updated_at: '2025-01-15T10:00:00Z' },
-    { id: 'demo-2', name: 'Summer Flash Sale — 48 Hour Countdown',     subject: 'Only 48 hrs left: up to 50% off sitewide',           created_at: '2025-02-10T09:00:00Z', updated_at: '2025-02-10T09:00:00Z' },
-    { id: 'demo-3', name: 'New Product Launch — Spring Collection',    subject: 'Introducing our brand-new Spring 2025 line',         created_at: '2025-03-01T08:00:00Z', updated_at: '2025-03-01T08:00:00Z' },
-    { id: 'demo-4', name: 'Monthly Newsletter — April Edition',        subject: 'Your April update: tips, stories & exclusive offers', created_at: '2025-04-01T07:00:00Z', updated_at: '2025-04-01T07:00:00Z' },
-    { id: 'demo-5', name: 'VIP Early Access — Members Only Preview',   subject: 'You\'re invited: shop 24 hours before everyone else', created_at: '2025-04-20T06:00:00Z', updated_at: '2025-04-20T06:00:00Z' },
+    { id: 'demo-1', name: 'Dormant User — Winter Win-Back Campaign',   subject: 'We miss you! Here\'s 20% off to welcome you back',  preheader: null, created_at: '2025-01-15T10:00:00Z', updated_at: '2025-01-15T10:00:00Z' },
+    { id: 'demo-2', name: 'Summer Flash Sale — 48 Hour Countdown',     subject: 'Only 48 hrs left: up to 50% off sitewide',           preheader: null, created_at: '2025-02-10T09:00:00Z', updated_at: '2025-02-10T09:00:00Z' },
+    { id: 'demo-3', name: 'New Product Launch — Spring Collection',    subject: 'Introducing our brand-new Spring 2025 line',         preheader: null, created_at: '2025-03-01T08:00:00Z', updated_at: '2025-03-01T08:00:00Z' },
+    { id: 'demo-4', name: 'Monthly Newsletter — April Edition',        subject: 'Your April update: tips, stories & exclusive offers', preheader: null, created_at: '2025-04-01T07:00:00Z', updated_at: '2025-04-01T07:00:00Z' },
+    { id: 'demo-5', name: 'VIP Early Access — Members Only Preview',   subject: 'You\'re invited: shop 24 hours before everyone else', preheader: null, created_at: '2025-04-20T06:00:00Z', updated_at: '2025-04-20T06:00:00Z' },
   ])
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [showEmailerDropdown, setShowEmailerDropdown] = useState(false)
@@ -1688,7 +1688,7 @@ export const EmailEditorPanel: React.FC = () => {
   const [emailerNameInput, setEmailerNameInput] = useState('')
   const dropdownRef = useRef<HTMLDivElement>(null)
 
-  const { document: doc, previewMode, setPreviewMode, updateSubject, syncFromCanvas } = useEmailStore()
+  const { document: doc, previewMode, setPreviewMode, updateSubject, updatePreheader, syncFromCanvas } = useEmailStore()
 
   // ── Sync canvas → emailStore on every canvas change ─────────────────────────
   // This bridges the CanvasBlock[] visual model with the EmailDocument compiler
@@ -1723,9 +1723,10 @@ export const EmailEditorPanel: React.FC = () => {
   }, [])
 
   const buildPayload = useCallback(() => ({
-    subject: doc.subject ?? null,
-    blocks:  canvasBlocks,
-  }), [doc.subject, canvasBlocks])
+    subject:   doc.subject   ?? null,
+    preheader: doc.preheader ?? null,
+    blocks:    canvasBlocks,
+  }), [doc.subject, doc.preheader, canvasBlocks])
 
   // Save (update) the current emailer
   const handleSave = useCallback(async () => {
@@ -1784,16 +1785,27 @@ export const EmailEditorPanel: React.FC = () => {
     try {
       const res = await fetch(`/api/emailers/${id}`)
       if (!res.ok) throw new Error()
-      const row = await res.json() as { id: string; name: string; subject: string | null; blocks: CanvasBlock[] }
+      const row = await res.json() as {
+        id: string
+        name: string
+        subject: string | null
+        preheader: string | null
+        blocks: CanvasBlock[]
+      }
+      // Restore canvas blocks
       setCanvasBlocks(Array.isArray(row.blocks) ? row.blocks : [])
       setCurrentEmailerId(row.id)
+      // Restore subject + preheader into the email store so buildPayload
+      // and the subject input both reflect the loaded emailer
+      updateSubject(row.subject ?? '')
+      updatePreheader(row.preheader ?? '')
       setSaveStatus('saved')
       setTimeout(() => setSaveStatus('idle'), 1500)
     } catch {
       setSaveStatus('error')
       setTimeout(() => setSaveStatus('idle'), 3000)
     }
-  }, [])
+  }, [updateSubject, updatePreheader])
 
   const handleTabClick = (tab: EmailTab) => {
     if (activeTab === tab) setPanelOpen((o) => !o)

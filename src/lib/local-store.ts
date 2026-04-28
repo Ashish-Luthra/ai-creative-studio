@@ -58,6 +58,7 @@ export function localGetEmailer(id: string): EmailerRow | null {
 export function localCreateEmailer(input: {
   name: string
   subject?: string | null
+  preheader?: string | null
   blocks: unknown
 }): EmailerRow {
   const rows = readAll()
@@ -66,6 +67,7 @@ export function localCreateEmailer(input: {
     id: newId(),
     name: input.name ?? 'Untitled',
     subject: input.subject ?? null,
+    preheader: input.preheader ?? null,
     blocks: input.blocks,
     created_at: ts,
     updated_at: ts,
@@ -74,10 +76,10 @@ export function localCreateEmailer(input: {
   return row
 }
 
-/** Update name, subject and/or blocks. Returns the updated row or null if not found. */
+/** Update name, subject, preheader and/or blocks. Returns the updated row or null if not found. */
 export function localUpdateEmailer(
   id: string,
-  patch: { name?: string; subject?: string | null; blocks?: unknown },
+  patch: { name?: string; subject?: string | null; preheader?: string | null; blocks?: unknown },
 ): EmailerRow | null {
   const rows = readAll()
   const idx = rows.findIndex((r) => r.id === id)
@@ -85,9 +87,10 @@ export function localUpdateEmailer(
 
   const updated: EmailerRow = {
     ...rows[idx],
-    ...(patch.name    !== undefined && { name:    patch.name }),
-    ...(patch.subject !== undefined && { subject: patch.subject }),
-    ...(patch.blocks  !== undefined && { blocks:  patch.blocks }),
+    ...(patch.name      !== undefined && { name:      patch.name }),
+    ...(patch.subject   !== undefined && { subject:   patch.subject }),
+    ...(patch.preheader !== undefined && { preheader: patch.preheader }),
+    ...(patch.blocks    !== undefined && { blocks:    patch.blocks }),
     updated_at: now(),
   }
   rows[idx] = updated

@@ -321,8 +321,10 @@ export const useEmailStore = create<EmailEditorState>((set, get) => ({
   },
 
   updateSubject: (subject) => {
-    const { document: doc } = get()
-    set({ document: { ...doc, subject } })
+    const { document: doc, history } = get()
+    const next = { ...doc, subject }
+    set({ document: next, history: pushHistory(history, doc), future: [] })
+    void get().recompile()
   },
 
   updatePreheader: (preheader) => {

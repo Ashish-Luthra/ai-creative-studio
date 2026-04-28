@@ -26,7 +26,7 @@ export async function GET() {
 
 // POST /api/emailers — create a new emailer
 export async function POST(req: Request) {
-  const body = await req.json() as { name?: string; subject?: string; blocks?: unknown }
+  const body = await req.json() as { name?: string; subject?: string; preheader?: string; blocks?: unknown }
 
   if (!body.blocks) {
     return NextResponse.json({ error: 'blocks is required' }, { status: 400 })
@@ -39,9 +39,10 @@ export async function POST(req: Request) {
     const { data, error } = await sb
       .from('emailers')
       .insert({
-        name:    body.name    ?? 'Untitled',
-        subject: body.subject ?? null,
-        blocks:  body.blocks,
+        name:      body.name      ?? 'Untitled',
+        subject:   body.subject   ?? null,
+        preheader: body.preheader ?? null,
+        blocks:    body.blocks,
       })
       .select()
       .single()
@@ -52,9 +53,10 @@ export async function POST(req: Request) {
 
   // ── Local file fallback ───────────────────────────────────────────────────
   const row = localCreateEmailer({
-    name:    body.name    ?? 'Untitled',
-    subject: body.subject ?? null,
-    blocks:  body.blocks,
+    name:      body.name      ?? 'Untitled',
+    subject:   body.subject   ?? null,
+    preheader: body.preheader ?? null,
+    blocks:    body.blocks,
   })
   return NextResponse.json(row, { status: 201 })
 }
