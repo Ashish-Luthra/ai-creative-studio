@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState, useEffect, useRef } from 'react'
-import { Search, Upload, X, Trash2, ChevronDown, Monitor } from 'lucide-react'
+import { Search, Upload, X, Trash2, ChevronDown, Monitor, Loader2, Sparkles } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 // ─── Categories ───────────────────────────────────────────────────────────────
@@ -29,6 +29,8 @@ interface ImageEntry {
   category: ImageCategory
   uploadedAt: string
   deletable: boolean
+  /** true while the AI is categorising this image — not persisted to localStorage */
+  categorising?: boolean
 }
 
 const STORAGE_KEY = 'ai-creative-studio:image-library'
@@ -45,7 +47,9 @@ function loadFromStorage(): ImageEntry[] {
 
 function saveToStorage(entries: ImageEntry[]) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(entries))
+    // Strip the transient `categorising` flag before persisting
+    const clean = entries.map(({ categorising: _, ...rest }) => rest)
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(clean))
   } catch {
     // localStorage quota exceeded — silently ignore
   }
@@ -234,12 +238,38 @@ function ImageGrid({
           key={image.id}
           className="overflow-hidden rounded-lg border border-gray-200 transition-all hover:border-blue-300 hover:shadow-sm"
         >
-          <button type="button" onClick={() => onSelect(image.src)} className="w-full text-left">
+          <button
+            type="button"
+            onClick={() => !image.categorising && onSelect(image.src)}
+            className="relative w-full text-left"
+            disabled={image.categorising}
+          >
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={image.src} alt={image.name} className="h-24 w-full object-cover" />
+            <img
+              src={image.src}
+              alt={image.name}
+              className={cn('h-24 w-full object-cover', image.categorising && 'opacity-50')}
+            />
+            {/* AI categorising overlay */}
+            {image.categorising && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-white/70 backdrop-blur-[2px]">
+                <Loader2 size={16} className="animate-spin text-[#1B51B3]" />
+                <span className="flex items-center gap-1 text-[9px] font-semibold text-[#1B51B3]">
+                  <Sparkles size={8} />
+                  AI categorising…
+                </span>
+              </div>
+            )}
             <div className="px-2 pt-2 pb-1">
               <div className="truncate text-[11px] font-medium text-gray-800">{image.name}</div>
-              <div className="truncate text-[9px] text-gray-400">{image.category}</div>
+              <div className="flex items-center gap-1">
+                <span className="truncate text-[9px] text-gray-400">{image.category}</span>
+                {image.categorising && (
+                  <span className="shrink-0 rounded-full bg-[#1B51B3]/10 px-1.5 py-0.5 text-[8px] font-semibold text-[#1B51B3]">
+                    AI
+                  </span>
+                )}
+              </div>
             </div>
           </button>
           <div className="flex items-center justify-between px-2 pb-2">
@@ -289,24 +319,52 @@ export const ApprovedImagesPanel: React.FC<ApprovedImagesPanelProps> = ({ open, 
     setUploads((prev) => prev.filter((img) => img.id !== id))
   }
 
-  // Handles bulk file upload from the computer source
+  // Handles bulk file upload — reads each file, adds it immediately with
+  // categorising=true, then calls the AI endpoint to auto-categorise.
   const handleComputerFiles = (files: FileList) => {
     Array.from(files).forEach((file) => {
       const reader = new FileReader()
-      reader.onload = () => {
+      reader.onload = async () => {
         const src = String(reader.result ?? '')
         if (!src) return
-        setUploads((prev) => [
-          {
-            id: `upload-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-            name: file.name.replace(/\.[^.]+$/, ''),
-            src,
-            category: uploadCategory,
-            uploadedAt: new Date().toISOString(),
-            deletable: true,
-          },
-          ...prev,
-        ])
+
+        const id = `upload-${Date.now()}-${Math.random().toString(36).slice(2)}`
+
+        // 1. Add immediately with fallback category + spinner
+        const entry: ImageEntry = {
+          id,
+          name: file.name.replace(/\.[^.]+$/, ''),
+          src,
+          category: uploadCategory,
+          uploadedAt: new Date().toISOString(),
+          deletable: true,
+          categorising: true,
+        }
+        setUploads((prev) => [entry, ...prev])
+
+        // 2. Call AI categorisation endpoint
+        try {
+          const res = await fetch('/api/categorize-image', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ dataUrl: src }),
+          })
+          const data = await res.json() as { category: string }
+          const aiCategory = data.category as ImageCategory
+
+          setUploads((prev) =>
+            prev.map((img) =>
+              img.id === id ? { ...img, category: aiCategory, categorising: false } : img,
+            ),
+          )
+        } catch {
+          // AI failed — keep the fallback category, clear spinner
+          setUploads((prev) =>
+            prev.map((img) =>
+              img.id === id ? { ...img, categorising: false } : img,
+            ),
+          )
+        }
       }
       reader.readAsDataURL(file)
     })
