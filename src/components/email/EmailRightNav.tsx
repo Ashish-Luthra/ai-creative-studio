@@ -9,6 +9,8 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { CanvasBlock } from './EmailEditorPanel'
+import { GOOGLE_FONT_FAMILIES } from '@/lib/canvas/googleFonts'
+import { AlertTriangle } from 'lucide-react'
 
 // ─── Tab routing ──────────────────────────────────────────────────────────────
 
@@ -79,7 +81,14 @@ const IMAGE_SHAPES: { id: CanvasBlock['imageShape']; path: string }[] = [
   { id: 'hexagon',  path: 'M16 0L32 9.3V22.7L16 32L0 22.7V9.3Z' },
 ]
 
-const FONT_OPTIONS = ['Arial', 'Georgia', 'Helvetica', 'Tahoma', 'Trebuchet MS', 'Verdana', 'Times New Roman']
+// Web-safe system fonts — always available regardless of network / email client
+const SYSTEM_FONTS = [
+  'Arial', 'Georgia', 'Helvetica', 'Tahoma',
+  'Times New Roman', 'Trebuchet MS', 'Verdana', 'Courier New',
+]
+
+// Combined set used for "is this font known?" checks
+const ALL_KNOWN_FONTS = new Set([...SYSTEM_FONTS, ...GOOGLE_FONT_FAMILIES])
 
 // ─── Preset soft-colour palette (matches ColorPickerPopup) ────────────────────
 const PRESET_COLORS = [
@@ -595,17 +604,52 @@ function BlockTab({ block, onPatch }: { block: CanvasBlock; onPatch: (p: Partial
 // ─── Tab: Font ─────────────────────────────────────────────────────────────────
 
 function FontTab({ block, onPatch }: { block: CanvasBlock; onPatch: (p: Partial<CanvasBlock>) => void }) {
+  const currentFont = block.fontFamily ?? 'Arial'
+  const isUnknownFont = !!block.fontFamily && !ALL_KNOWN_FONTS.has(block.fontFamily)
+
   return (
     <div className="flex-1 overflow-auto px-4 py-4 space-y-4">
+
+      {/* ── Unknown-font warning ─────────────────────────────────────────────── */}
+      {isUnknownFont && (
+        <div className="flex gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5">
+          <AlertTriangle size={14} className="mt-0.5 shrink-0 text-amber-500" />
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold text-amber-700">
+              Font not available in editor
+            </p>
+            <p className="mt-0.5 text-[10px] leading-snug text-amber-600">
+              <span className="font-mono">&ldquo;{block.fontFamily}&rdquo;</span> isn&apos;t in
+              the font list and won&apos;t render correctly in the email.
+              Please select a replacement below.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Family */}
       <div>
         <SectionLabel>Font Family</SectionLabel>
         <select
-          value={block.fontFamily ?? 'Arial'}
+          value={ALL_KNOWN_FONTS.has(currentFont) ? currentFont : ''}
           onChange={(e) => onPatch({ fontFamily: e.target.value })}
-          className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-[12px] text-gray-700 focus:border-blue-400 focus:outline-none"
+          className={cn(
+            'w-full rounded-xl border px-3 py-2.5 text-[12px] text-gray-700 focus:outline-none',
+            isUnknownFont
+              ? 'border-amber-300 bg-amber-50 focus:border-amber-400'
+              : 'border-gray-200 bg-white focus:border-blue-400',
+          )}
         >
-          {FONT_OPTIONS.map((f) => <option key={f} value={f}>{f}</option>)}
+          {/* Placeholder shown only when current font is unknown */}
+          {isUnknownFont && (
+            <option value="" disabled>— select a font —</option>
+          )}
+          <optgroup label="System Fonts">
+            {SYSTEM_FONTS.map((f) => <option key={f} value={f}>{f}</option>)}
+          </optgroup>
+          <optgroup label="Google Fonts">
+            {GOOGLE_FONT_FAMILIES.map((f) => <option key={f} value={f}>{f}</option>)}
+          </optgroup>
         </select>
       </div>
 

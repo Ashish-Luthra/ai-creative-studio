@@ -1,6 +1,7 @@
 'use client'
 import { useState, useRef, useCallback } from 'react'
 import { ColorPickerPopup } from './ColorPickerPopup'
+import { GOOGLE_FONT_FAMILIES } from '@/lib/canvas/googleFonts'
 
 // ─── ContentEditable helpers ──────────────────────────────────────────────────
 
@@ -79,9 +80,9 @@ export function TextEditPanel({ onClose }: TextEditPanelProps) {
     }
   }, [])
 
-  const FONT_OPTIONS = [
-    'Georgia', 'Arial', 'Helvetica', 'Verdana',
-    'Times New Roman', 'Courier New', 'Trebuchet MS', 'Tahoma',
+  const SYSTEM_FONTS_TEXT = [
+    'Arial', 'Georgia', 'Helvetica', 'Tahoma',
+    'Times New Roman', 'Trebuchet MS', 'Verdana', 'Courier New',
   ]
 
   const WEIGHTS: { label: string; value: string }[] = [
@@ -189,9 +190,16 @@ export function TextEditPanel({ onClose }: TextEditPanelProps) {
                   onChange={(e) => setFontFamily(e.target.value)}
                   className="flex-1 rounded-md border border-gray-200 px-2 py-1.5 text-[12px] text-gray-700 focus:border-blue-400 focus:outline-none"
                 >
-                  {FONT_OPTIONS.map((f) => (
-                    <option key={f} value={f}>{f}</option>
-                  ))}
+                  <optgroup label="System Fonts">
+                    {SYSTEM_FONTS_TEXT.map((f) => (
+                      <option key={f} value={f}>{f}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Google Fonts">
+                    {GOOGLE_FONT_FAMILIES.map((f) => (
+                      <option key={f} value={f}>{f}</option>
+                    ))}
+                  </optgroup>
                 </select>
                 <button
                   onMouseDown={(e) => {

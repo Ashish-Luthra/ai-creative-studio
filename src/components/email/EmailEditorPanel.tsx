@@ -21,6 +21,7 @@ import { TextEditPanel } from './TextEditPanel'
 import { ApprovedImagesPanel } from '@/components/canvas/ApprovedImagesPanel'
 import { AllyvateAssistant, type AllyContext } from '@/components/ai/AllyvateAssistant'
 import { EmailRightNav } from './EmailRightNav'
+import { GOOGLE_FONT_FAMILIES } from '@/lib/canvas/googleFonts'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 // CanvasBlock is imported from @/types/canvas (shared with canvasConverter)
@@ -66,8 +67,11 @@ const BLOCK_LABEL: Record<string, string> = {
   'testimonial':           'Testimonial',
 }
 
-// Font options
-const FONT_OPTIONS = ['Arial', 'Georgia', 'Helvetica', 'Tahoma', 'Trebuchet MS', 'Verdana']
+// Web-safe system fonts for the global body font picker
+const SYSTEM_FONTS_EMAIL = [
+  'Arial', 'Georgia', 'Helvetica', 'Tahoma',
+  'Times New Roman', 'Trebuchet MS', 'Verdana', 'Courier New',
+]
 
 // ─── Default canvas (email content flow) ─────────────────────────────────────
 
@@ -513,9 +517,16 @@ function StylePanel() {
           onChange={(e) => updateGlobalStyles({ fontFamily: e.target.value })}
           className="w-full rounded-md border border-gray-200 bg-white px-2 py-1.5 text-[12px] text-gray-700 focus:border-blue-400 focus:outline-none"
         >
-          {FONT_OPTIONS.map((f) => (
-            <option key={f} value={f}>{f}</option>
-          ))}
+          <optgroup label="System Fonts">
+            {SYSTEM_FONTS_EMAIL.map((f) => (
+              <option key={f} value={f}>{f}</option>
+            ))}
+          </optgroup>
+          <optgroup label="Google Fonts">
+            {GOOGLE_FONT_FAMILIES.map((f) => (
+              <option key={f} value={f}>{f}</option>
+            ))}
+          </optgroup>
         </select>
       </Field>
 
