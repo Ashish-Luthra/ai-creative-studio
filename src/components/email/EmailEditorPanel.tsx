@@ -744,6 +744,7 @@ function BlockContent({
   buttonBorderWidth,
   buttonWidth,
   buttonHeight,
+  buttonFontFamily,
   // Font settings
   fontFamily,
   fontSize,
@@ -784,6 +785,7 @@ function BlockContent({
   buttonBorderWidth?: number
   buttonWidth?: number
   buttonHeight?: number
+  buttonFontFamily?: string
   fontFamily?: string
   fontSize?: number
   fontBold?: boolean
@@ -826,6 +828,7 @@ function BlockContent({
     backgroundColor: btnShape.filled ? btnFill : 'transparent',
     border:          `${buttonBorderWidth ?? 1}px solid ${btnBorder}`,
     color:           btnShape.filled ? '#FFFFFF' : btnFill,
+    fontFamily:      buttonFontFamily ?? fontFamily ?? undefined,
     width:           buttonWidth  ? `${buttonWidth}px`  : undefined,
     height:          buttonHeight ? `${buttonHeight}px` : undefined,
   }
@@ -2432,6 +2435,7 @@ export const EmailEditorPanel: React.FC = () => {
                         buttonBorderWidth={block.buttonBorderWidth}
                         buttonWidth={block.buttonWidth}
                         buttonHeight={block.buttonHeight}
+                        buttonFontFamily={block.buttonFontFamily}
                         fontFamily={block.fontFamily ?? doc.globalStyles.fontFamily}
                         fontSize={block.fontSize}
                         fontBold={block.fontBold}

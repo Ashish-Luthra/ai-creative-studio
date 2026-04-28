@@ -24,6 +24,7 @@ export interface CanvasBlock {
   buttonBorderWidth?: number
   buttonWidth?: number
   buttonHeight?: number
+  buttonFontFamily?: string
   // Font
   fontFamily?: string
   fontSize?: number

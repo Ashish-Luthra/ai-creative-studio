@@ -69,7 +69,7 @@ function buttonStyles(cb: CanvasBlock, overrides: Partial<ButtonStyles> = {}): B
   return {
     backgroundColor: cb.buttonFillColor ?? '#111827',
     color: '#FFFFFF',
-    fontFamily: cb.fontFamily ?? '',
+    fontFamily: cb.buttonFontFamily ?? cb.fontFamily ?? '',
     fontSize: cb.fontSize ?? 14,
     fontWeight: '600',
     padding: { top: 12, right: 24, bottom: 12, left: 24 },

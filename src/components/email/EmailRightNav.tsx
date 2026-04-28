@@ -773,10 +773,11 @@ function PositionIcon({ align, active }: { align: 'left' | 'center' | 'right'; a
 }
 
 function ButtonTab({ block, onPatch }: { block: CanvasBlock; onPatch: (p: Partial<CanvasBlock>) => void }) {
-  const selectedVariant = block.buttonShapeVariant ?? 0
-  const fillColor   = block.buttonFillColor   ?? '#1F2937'
-  const borderColor = block.buttonBorderColor ?? '#1F2937'
-  const position    = block.buttonPosition    ?? 'center'
+  const selectedVariant  = block.buttonShapeVariant  ?? 0
+  const fillColor        = block.buttonFillColor      ?? '#1F2937'
+  const borderColor      = block.buttonBorderColor    ?? '#1F2937'
+  const position         = block.buttonPosition       ?? 'center'
+  const buttonFontFamily = block.buttonFontFamily     ?? block.fontFamily ?? 'Arial'
 
   return (
     <div className="flex-1 overflow-auto">
@@ -792,6 +793,23 @@ function ButtonTab({ block, onPatch }: { block: CanvasBlock; onPatch: (p: Partia
       </div>
 
       <div className="px-4 py-4 space-y-5">
+        {/* Font Family — independent from text font */}
+        <div>
+          <SectionLabel>Font Family</SectionLabel>
+          <select
+            value={ALL_KNOWN_FONTS.has(buttonFontFamily) ? buttonFontFamily : (block.fontFamily ?? 'Arial')}
+            onChange={(e) => onPatch({ buttonFontFamily: e.target.value })}
+            className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-[12px] text-gray-700 focus:border-blue-400 focus:outline-none"
+          >
+            <optgroup label="System Fonts">
+              {SYSTEM_FONTS.map((f) => <option key={f} value={f}>{f}</option>)}
+            </optgroup>
+            <optgroup label="Google Fonts">
+              {GOOGLE_FONT_FAMILIES.map((f) => <option key={f} value={f}>{f}</option>)}
+            </optgroup>
+          </select>
+        </div>
+
         {/* Shape variants — 4 × 2 grid */}
         <div>
           <SectionLabel>Style</SectionLabel>
