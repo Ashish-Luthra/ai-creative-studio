@@ -710,14 +710,23 @@ function applyOutlookFixes(html: string, contentWidth: number, fontImportUrl: st
     `</style><![endif]-->`,
   ].join('')
 
-  // ── Google Fonts @import ────────────────────────────────────────────────────
-  // Inject before Outlook fixes so it stays in <head>.
-  // - Supported: Apple Mail, Gmail web, Yahoo Mail, Outlook iOS/Android
-  // - Ignored:   Outlook Windows (falls back to the CSS font-family stack)
-  // The @import is placed OUTSIDE any MSO conditional so non-Outlook clients
-  // that don't support conditionals still pick it up.
+  // ── Google Fonts injection ──────────────────────────────────────────────────
+  // Two tags for maximum compatibility:
+  //
+  //  1. <link rel="stylesheet"> — used by browsers (iframe preview, Chrome, Safari,
+  //     Firefox, Outlook iOS/Android, Samsung Mail). Loads reliably in any normal
+  //     browser context including srcDoc iframes.
+  //
+  //  2. <style>@import url();</style> — used by email clients that support web
+  //     fonts but strip <link> tags (Apple Mail, Gmail web, Yahoo Mail).
+  //
+  // Outlook Windows ignores both and falls back to the CSS font-family stack.
+  // The blocks are placed OUTSIDE any MSO conditional so all other clients see them.
   const fontBlock = fontImportUrl
-    ? `<style type="text/css">@import url('${fontImportUrl}');</style>`
+    ? [
+        `<link rel="stylesheet" href="${fontImportUrl}">`,
+        `<style type="text/css">@import url('${fontImportUrl}');</style>`,
+      ].join('')
     : ''
 
   // Inject font block + MSO block + responsive styles before </head>

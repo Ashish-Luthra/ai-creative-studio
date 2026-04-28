@@ -196,13 +196,16 @@ describe('Google Fonts injection', () => {
     expect(r.html).not.toContain('fonts.googleapis.com')
   })
 
-  it('FONT #2 — @import injected for a recognised Google Font', async () => {
+  it('FONT #2 — both <link> and @import injected for a recognised Google Font', async () => {
     const doc = makeDoc()
     // Set a Google Font on the global style
     doc.globalStyles.fontFamily = 'Poppins'
     const r = await compileEmail(doc)
     expect(r.html).toContain('fonts.googleapis.com')
     expect(r.html).toContain('Poppins')
+    // <link> tag for browser / iframe preview compatibility
+    expect(r.html).toMatch(/<link[^>]*rel="stylesheet"[^>]*fonts\.googleapis\.com/)
+    // @import for email clients that strip <link> (Apple Mail, Gmail web, etc.)
     expect(r.html).toContain('@import url(')
   })
 
@@ -223,14 +226,23 @@ describe('Google Fonts injection', () => {
     expect(r.html).toContain('Lora')
   })
 
-  it('FONT #4 — @import style block appears before MSO conditional comment', async () => {
+  it('FONT #3b — Barlow (top-30 font) gets both <link> and @import tags', async () => {
+    const doc = makeDoc()
+    doc.globalStyles.fontFamily = 'Barlow'
+    const r = await compileEmail(doc)
+    expect(r.html).toContain('Barlow')
+    expect(r.html).toMatch(/<link[^>]*Barlow/)
+    expect(r.html).toContain('@import url(')
+  })
+
+  it('FONT #4 — font link block appears before MSO conditional comment', async () => {
     const doc = makeDoc()
     doc.globalStyles.fontFamily = 'Roboto'
     const r = await compileEmail(doc)
-    const importPos = r.html.indexOf('@import url(')
+    const linkPos   = r.html.indexOf('fonts.googleapis.com')
     const msoPos    = r.html.indexOf('[if mso]')
-    expect(importPos).toBeGreaterThan(-1)
-    expect(importPos).toBeLessThan(msoPos)
+    expect(linkPos).toBeGreaterThan(-1)
+    expect(linkPos).toBeLessThan(msoPos)
   })
 
   it('FONT #5 — top 30 fonts export contains exactly 31 entries and all are strings', async () => {
