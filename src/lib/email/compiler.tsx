@@ -714,17 +714,24 @@ function applyOutlookFixes(html: string, contentWidth: number, fontImportUrl: st
   // ── Google Fonts injection ──────────────────────────────────────────────────
   // Two tags for maximum compatibility:
   //
-  //  1. <link rel="stylesheet"> — used by browsers (iframe preview, Chrome, Safari,
+  //  1. <link rel="preconnect"> × 2 — establishes the TCP+TLS connection to
+  //     Google's font servers BEFORE the stylesheet request fires, cutting
+  //     latency by 100-300 ms on cold loads (important for srcDoc preview iframes
+  //     which cannot reuse the parent page's cached connections in all browsers).
+  //
+  //  2. <link rel="stylesheet"> — used by browsers (iframe preview, Chrome, Safari,
   //     Firefox, Outlook iOS/Android, Samsung Mail). Loads reliably in any normal
   //     browser context including srcDoc iframes.
   //
-  //  2. <style>@import url();</style> — used by email clients that support web
+  //  3. <style>@import url();</style> — used by email clients that support web
   //     fonts but strip <link> tags (Apple Mail, Gmail web, Yahoo Mail).
   //
-  // Outlook Windows ignores both and falls back to the CSS font-family stack.
+  // Outlook Windows ignores all three and falls back to the CSS font-family stack.
   // The blocks are placed OUTSIDE any MSO conditional so all other clients see them.
   const fontBlock = fontImportUrl
     ? [
+        `<link rel="preconnect" href="https://fonts.googleapis.com">`,
+        `<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>`,
         `<link rel="stylesheet" href="${fontImportUrl}">`,
         `<style type="text/css">@import url('${fontImportUrl}');</style>`,
       ].join('')

@@ -487,9 +487,14 @@ function convertImageTopTextBottom(cb: CanvasBlock): EmailSection[] {
 
 function convertTestimonial(cb: CanvasBlock): EmailSection {
   // Canvas: flex min-h-[200px] gap-8 bg-gray-50 p-12
-  //         Left: avatar image w-32 (128px), circular
-  //         Right: name (14px bold tracking-widest uppercase), quote (14px leading-relaxed gray-600),
-  //                star rating "★★★★☆" (20px yellow)
+  //         Left: avatar image w-32 (128px fixed), circular, shrink-0
+  //         Right: flex-1 — name (14px bold tracking-widest uppercase),
+  //                quote (14px leading-relaxed gray-600), stars (20px yellow)
+  //
+  // The canvas left column is FIXED at 128px.  Using `image-left` (40/60) gave a
+  // 240px avatar column — nearly double the image width and visually distorted.
+  // We manually construct a 25 / 75 split so the avatar column (~150px) fits the
+  // 128px image without wasted space, matching the canvas proportions.
 
   const avatarSrc = cb.imageSrcs?.['avatar'] ?? ''
   const avatarBlock = makeImageBlock(avatarSrc, 'Testimonial avatar')
@@ -497,7 +502,7 @@ function convertTestimonial(cb: CanvasBlock): EmailSection {
     width: 128,       // canvas: w-32 = 128px
     align: 'center',
     padding: { top: 0, right: 0, bottom: 0, left: 0 },
-    borderRadius: 64, // circular
+    borderRadius: 64, // circular (supported in Apple Mail, iOS, Gmail web)
   }
 
   const name = makeTextBlock({
@@ -514,10 +519,23 @@ function convertTestimonial(cb: CanvasBlock): EmailSection {
     styles: textStyles(cb, { fontSize: 20, color: '#FBBF24' }),
   })
 
-  // image-left = 40/60 for avatar vs text; bg-gray-50 = #F9FAFB · p-12 = 48px
-  return makeSection('image-left', [[avatarBlock], [name, quote, stars]], {
-    styles: sectionStyles(cb, { top: 48, right: 48, bottom: 48, left: 48 }, '#F9FAFB'),
-  })
+  // 25 / 75 manual split — matches the canvas's fixed-128px-left / flex-1-right layout.
+  // bg-gray-50 = #F9FAFB · p-12 = 48px outer padding
+  return {
+    id: nanoid(),
+    layout: 'two-col',
+    columns: [
+      {
+        id: nanoid(), widthPct: 25,
+        blocks: [makeSpacerBlock(8), avatarBlock, makeSpacerBlock(8)],
+      },
+      {
+        id: nanoid(), widthPct: 75,
+        blocks: [makeSpacerBlock(8), name, makeSpacerBlock(8), quote, stars, makeSpacerBlock(8)],
+      },
+    ],
+    styles: sectionStyles(cb, { top: 32, right: 48, bottom: 32, left: 48 }, '#F9FAFB'),
+  }
 }
 
 // ─── Main converter ───────────────────────────────────────────────────────────

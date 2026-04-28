@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useCallback, useRef, useEffect } from 'react'
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import {
   Layers, LayoutGrid, Palette, FileText,
   Monitor, Smartphone, ChevronUp, ChevronDown, Trash2,
@@ -21,7 +21,7 @@ import { TextEditPanel } from './TextEditPanel'
 import { ApprovedImagesPanel } from '@/components/canvas/ApprovedImagesPanel'
 import { AllyvateAssistant, type AllyContext } from '@/components/ai/AllyvateAssistant'
 import { EmailRightNav } from './EmailRightNav'
-import { GOOGLE_FONT_FAMILIES } from '@/lib/canvas/googleFonts'
+import { GOOGLE_FONT_FAMILIES, getGoogleFontStylesheetHrefs } from '@/lib/canvas/googleFonts'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 // CanvasBlock is imported from @/types/canvas (shared with canvasConverter)
@@ -1713,6 +1713,22 @@ export const EmailEditorPanel: React.FC = () => {
   // Toggle between live canvas editing and iframe-based email HTML preview
   const [showPreview, setShowPreview] = useState(false)
 
+  // ── Font-enriched preview HTML ─────────────────────────────────────────────
+  // srcDoc iframes run with a null origin, which means they cannot reuse the
+  // parent page's cached Google Fonts connections in all browsers.  We pre-inject
+  // <link> tags for every font in the full catalogue so the preview shows the
+  // correct font immediately — these same fonts are already loaded by the root
+  // layout, so browsers that share the cache serve them from memory.
+  // NOTE: these extra links are injected for preview only; the exported HTML still
+  // only embeds the specific fonts actually used in the document (as compiled).
+  const previewSrcDoc = useMemo(() => {
+    if (!compiledHtml) return ''
+    const extraLinks = getGoogleFontStylesheetHrefs()
+      .map((href) => `<link rel="stylesheet" href="${href}">`)
+      .join('')
+    return compiledHtml.replace('</head>', `${extraLinks}</head>`)
+  }, [compiledHtml])
+
   // ── Sync canvas → emailStore on every canvas change ─────────────────────────
   // This bridges the CanvasBlock[] visual model with the EmailDocument compiler
   // model so that compiled HTML always reflects what the user sees on canvas.
@@ -2282,10 +2298,10 @@ export const EmailEditorPanel: React.FC = () => {
                   {previewMode === 'mobile' ? 'Email client — mobile' : 'Email client — desktop'}
                 </div>
               </div>
-              {compiledHtml ? (
+              {previewSrcDoc ? (
                 <iframe
                   title="Email HTML Preview"
-                  srcDoc={compiledHtml}
+                  srcDoc={previewSrcDoc}
                   className="w-full border-0 block"
                   style={{ minHeight: 600, height: 'auto' }}
                   onLoad={(e) => {
