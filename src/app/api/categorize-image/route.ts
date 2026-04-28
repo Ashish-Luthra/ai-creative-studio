@@ -7,7 +7,7 @@
  */
 import { NextResponse } from 'next/server'
 import { classifyImage, AI_PROVIDER, AI_MODEL } from '@/lib/llm'
-import { IMAGE_CATEGORIES } from '@/components/canvas/ApprovedImagesPanel'
+import { IMAGE_CATEGORIES } from '@/lib/image-categories'
 
 export async function POST(req: Request) {
   try {

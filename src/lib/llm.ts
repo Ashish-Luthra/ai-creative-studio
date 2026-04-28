@@ -58,41 +58,17 @@ ${categories.map((c) => `- ${c}`).join('\n')}`,
 }
 
 // ── OpenAI ───────────────────────────────────────────────────────────────────
+// To enable OpenAI support: npm install openai  and set AI_PROVIDER=openai
 
 async function classifyWithOpenAI(
-  base64: string,
-  mediaType: string,
-  categories: string[],
+  _base64: string,
+  _mediaType: string,
+  _categories: string[],
 ): Promise<string> {
-  // Dynamic import so the package is optional
-  const { default: OpenAI } = await import('openai' as string as 'openai')
-  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-
-  const response = await client.chat.completions.create({
-    model: AI_MODEL,
-    max_tokens: 64,
-    messages: [
-      {
-        role: 'user',
-        content: [
-          { type: 'image_url', image_url: { url: `data:${mediaType};base64,${base64}` } },
-          {
-            type: 'text',
-            text: `You are an image categorisation assistant for a digital asset management system.
-
-Look at this image and pick the SINGLE most appropriate category from the list below.
-Reply with ONLY the exact category name — no explanation, no punctuation, nothing else.
-
-Categories:
-${categories.map((c) => `- ${c}`).join('\n')}`,
-          },
-        ],
-      },
-    ],
-  })
-
-  const raw = response.choices[0]?.message?.content?.trim() ?? ''
-  return categories.includes(raw) ? raw : 'Uncategorised'
+  throw new Error(
+    'OpenAI support requires the "openai" package. ' +
+    'Run: npm install openai  and set AI_PROVIDER=openai in .env.local',
+  )
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────

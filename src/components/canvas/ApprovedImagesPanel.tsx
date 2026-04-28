@@ -3,22 +3,9 @@
 import { useMemo, useState, useEffect, useRef } from 'react'
 import { Search, Upload, X, Trash2, ChevronDown, Monitor, Loader2, Sparkles } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { IMAGE_CATEGORIES, type ImageCategory } from '@/lib/image-categories'
 
-// ─── Categories ───────────────────────────────────────────────────────────────
-
-export const IMAGE_CATEGORIES = [
-  'Logo & Brand Marks',
-  'Product Images',
-  'Lifestyle & Campaign',
-  'Backgrounds & Textures',
-  'Icons & UI Elements',
-  'Social Media Assets',
-  'AI Generated',
-  'Illustrations & Graphics',
-  'Uncategorised',
-] as const
-
-export type ImageCategory = (typeof IMAGE_CATEGORIES)[number]
+export { IMAGE_CATEGORIES, type ImageCategory }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -71,14 +58,17 @@ interface ApprovedImagesPanelProps {
 
 // ─── Upload source picker modal ───────────────────────────────────────────────
 
-// eslint-disable-next-line @next/next/no-img-element
-const GoogleDriveLogo  = () => <img src="/brand-logos/google-drive.svg"  alt="Google Drive"  width={36} height={36} />
-// eslint-disable-next-line @next/next/no-img-element
-const OneDriveLogo     = () => <img src="/brand-logos/onedrive.svg"      alt="OneDrive"      width={44} height={32} />
-// eslint-disable-next-line @next/next/no-img-element
-const DropboxLogo      = () => <img src="/brand-logos/dropbox.svg"       alt="Dropbox"       width={36} height={36} />
-// eslint-disable-next-line @next/next/no-img-element
-const BynderLogo       = () => <img src="/brand-logos/bynder.svg"        alt="Bynder"        width={80} height={28} />
+// All brand logos rendered inside a fixed 44×36 box with object-contain
+// so every logo appears at the same visual weight regardless of aspect ratio.
+const LogoBox = ({ src, alt }: { src: string; alt: string }) => (
+  // eslint-disable-next-line @next/next/no-img-element
+  <img src={src} alt={alt} className="h-9 w-11 object-contain" />
+)
+
+const GoogleDriveLogo = () => <LogoBox src="/brand-logos/google-drive.svg" alt="Google Drive" />
+const OneDriveLogo    = () => <LogoBox src="/brand-logos/onedrive.svg"     alt="OneDrive" />
+const DropboxLogo     = () => <LogoBox src="/brand-logos/dropbox.svg"      alt="Dropbox" />
+const BynderLogo      = () => <LogoBox src="/brand-logos/bynder.svg"       alt="Bynder" />
 
 interface UploadSourcePickerProps {
   uploadCategory: string
@@ -95,7 +85,7 @@ function UploadSourcePicker({ uploadCategory, onComputerFiles, onClose }: Upload
       label: 'My Computer',
       sublabel: 'Bulk upload supported',
       logo: (
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gray-100 text-gray-600">
+        <div className="flex h-9 w-11 items-center justify-center rounded-xl bg-gray-100 text-gray-600">
           <Monitor size={22} />
         </div>
       ),
