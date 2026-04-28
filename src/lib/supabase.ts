@@ -1,19 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-
-// Browser-safe client (anon key)
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
-
-// Server-only client (service-role key bypasses RLS – only use in API routes)
-export function createServiceClient() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  )
-}
-
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface EmailerRow {
@@ -26,3 +12,42 @@ export interface EmailerRow {
 }
 
 export type EmailerMeta = Omit<EmailerRow, 'blocks'>
+
+// ── Supabase configured? ──────────────────────────────────────────────────────
+// When NEXT_PUBLIC_SUPABASE_URL is empty (local dev without Supabase) we must
+// NOT call createClient — it throws synchronously and crashes every API route.
+
+export function isSupabaseConfigured(): boolean {
+  return !!(
+    process.env.NEXT_PUBLIC_SUPABASE_URL &&
+    process.env.NEXT_PUBLIC_SUPABASE_URL.startsWith('http')
+  )
+}
+
+// Browser-safe client (anon key) — returns null when not configured
+export function getSupabaseClient() {
+  if (!isSupabaseConfigured()) return null
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  )
+}
+
+// Server-only client (service-role key bypasses RLS — only use in API routes)
+// Returns null when Supabase is not configured so callers can fall back to local store.
+export function createServiceClient() {
+  if (!isSupabaseConfigured()) return null
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  )
+}
+
+// Legacy export — kept for any code that imported `supabase` directly.
+// Will be null in local dev; callers should prefer getSupabaseClient().
+export const supabase = isSupabaseConfigured()
+  ? createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    )
+  : null
