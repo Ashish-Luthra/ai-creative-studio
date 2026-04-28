@@ -291,7 +291,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
         ensureCreativeMetadata(c)
         const creativeId = getCreativeIdFromObject(target)
         if (!creativeId) return
-        const data = (target as FabricObject & { data?: { kind?: string } }).data
+        const data = (target as FabricObject & { data?: { kind?: string; moveHandle?: boolean } }).data
         const handMode = activeToolRef.current === 'hand'
         const directMoveEnabled = data?.kind === 'creative-frame' || data?.moveHandle === true
         if (!handMode && !directMoveEnabled) return
@@ -318,7 +318,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
         const creativeId = getCreativeIdFromObject(target)
         if (!creativeId) return
 
-        const data = (target as FabricObject & { data?: { kind?: string } }).data
+        const data = (target as FabricObject & { data?: { kind?: string; moveHandle?: boolean } }).data
         const handMode = activeToolRef.current === 'hand'
         const directMoveEnabled = data?.kind === 'creative-frame' || data?.moveHandle === true
         if (!handMode && !directMoveEnabled) return
