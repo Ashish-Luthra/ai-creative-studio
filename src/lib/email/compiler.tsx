@@ -34,6 +34,43 @@ import type {
   GlobalEmailStyles,
 } from '@/types/email'
 import { buildFontStack, layoutToColumnWidths } from './styleUtils'
+import { getEmailFontImportUrl } from '@/lib/canvas/googleFonts'
+
+// ─── Font collection ──────────────────────────────────────────────────────────
+
+/**
+ * Walks an EmailDocument and returns every unique font family referenced —
+ * globalStyles + per-block TextStyles + ButtonStyles.
+ * The compiler uses this to build a targeted Google Fonts @import URL so only
+ * the fonts that are actually used get loaded in the email.
+ */
+function collectUsedFonts(doc: EmailDocument): string[] {
+  const families = new Set<string>()
+
+  // Global body font
+  if (doc.globalStyles.fontFamily) {
+    families.add(doc.globalStyles.fontFamily)
+  }
+
+  for (const section of doc.sections) {
+    for (const column of section.columns) {
+      for (const block of column.blocks) {
+        if (block.type === 'text' || block.type === 'unsubscribe') {
+          const b = block as TextBlock | UnsubscribeBlock
+          if ('styles' in b && b.styles && 'fontFamily' in b.styles) {
+            families.add((b.styles as { fontFamily: string }).fontFamily)
+          }
+        }
+        if (block.type === 'button') {
+          const b = block as ButtonBlock
+          if (b.styles?.fontFamily) families.add(b.styles.fontFamily)
+        }
+      }
+    }
+  }
+
+  return [...families].filter(Boolean)
+}
 
 // ─── Validation pass ─────────────────────────────────────────────────────────
 
@@ -656,7 +693,7 @@ const RESPONSIVE_STYLE = `
 <!--<![endif]-->
 `.trim()
 
-function applyOutlookFixes(html: string, contentWidth: number): string {
+function applyOutlookFixes(html: string, contentWidth: number, fontImportUrl: string): string {
   // ── FIX #4 — MSO head block ─────────────────────────────────────────────────
   // Office document settings + VML namespace + table reset for Outlook Windows.
   const msoHeadBlock = [
@@ -673,8 +710,18 @@ function applyOutlookFixes(html: string, contentWidth: number): string {
     `</style><![endif]-->`,
   ].join('')
 
-  // Inject both blocks before </head> — MSO block first, then responsive styles
-  html = html.replace('</head>', `${msoHeadBlock}${RESPONSIVE_STYLE}</head>`)
+  // ── Google Fonts @import ────────────────────────────────────────────────────
+  // Inject before Outlook fixes so it stays in <head>.
+  // - Supported: Apple Mail, Gmail web, Yahoo Mail, Outlook iOS/Android
+  // - Ignored:   Outlook Windows (falls back to the CSS font-family stack)
+  // The @import is placed OUTSIDE any MSO conditional so non-Outlook clients
+  // that don't support conditionals still pick it up.
+  const fontBlock = fontImportUrl
+    ? `<style type="text/css">@import url('${fontImportUrl}');</style>`
+    : ''
+
+  // Inject font block + MSO block + responsive styles before </head>
+  html = html.replace('</head>', `${fontBlock}${msoHeadBlock}${RESPONSIVE_STYLE}</head>`)
 
   // ── FIX #5 — VML namespaces on <html> ──────────────────────────────────────
   html = html.replace(
@@ -726,12 +773,17 @@ export async function compileEmail(
 
   const width = opts.width ?? doc.globalStyles.contentWidth ?? 600
 
+  // Collect font families used in this document and build a targeted @import URL.
+  // Only Google Fonts are imported; system fonts (Arial, Helvetica, etc.) are skipped.
+  const usedFonts = collectUsedFonts(doc)
+  const fontImportUrl = getEmailFontImportUrl(usedFonts)
+
   try {
     const rawHtml = await render(<EmailTemplate doc={doc} width={width} />, {
       pretty: opts.pretty === true,
     })
 
-    const html = applyOutlookFixes(rawHtml, width)
+    const html = applyOutlookFixes(rawHtml, width, fontImportUrl)
 
     return { html, errors: [], warnings }
   } catch (err) {

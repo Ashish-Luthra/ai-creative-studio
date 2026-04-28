@@ -185,3 +185,65 @@ describe('Mobile / responsive compatibility', () => {
     expect(html.toLowerCase()).not.toContain('<script')
   })
 })
+
+// ─── Google Fonts injection ───────────────────────────────────────────────────
+
+describe('Google Fonts injection', () => {
+  it('FONT #1 — no @import injected when only system fonts are used (avoids dead request)', async () => {
+    // Default doc uses Arial throughout — no Google Fonts
+    const r = await compileEmail(makeDoc())
+    // Should NOT contain a fonts.googleapis.com @import
+    expect(r.html).not.toContain('fonts.googleapis.com')
+  })
+
+  it('FONT #2 — @import injected for a recognised Google Font', async () => {
+    const doc = makeDoc()
+    // Set a Google Font on the global style
+    doc.globalStyles.fontFamily = 'Poppins'
+    const r = await compileEmail(doc)
+    expect(r.html).toContain('fonts.googleapis.com')
+    expect(r.html).toContain('Poppins')
+    expect(r.html).toContain('@import url(')
+  })
+
+  it('FONT #3 — @import includes multiple fonts when document uses several families', async () => {
+    const doc = makeDoc()
+    doc.globalStyles.fontFamily = 'Montserrat'
+    // Add a text block with a different Google Font
+    const section = doc.sections[0]
+    section.columns[0].blocks.push({
+      id: 'test-text', type: 'text', content: '<p>Hello</p>',
+      styles: {
+        fontFamily: 'Lora', fontSize: 16, fontWeight: 'normal', lineHeight: 1.5,
+        color: '#111', textAlign: 'left', padding: { top: 0, right: 0, bottom: 0, left: 0 },
+      },
+    })
+    const r = await compileEmail(doc)
+    expect(r.html).toContain('Montserrat')
+    expect(r.html).toContain('Lora')
+  })
+
+  it('FONT #4 — @import style block appears before MSO conditional comment', async () => {
+    const doc = makeDoc()
+    doc.globalStyles.fontFamily = 'Roboto'
+    const r = await compileEmail(doc)
+    const importPos = r.html.indexOf('@import url(')
+    const msoPos    = r.html.indexOf('[if mso]')
+    expect(importPos).toBeGreaterThan(-1)
+    expect(importPos).toBeLessThan(msoPos)
+  })
+
+  it('FONT #5 — top 30 fonts export contains exactly 31 entries and all are strings', async () => {
+    const { TOP_30_FONTS } = await import('@/lib/canvas/googleFonts')
+    expect(TOP_30_FONTS.length).toBe(31)
+    TOP_30_FONTS.forEach((f) => expect(typeof f).toBe('string'))
+  })
+
+  it('FONT #6 — all top 30 fonts are present in the full GOOGLE_FONT_FAMILIES list', async () => {
+    const { TOP_30_FONTS, GOOGLE_FONT_FAMILIES } = await import('@/lib/canvas/googleFonts')
+    const set = new Set(GOOGLE_FONT_FAMILIES)
+    TOP_30_FONTS.forEach((f) => {
+      expect(set.has(f), `"${f}" missing from GOOGLE_FONT_FAMILIES`).toBe(true)
+    })
+  })
+})
