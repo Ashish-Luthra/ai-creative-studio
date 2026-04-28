@@ -5,7 +5,10 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "parity:smoke": "node scripts/canvas-parity-smoke.mjs",
+    "parity:update-baseline": "UPDATE_PARITY_BASELINE=1 node scripts/canvas-parity-smoke.mjs",
+    "parity:ci": "PLAYWRIGHT_BROWSER=chromium node scripts/canvas-parity-smoke.mjs"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.2.4",
@@ -29,6 +32,9 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "pixelmatch": "^7.1.0",
+    "playwright": "^1.59.1",
+    "pngjs": "^7.0.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

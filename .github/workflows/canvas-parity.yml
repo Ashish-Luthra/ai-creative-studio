@@ -1,0 +1,56 @@
+name: Canvas Parity
+
+on:
+  pull_request:
+    branches: ['**']
+  workflow_dispatch:
+
+jobs:
+  canvas-parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Start Next.js dev server
+        run: npm run dev -- --hostname 127.0.0.1 --port 3000 > /tmp/next-dev.log 2>&1 &
+
+      - name: Wait for app readiness
+        run: |
+          for i in {1..60}; do
+            if curl -sSf "http://127.0.0.1:3000/studio/dev-session/canvas" > /dev/null; then
+              echo "App is ready"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "App failed to become ready in time"
+          cat /tmp/next-dev.log
+          exit 1
+
+      - name: Run canvas parity checks
+        run: npm run parity:ci
+
+      - name: Upload parity artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: canvas-parity-artifacts
+          path: |
+            artifacts/**
+            /tmp/next-dev.log
+          if-no-files-found: warn
