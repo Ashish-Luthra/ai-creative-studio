@@ -7,7 +7,7 @@ import {
   Type, Plus, X, MousePointer2, ChevronsUpDown,
   Star, Link2, Share2, MapPin, Mail, Layout,
   Save, FolderOpen, ChevronDown as ChevronDownIcon, Check, Loader2, PlusCircle,
-  Image as ImageIcon,
+  Image as ImageIcon, Eye, EyeOff,
 } from 'lucide-react'
 import type { EmailerMeta } from '@/lib/supabase'
 import type { CanvasBlock } from '@/types/canvas'
@@ -1699,7 +1699,10 @@ export const EmailEditorPanel: React.FC = () => {
   const [emailerNameInput, setEmailerNameInput] = useState('')
   const dropdownRef = useRef<HTMLDivElement>(null)
 
-  const { document: doc, previewMode, setPreviewMode, updateSubject, updatePreheader, syncFromCanvas } = useEmailStore()
+  const { document: doc, previewMode, setPreviewMode, updateSubject, updatePreheader, syncFromCanvas, compiledHtml } = useEmailStore()
+
+  // Toggle between live canvas editing and iframe-based email HTML preview
+  const [showPreview, setShowPreview] = useState(false)
 
   // ── Sync canvas → emailStore on every canvas change ─────────────────────────
   // This bridges the CanvasBlock[] visual model with the EmailDocument compiler
@@ -2193,6 +2196,21 @@ export const EmailEditorPanel: React.FC = () => {
               <Smartphone size={12} /> Mobile
             </button>
           </div>
+
+          {/* ── HTML Preview toggle ── */}
+          <button
+            onClick={() => setShowPreview((v) => !v)}
+            title={showPreview ? 'Back to editor' : 'Preview actual email HTML'}
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] font-medium transition-colors',
+              showPreview
+                ? 'border-blue-400 bg-blue-50 text-blue-600'
+                : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50',
+            )}
+          >
+            {showPreview ? <EyeOff size={12} /> : <Eye size={12} />}
+            {showPreview ? 'Edit' : 'Preview'}
+          </button>
         </div>
 
         {/* ── Save / Name modal ── */}
@@ -2234,9 +2252,54 @@ export const EmailEditorPanel: React.FC = () => {
           </div>
         )}
 
+        {/* ── HTML Preview iframe (replaces canvas when Preview is active) ── */}
+        {showPreview && (
+          <div className="flex flex-1 items-start justify-center overflow-auto bg-[#F3F4F6] py-8">
+            <div
+              className={cn(
+                'overflow-hidden rounded-lg bg-white shadow-xl ring-1 ring-black/5',
+                previewMode === 'mobile' ? 'w-[390px]' : 'w-[660px]',
+              )}
+            >
+              {/* Browser chrome bar */}
+              <div className="flex h-8 items-center gap-1.5 border-b border-gray-100 bg-gray-50 px-3">
+                <div className="h-2.5 w-2.5 rounded-full bg-red-400" />
+                <div className="h-2.5 w-2.5 rounded-full bg-yellow-400" />
+                <div className="h-2.5 w-2.5 rounded-full bg-green-400" />
+                <div className="ml-2 flex-1 rounded-sm bg-white px-2 py-0.5 text-[9px] text-gray-300 text-center">
+                  {previewMode === 'mobile' ? 'Email client — mobile' : 'Email client — desktop'}
+                </div>
+              </div>
+              {compiledHtml ? (
+                <iframe
+                  title="Email HTML Preview"
+                  srcDoc={compiledHtml}
+                  className="w-full border-0 block"
+                  style={{ minHeight: 600, height: 'auto' }}
+                  onLoad={(e) => {
+                    // Auto-size iframe to its content height
+                    const iframe = e.currentTarget
+                    try {
+                      const h = iframe.contentDocument?.documentElement?.scrollHeight
+                      if (h) iframe.style.height = `${h}px`
+                    } catch { /* cross-origin guard */ }
+                  }}
+                />
+              ) : (
+                <div className="flex h-40 items-center justify-center text-[12px] text-gray-400">
+                  Compiling email…
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Scrollable canvas */}
         <div
-          className="flex flex-1 items-start justify-center overflow-auto py-8"
+          className={cn(
+            'flex flex-1 items-start justify-center overflow-auto py-8',
+            showPreview && 'hidden',
+          )}
           onClick={handleCanvasClick}
         >
           <div className="w-full max-w-[680px] px-4">

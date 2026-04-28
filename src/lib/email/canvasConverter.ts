@@ -131,13 +131,39 @@ function convertSpacer(cb: CanvasBlock): EmailSection {
 }
 
 function convertSocial(cb: CanvasBlock): EmailSection {
-  const platforms = ['Facebook', 'Instagram', 'Twitter', 'LinkedIn']
-  const links = platforms
-    .map((p) => `<a href="#" style="color:#2563EB;text-decoration:none;margin:0 6px">${p}</a>`)
-    .join('')
+  // Use inline SVG icons embedded as data-URIs so they work in all email clients
+  // without requiring external image hosting. Each icon is a 32×32 circle with
+  // the platform logo inside, matching the canvas block's visual style.
+  const SOCIAL_ICONS: { name: string; svg: string }[] = [
+    {
+      name: 'Facebook',
+      svg: `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#1877F2"/><path d="M21 16h-3v9h-4v-9h-2v-3h2v-2c0-2.2 1.3-4 4-4h3v3h-2c-.6 0-1 .4-1 1v2h3l-.5 3z" fill="#fff"/></svg>`,
+    },
+    {
+      name: 'Instagram',
+      svg: `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><defs><radialGradient id="ig" cx="30%" cy="107%" r="150%"><stop offset="0%" stop-color="#ffd600"/><stop offset="50%" stop-color="#ff0069"/><stop offset="100%" stop-color="#7638fa"/></radialGradient></defs><circle cx="16" cy="16" r="16" fill="url(#ig)"/><rect x="9" y="9" width="14" height="14" rx="4" fill="none" stroke="#fff" stroke-width="1.5"/><circle cx="16" cy="16" r="3.5" fill="none" stroke="#fff" stroke-width="1.5"/><circle cx="20.5" cy="11.5" r="1" fill="#fff"/></svg>`,
+    },
+    {
+      name: 'Pinterest',
+      svg: `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#E60023"/><path d="M16 6C10.5 6 6 10.5 6 16c0 4.2 2.6 7.8 6.3 9.3-.1-.8-.1-2 .2-2.9l1.3-5.5s-.3-.7-.3-1.7c0-1.6.9-2.8 2.3-2.8 1.1 0 1.6.8 1.6 1.8 0 1.1-.7 2.7-1.1 4.2-.3 1.2.6 2.2 1.8 2.2 2.2 0 3.7-2.8 3.7-6.2 0-2.6-1.8-4.5-4.4-4.5-3 0-4.8 2.3-4.8 4.6 0 .9.4 1.9.8 2.4.1.1.1.2.1.3l-.3 1.3c-.1.3-.3.4-.6.3-1.7-.8-2.7-3.2-2.7-5.2 0-4.2 3-8 8.7-8 4.6 0 8.1 3.3 8.1 7.6 0 4.6-2.9 8.2-6.8 8.2-1.4 0-2.6-.7-3-1.5l-.8 3c-.3 1.1-1 2.5-1.5 3.3.8.3 1.6.4 2.5.4 5.5 0 10-4.5 10-10S21.5 6 16 6z" fill="#fff"/></svg>`,
+    },
+    {
+      name: 'X',
+      svg: `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#000"/><path d="M18.2 14.8L23.5 9h-1.3l-4.5 5.2L14 9H9.5l5.6 8.1-5.6 6.4H11l4.8-5.5L19.7 23H24l-5.8-8.2zm-1.7 2l-.6-.8-4.6-6.6h2l3.7 5.3.6.8 4.8 6.8h-2l-3.9-5.5z" fill="#fff"/></svg>`,
+    },
+  ]
+
+  const iconCells = SOCIAL_ICONS.map(({ name, svg }) => {
+    const dataUri = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
+    return `<td align="center" style="padding:0 6px">` +
+      `<a href="#" style="text-decoration:none;display:inline-block" title="${name}">` +
+      `<img src="${dataUri}" width="32" height="32" alt="${name}" style="display:block;border:none;width:32px;height:32px">` +
+      `</a></td>`
+  }).join('')
+
   const block = makeTextBlock({
-    content: `<p style="margin:0;text-align:center">${links}</p>`,
-    styles: textStyles(cb, { textAlign: 'center', fontSize: 13 }),
+    content: `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 auto"><tbody><tr>${iconCells}</tr></tbody></table>`,
+    styles: textStyles(cb, { textAlign: 'center', fontSize: 0 }),
   })
   return makeSection('full', [[block]], { styles: sectionStyles(cb) })
 }
@@ -231,14 +257,18 @@ function convertImageLeftTextRight(cb: CanvasBlock): EmailSection {
   const imgSrc = cb.imageSrcs?.['main'] ?? ''
   const imgBlock = makeImageBlock(imgSrc, 'Feature image')
   imgBlock.styles = imageStyles()
+  const tagline = makeTextBlock({
+    content: '<p style="margin:0;font-style:italic;color:#9CA3AF">From The &lsquo;Gram</p>',
+    styles: textStyles(cb, { fontSize: 13, color: '#9CA3AF', textAlign: 'center' }),
+  })
   const heading = makeTextBlock({
-    content: '<p style="margin:0;font-size:22px;font-weight:700;letter-spacing:0.06em">The Post That Got Everyone Talking</p>',
-    styles: textStyles(cb, { fontSize: 22, fontWeight: 'bold' }),
+    content: '<p style="margin:0;font-size:24px;font-weight:700;text-align:center">The Post That Got Everyone Talking</p>',
+    styles: textStyles(cb, { fontSize: 24, fontWeight: 'bold', textAlign: 'center' }),
   })
   const divider = makeDividerBlock()
   const btn = makeButtonBlock('SEE IT', '#')
-  btn.styles = buttonStyles(cb)
-  return makeSection('image-left', [[imgBlock], [heading, divider, btn]], { styles: sectionStyles(cb) })
+  btn.styles = buttonStyles(cb, { align: 'center' })
+  return makeSection('image-left', [[imgBlock], [tagline, heading, divider, btn]], { styles: sectionStyles(cb) })
 }
 
 function convertCenteredContent(cb: CanvasBlock): EmailSection {
