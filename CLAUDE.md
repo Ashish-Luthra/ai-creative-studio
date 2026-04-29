@@ -411,6 +411,24 @@ CREATE TABLE clusters (
 
 ---
 
+### Session — 2026-04-30
+
+#### Completed
+- **All prebuilt block text edits now export correctly**
+  - Added `t(cb, key, defaultText)` helper in `canvasConverter.ts` — reads `cb.texts?.[key]` with fallback to hardcoded default
+  - Updated every converter to use `t()`: `convertText`, `convertButton`, `convertAddress`, `convertFooter`, `convertContent` (image-text / 2col-text / 3col-text), `convertImageLeftTextRight`, `convertTextOverImage`, `convertTextLeftImageRight`, `convertRecipeCard`, `convertImageTopTextBottom`, `convertTestimonial`
+  - `centered-content` remains deferred — text is embedded in a single inline HTML string; requires structural split into per-field `makeTextBlock` calls
+- **Claude Code auto-approval rules added to CLAUDE.md** (Section 12)
+  - Auto-approve: file edits, shell/npm commands, package installs, safe git operations
+  - Require confirmation: `git reset --hard`, `git clean`, force-push to main, interactive rebase, amend on published commits, history rewrite tools, destructive DB migrations, `.env` overwrites
+
+#### Open Items / Next Steps
+- Split `centered-content` converter into per-field `makeTextBlock`s (heading, body, label, number) — unlocks both text-edit export and per-field font/case overrides
+- Test case toggles (`aa/aA/AA`) end-to-end: live preview + exported HTML `text-transform` inline style
+- Verify cursor fix works across all blocks (only `text-over-image` confirmed by user so far)
+
+---
+
 ## 10. How to Work with This Project (Claude Code Instructions)
 
 1. Always read this file at session start.
