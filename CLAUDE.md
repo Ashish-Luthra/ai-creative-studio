@@ -389,6 +389,28 @@ CREATE TABLE clusters (
 
 ---
 
+### Session — 2026-04-29 (continued 2)
+
+#### Completed
+- **Text case controls in FontTab (`aa / aA / AA`)**
+  - Added `fontCase?: 'none' | 'lowercase' | 'uppercase'` to `CanvasBlock` block-level font fields and per-field `textStyles` shape (`src/types/canvas.ts`)
+  - Added `textTransform?: 'none' | 'lowercase' | 'uppercase'` to `TextStyles` in `src/types/email.ts`
+  - `canvasConverter.ts`: `textStyles()` derives `textTransform` from `cb.fontCase`; `fieldTextStyles()` merges per-field `fontCase → textTransform` override
+  - `compiler.tsx`: `textTransform` applied as inline style on `<td>` (only when set and not `'none'`)
+  - `EmailEditorPanel.tsx`: `fontCase` destructured and wired into `fontStyle` (block-level) and `resolveFieldStyle` (per-field) for live editor preview; prop passed into `BlockContent`
+  - `EmailRightNav.tsx` FontTab: added `currentCase` resolved value, `handleCase` handler, and three toggle buttons (`aA` default / `aa` lowercase / `AA` uppercase) — placed between Style and Alignment sections; respects per-field mode when a text field is focused
+
+#### Architectural Decisions
+- `aA` = `'none'` (no transform, preserves original case) is the default
+- `fontCase` on `CanvasBlock` mirrors the same pattern as `fontBold`, `fontItalic`, etc. — block-level default, overridable per field via `textStyles[key].fontCase`
+- `textTransform: none` is never emitted as an inline style in exported HTML (only lowercase/uppercase are)
+
+#### Next Steps
+- Test case toggles in browser: verify live preview and exported HTML both reflect the transform
+- Split `centered-content` converter into separate `makeTextBlock`s per field so per-field font overrides (including case) export correctly
+
+---
+
 ## 10. How to Work with This Project (Claude Code Instructions)
 
 1. Always read this file at session start.
