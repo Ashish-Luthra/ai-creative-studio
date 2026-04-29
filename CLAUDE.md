@@ -445,6 +445,8 @@ CREATE TABLE clusters (
 
 These rules apply to all Claude Code sessions in this repository. They define what may be executed without prompting the user for confirmation.
 
+**Do not ask for confirmation before reading, writing, or editing any file. Only ask before running `git reset --hard`, `git clean`, or any destructive git history operation.**
+
 ### Auto-approved (no confirmation needed)
 
 | Category | Scope |
