@@ -342,6 +342,35 @@ CREATE TABLE clusters (
 
 ---
 
+## 11. Session Log
+
+### Session — 2026-04-29
+
+#### Completed
+- **Per-field text editing for all email blocks**
+  - Added `texts?: Record<string, string>` and `textStyles?: Record<string, TextStyle>` to `CanvasBlock` type (`src/types/canvas.ts`)
+  - Replaced shared `editable` spread in `BlockContent` with `editableField(key, defaultText, extraStyle)` and `buttonField(key, defaultText, extraStyle)` helpers — text is persisted via `onBlur`, no cursor resets during typing
+  - All blocks now store text per named key: `heading`, `body`, `tagline`, `button`, `label`, `description`, `quote`, `name`, `address`, `copyright`, `col1-heading`, `col1-body`, `col2-heading`, `col2-body`, `col3-heading`, `col3-body`, etc.
+  - Blocks updated: `text`, `button`, `address`, `footer`, `2col-text`, `3col-text`, `image-text`, `image-left-text-right`, `centered-content`, `text-over-image`, `text-left-image-right`, `recipe-card`, `image-top-text-bottom`, `testimonial`
+- **Per-field font styling in Right Nav**
+  - `FontTab` in `EmailRightNav` now shows a blue "Editing: [field]" chip with a Reset button when a text field is focused
+  - All font controls (family, size, colour, bold/italic/underline, alignment, line height, letter spacing) read/write the focused field's `textStyles[key]` override; fall back to block-level defaults when no field is active
+  - Added `activeTextKey` state in `EmailEditorPanel`, wired via `onTextFocus` callback from `BlockContent`
+- **Cleanup**
+  - Removed dead `textToolbarPosition` state and unused `FloatingTextToolbar` import from `EmailEditorPanel`
+
+#### Architectural Decisions
+- Text content stored as HTML strings in `block.texts[key]` (via `innerHTML`) to preserve inline formatting (bold, italic, etc.) applied by `execCommand`
+- Per-field font overrides in `block.textStyles[key]` override block-level font properties at render time; block-level props remain as the "default" for all fields
+- `dangerouslySetInnerHTML` + `onBlur` pattern used for contentEditable to avoid cursor resets on re-render
+
+#### Next Steps
+- Wire `textStyles` overrides through to the email HTML compiler (`canvasConverter.ts` / `compiler.tsx`) so per-field fonts export correctly
+- Floating toolbar (canvas mode `FloatToolbar`) still renders — remove it and confirm AI Assistant replaces it in canvas mode
+- Floating toolbar should appear only in Right Nav for email mode (already done via `TextEditPanel` and `FontTab`)
+
+---
+
 ## 10. How to Work with This Project (Claude Code Instructions)
 
 1. Always read this file at session start.
