@@ -58,4 +58,18 @@ export interface CanvasBlock {
   linkType?: 'url' | 'file' | 'checkout'
   linkUrl?: string
   linkAction?: string
+  // Per-field text content — keyed by a field name (e.g. 'heading', 'tagline', 'body')
+  texts?: Record<string, string>
+  // Per-field font overrides — same keys as texts
+  textStyles?: Record<string, {
+    fontFamily?: string
+    fontSize?: number
+    fontBold?: boolean
+    fontItalic?: boolean
+    fontUnderline?: boolean
+    fontColor?: string
+    textAlign?: 'left' | 'center' | 'right'
+    lineHeight?: number
+    letterSpacing?: number
+  }>
 }

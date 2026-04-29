@@ -16,7 +16,6 @@ import { cn } from '@/lib/utils'
 import { useEmailStore } from '@/lib/email/emailStore'
 import { BlockLibrary } from './BlockLibrary'
 import { FloatingActionBar } from './FloatingActionBar'
-import { FloatingTextToolbar } from './FloatingTextToolbar'
 import { TextEditPanel } from './TextEditPanel'
 import { ApprovedImagesPanel } from '@/components/canvas/ApprovedImagesPanel'
 import { AllyvateAssistant, type AllyContext } from '@/components/ai/AllyvateAssistant'
@@ -797,6 +796,10 @@ function BlockContent({
   isDraggingButton,
   onDropButton,
   onContentButtonRemove,
+  texts,
+  textStyles,
+  onTextChange,
+  onTextFocus,
 }: {
   type: string
   backgroundColor?: string
@@ -842,6 +845,10 @@ function BlockContent({
   isDraggingButton?: boolean
   onDropButton?: (pos: 'below-text' | 'on-image') => void
   onContentButtonRemove?: () => void
+  texts?: Record<string, string>
+  textStyles?: CanvasBlock['textStyles']
+  onTextChange?: (key: string, html: string) => void
+  onTextFocus?: (key: string) => void
 }) {
   // ── Button style derivation ──────────────────────────────────────────────────
   const BTN_SHAPES = [
@@ -892,21 +899,60 @@ function BlockContent({
   }
   const imgClip = imageShape ? (IMAGE_CLIP[imageShape] ?? {}) : {}
 
-  const editable = {
-    contentEditable: true as const,
-    suppressContentEditableWarning: true,
-    onClick: onTextClick,
-    className:
-      'outline-none cursor-text border-2 border-transparent hover:border-blue-200 rounded px-1 transition-colors',
+  const EDITABLE_CLASS = 'outline-none cursor-text border-2 border-transparent hover:border-blue-200 rounded px-1 transition-colors'
+
+  // Merge block-level fontStyle + spec overrides + per-field textStyles override
+  function resolveFieldStyle(key: string, extraStyle: React.CSSProperties = {}): React.CSSProperties {
+    const ts = textStyles?.[key]
+    const override: React.CSSProperties = {}
+    if (ts) {
+      if (ts.fontFamily  !== undefined) override.fontFamily    = ts.fontFamily
+      if (ts.fontSize    !== undefined) override.fontSize      = ts.fontSize
+      if (ts.fontBold    !== undefined) override.fontWeight    = ts.fontBold    ? 'bold'      : 'normal'
+      if (ts.fontItalic  !== undefined) override.fontStyle     = ts.fontItalic  ? 'italic'    : 'normal'
+      if (ts.fontUnderline !== undefined) override.textDecoration = ts.fontUnderline ? 'underline' : 'none'
+      if (ts.fontColor   !== undefined) override.color         = ts.fontColor
+      if (ts.textAlign   !== undefined) override.textAlign     = ts.textAlign
+      if (ts.lineHeight  !== undefined) override.lineHeight    = ts.lineHeight
+      if (ts.letterSpacing !== undefined) override.letterSpacing = `${ts.letterSpacing}px`
+    }
+    return { ...fontStyle, ...extraStyle, ...override }
   }
 
-  // Used for the CTA button element inside layout blocks — same contentEditable
-  // behaviour but routes to the Button tab instead of the Font tab in the right nav.
+  // Returns all props for an editable text field (heading, body, tagline, etc.)
+  function editableField(key: string, defaultText: string, extraStyle: React.CSSProperties = {}) {
+    return {
+      contentEditable: true as const,
+      suppressContentEditableWarning: true,
+      onClick: onTextClick,
+      onFocus: () => onTextFocus?.(key),
+      onBlur: (e: React.FocusEvent<HTMLElement>) => onTextChange?.(key, e.currentTarget.innerHTML),
+      className: EDITABLE_CLASS,
+      dangerouslySetInnerHTML: { __html: texts?.[key] ?? defaultText },
+      style: resolveFieldStyle(key, extraStyle),
+    }
+  }
+
+  // Returns all props for an editable button label field
+  function buttonField(key: string, defaultText: string, extraStyle: React.CSSProperties = {}) {
+    return {
+      contentEditable: true as const,
+      suppressContentEditableWarning: true,
+      onClick: onButtonAreaClick ?? onTextClick,
+      onFocus: () => { onTextFocus?.(key) },
+      onBlur: (e: React.FocusEvent<HTMLElement>) => onTextChange?.(key, e.currentTarget.innerHTML),
+      className: EDITABLE_CLASS,
+      dangerouslySetInnerHTML: { __html: texts?.[key] ?? defaultText },
+      style: { ...btnStyle, ...extraStyle },
+    }
+  }
+
+  // Legacy spread for elements that still use children (e.g. embedded content buttons with a remove icon inside)
   const buttonEditable = {
     contentEditable: true as const,
     suppressContentEditableWarning: true,
     onClick: onButtonAreaClick ?? onTextClick,
-    className: editable.className,
+    className: EDITABLE_CLASS,
   }
 
   // Inline bg style — overrides Tailwind bg-* classes on the outermost element
@@ -1114,20 +1160,12 @@ function BlockContent({
             style={contentHeight ? { minHeight: contentHeight } : undefined}
           >
             <div className="flex flex-col gap-2 px-8">
-              <h4 {...editable} className={`${editable.className} text-sm font-semibold`} style={fontStyle}>
-                Column One Heading
-              </h4>
-              <p {...editable} className={`${editable.className} text-sm leading-relaxed text-gray-600`} style={fontStyle}>
-                Add your text here. Click to edit this column and tell your story.
-              </p>
+              <h4 {...editableField('col1-heading', 'Column One Heading', { fontSize: '14px', fontWeight: 600 })} />
+              <p {...editableField('col1-body', 'Add your text here. Click to edit this column and tell your story.', { fontSize: '14px', lineHeight: 1.6, color: '#4B5563' })} />
             </div>
             <div className="flex flex-col gap-2 px-8">
-              <h4 {...editable} className={`${editable.className} text-sm font-semibold`} style={fontStyle}>
-                Column Two Heading
-              </h4>
-              <p {...editable} className={`${editable.className} text-sm leading-relaxed text-gray-600`} style={fontStyle}>
-                Add your text here. Click to edit this column and share more details.
-              </p>
+              <h4 {...editableField('col2-heading', 'Column Two Heading', { fontSize: '14px', fontWeight: 600 })} />
+              <p {...editableField('col2-body', 'Add your text here. Click to edit this column and share more details.', { fontSize: '14px', lineHeight: 1.6, color: '#4B5563' })} />
             </div>
           </div>
           {contentButton?.position === 'below-text' ? embeddedBtn : dropZoneBelow}
@@ -1150,14 +1188,10 @@ function BlockContent({
             className="grid grid-cols-3 divide-x divide-gray-100 px-2 py-8"
             style={contentHeight ? { minHeight: contentHeight } : undefined}
           >
-            {(['One', 'Two', 'Three'] as const).map((col) => (
-              <div key={col} className="flex flex-col gap-2 px-6">
-                <h4 {...editable} className={`${editable.className} text-sm font-semibold`} style={fontStyle}>
-                  Column {col}
-                </h4>
-                <p {...editable} className={`${editable.className} text-xs leading-relaxed text-gray-600`} style={fontStyle}>
-                  Click to edit this column.
-                </p>
+            {([1, 2, 3] as const).map((n) => (
+              <div key={n} className="flex flex-col gap-2 px-6">
+                <h4 {...editableField(`col${n}-heading`, `Column ${['One','Two','Three'][n-1]}`, { fontSize: '14px', fontWeight: 600 })} />
+                <p {...editableField(`col${n}-body`, 'Click to edit this column.', { fontSize: '12px', lineHeight: 1.6, color: '#4B5563' })} />
               </div>
             ))}
           </div>
@@ -1323,12 +1357,8 @@ function BlockContent({
               onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy' }}
               onDrop={(e) => { e.preventDefault(); e.stopPropagation(); onDropButton?.('below-text') }}
             >
-              <h4 {...editable} className={`${editable.className} font-semibold text-sm`} style={fontStyle}>
-                Content Heading
-              </h4>
-              <p {...editable} className={`${editable.className} text-sm leading-relaxed text-gray-600`} style={fontStyle}>
-                Click to edit this text. Tell your story alongside the image.
-              </p>
+              <h4 {...editableField('heading', 'Content Heading', { fontSize: '14px', fontWeight: 600 })} />
+              <p {...editableField('body', 'Click to edit this text. Tell your story alongside the image.', { fontSize: '14px', lineHeight: 1.6, color: '#4B5563' })} />
               {isDraggingButton && !contentButton && (
                 <div className="rounded-xl border-2 border-dashed border-blue-400 bg-blue-50 py-2 text-center text-[10px] font-medium text-blue-500">
                   Drop button below text
@@ -1352,13 +1382,7 @@ function BlockContent({
   if (type === 'text') {
     return (
       <div className="bg-white px-12 py-8" style={bg}>
-        <p
-          {...editable}
-          className={`${editable.className} text-sm leading-relaxed text-gray-700`}
-          style={fontStyle}
-        >
-          Your text content here. Click to edit this paragraph and add your own copy.
-        </p>
+        <p {...editableField('body', 'Your text content here. Click to edit this paragraph and add your own copy.', { fontSize: '14px', lineHeight: 1.6, color: '#374151' })} />
       </div>
     )
   }
@@ -1366,13 +1390,7 @@ function BlockContent({
   if (type === 'button') {
     return (
       <div className="bg-white py-8" style={{ ...bg, display: 'flex', alignItems: 'center', justifyContent: btnJustify, paddingLeft: 48, paddingRight: 48 }}>
-        <div
-          {...editable}
-          className={`${editable.className} px-10 py-3 text-sm font-semibold tracking-widest`}
-          style={btnStyle}
-        >
-          CLICK HERE
-        </div>
+        <div {...buttonField('label', 'CLICK HERE', { padding: '12px 40px', fontSize: '14px', fontWeight: 600, letterSpacing: '0.1em' })} />
       </div>
     )
   }
@@ -1437,12 +1455,7 @@ function BlockContent({
   if (type === 'address') {
     return (
       <div className="bg-white px-12 py-4 text-center" style={bg}>
-        <p
-          {...editable}
-          className={`${editable.className} text-[11px] leading-relaxed text-gray-500`}
-        >
-          123 Main Street, Suite 100 · City, State 12345 · United States
-        </p>
+        <p {...editableField('address', '123 Main Street, Suite 100 · City, State 12345 · United States', { fontSize: '11px', lineHeight: 1.6, color: '#6B7280' })} />
       </div>
     )
   }
@@ -1471,12 +1484,7 @@ function BlockContent({
             </React.Fragment>
           ))}
         </div>
-        <p
-          {...editable}
-          className={`${editable.className} text-[10px] text-gray-400`}
-        >
-          © {new Date().getFullYear()} Your Company Name. All rights reserved.
-        </p>
+        <p {...editableField('copyright', `© ${new Date().getFullYear()} Your Company Name. All rights reserved.`, { fontSize: '10px', color: '#9CA3AF' })} />
       </div>
     )
   }
@@ -1513,21 +1521,11 @@ function BlockContent({
         />
         <div className="flex flex-col items-center justify-center gap-4"
           style={{ width: `${S.textColPct}%`, padding: S.textPaddingH }}>
-          <p {...editable}
-            style={{ ...fontStyle, fontSize: S.taglineFontSize, color: S.taglineColor, fontStyle: 'italic', textAlign: 'center' }}
-            className={editable.className}>
-            From The &apos;Gram
-          </p>
-          <h2 {...editable}
-            style={{ ...fontStyle, fontSize: S.headingFontSize, fontWeight: S.headingWeight, textAlign: 'center' }}
-            className={editable.className}>
-            The Post That Got Everyone Talking
-          </h2>
+          <p {...editableField('tagline', "From The 'Gram", { fontSize: S.taglineFontSize, color: S.taglineColor, fontStyle: 'italic', textAlign: 'center' })} />
+          <h2 {...editableField('heading', 'The Post That Got Everyone Talking', { fontSize: S.headingFontSize, fontWeight: S.headingWeight, textAlign: 'center' })} />
           <div style={{ height: 1, width: 64, backgroundColor: S.dividerColor }} />
           <div style={{ display: 'flex', justifyContent: btnJustify }}>
-            <div {...buttonEditable} style={btnStyle} className={`${buttonEditable.className} px-6 py-2 text-xs font-semibold tracking-widest`}>
-              {S.buttonLabel}
-            </div>
+            <div {...buttonField('button', S.buttonLabel, { padding: '8px 24px', fontSize: '12px', fontWeight: 600, letterSpacing: '0.1em' })} />
           </div>
         </div>
       </div>
@@ -1539,26 +1537,12 @@ function BlockContent({
     return (
       <div className="text-center" style={{ backgroundColor: bg.backgroundColor ?? S.outerBg, padding: S.outerPadding.top }}>
         <div className="inline-block rounded shadow-sm" style={{ backgroundColor: S.cardBg, borderRadius: S.cardBorderRadius, padding: S.cardPadding }}>
-          <div {...editable}
-            style={{ ...fontStyle, fontSize: S.numberFontSize, color: S.numberColor, lineHeight: S.numberLineHeight }}
-            className={editable.className}>
-            6
-          </div>
-          <h3 {...editable}
-            style={{ ...fontStyle, fontSize: S.headingFontSize, fontWeight: S.headingWeight, marginTop: 8 }}
-            className={editable.className}>
-            Tips to Photograph Food
-          </h3>
-          <p {...editable}
-            style={{ ...fontStyle, fontSize: S.bodyFontSize, color: S.bodyColor, maxWidth: S.bodyMaxWidthPx, margin: '12px auto 0', lineHeight: S.bodyLineHeight }}
-            className={editable.className}>
-            I remember my first try at food photography. I created this guide to help you get started without making all the mistakes I did.
-          </p>
+          <div {...editableField('number', '6', { fontSize: S.numberFontSize, color: S.numberColor, lineHeight: S.numberLineHeight })} />
+          <h3 {...editableField('heading', 'Tips to Photograph Food', { fontSize: S.headingFontSize, fontWeight: S.headingWeight, marginTop: 8 })} />
+          <p {...editableField('body', 'I remember my first try at food photography. I created this guide to help you get started without making all the mistakes I did.', { fontSize: S.bodyFontSize, color: S.bodyColor, maxWidth: S.bodyMaxWidthPx, margin: '12px auto 0', lineHeight: S.bodyLineHeight })} />
           <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', justifyContent: btnJustify, gap: 12 }}>
             <span style={{ fontSize: S.labelFontSize, color: S.labelColor }}>001</span>
-            <div {...buttonEditable} style={btnStyle} className={`${buttonEditable.className} px-6 py-2 text-xs font-semibold tracking-widest`}>
-              {S.buttonLabel}
-            </div>
+            <div {...buttonField('button', S.buttonLabel, { padding: '8px 24px', fontSize: '12px', fontWeight: 600, letterSpacing: '0.1em' })} />
           </div>
         </div>
       </div>
@@ -1571,18 +1555,10 @@ function BlockContent({
       <div style={{ backgroundColor: bg.backgroundColor ?? S.bgColor }}>
         <div className="text-center" style={{ padding: S.sectionPadding.top }}>
           <div style={{ margin: '0 auto 16px', height: 1, width: 64, backgroundColor: S.dividerColor }} />
-          <h3 {...editable}
-            style={{ ...fontStyle, fontSize: S.headingFontSize, fontWeight: S.headingWeight, letterSpacing: S.headingTracking, textTransform: 'uppercase', textAlign: 'center' }}
-            className={editable.className}>
-            A Little Gift of Thanks for Joining the List.
-          </h3>
+          <h3 {...editableField('heading', 'A Little Gift of Thanks for Joining the List.', { fontSize: S.headingFontSize, fontWeight: S.headingWeight, letterSpacing: S.headingTracking, textTransform: 'uppercase', textAlign: 'center' })} />
           <div style={{ margin: '16px auto 0', height: 1, width: 64, backgroundColor: S.dividerColor }} />
           <div style={{ marginTop: 24, display: 'flex', justifyContent: btnJustify }}>
-            <div {...buttonEditable}
-              className={`${buttonEditable.className} text-xs font-semibold tracking-widest`}
-              style={{ ...btnStyle, paddingTop: S.buttonPadding.top, paddingBottom: S.buttonPadding.top, paddingLeft: S.buttonPadding.right, paddingRight: S.buttonPadding.right }}>
-              {S.buttonLabel}
-            </div>
+            <div {...buttonField('button', S.buttonLabel, { paddingTop: S.buttonPadding.top, paddingBottom: S.buttonPadding.top, paddingLeft: S.buttonPadding.right, paddingRight: S.buttonPadding.right, fontSize: '12px', fontWeight: 600, letterSpacing: '0.1em' })} />
           </div>
         </div>
         <ResizableImageSlot
@@ -1603,15 +1579,9 @@ function BlockContent({
       <div className="flex min-h-[300px]" style={bg}>
         <div className="flex flex-col items-center justify-center gap-6"
           style={{ width: `${S.textColPct}%`, padding: S.textPaddingH }}>
-          <h3 {...editable}
-            style={{ ...fontStyle, fontSize: S.headingFontSize, fontWeight: S.headingWeight, lineHeight: S.headingLineHeight }}
-            className={editable.className}>
-            WEL—COME
-          </h3>
+          <h3 {...editableField('heading', 'WEL—COME', { fontSize: S.headingFontSize, fontWeight: S.headingWeight, lineHeight: S.headingLineHeight })} />
           <div style={{ display: 'flex', justifyContent: btnJustify }}>
-            <div {...buttonEditable} style={btnStyle} className={`${buttonEditable.className} px-6 py-2 text-xs font-semibold tracking-widest`}>
-              {S.buttonLabel}
-            </div>
+            <div {...buttonField('button', S.buttonLabel, { padding: '8px 24px', fontSize: '12px', fontWeight: 600, letterSpacing: '0.1em' })} />
           </div>
         </div>
         <ResizableImageSlot
@@ -1641,23 +1611,11 @@ function BlockContent({
           onImageClick={onImageClick}
         />
         <div className="flex flex-col justify-center gap-3 px-4" style={{ width: `${S.textColPct}%` }}>
-          <p {...editable}
-            style={{ ...fontStyle, fontSize: S.labelFontSize, color: S.labelColor, fontStyle: 'italic' }}
-            className={editable.className}>One</p>
-          <h3 {...editable}
-            style={{ ...fontStyle, fontSize: S.headingFontSize, fontWeight: S.headingWeight }}
-            className={editable.className}>
-            Click here for my creamy butternut squash soup
-          </h3>
-          <p {...editable}
-            style={{ ...fontStyle, fontSize: S.descFontSize, color: S.descColor, fontStyle: 'italic' }}
-            className={editable.className}>
-            A warming recipe perfect for fall evenings.
-          </p>
+          <p {...editableField('label', 'One', { fontSize: S.labelFontSize, color: S.labelColor, fontStyle: 'italic' })} />
+          <h3 {...editableField('heading', 'Click here for my creamy butternut squash soup', { fontSize: S.headingFontSize, fontWeight: S.headingWeight })} />
+          <p {...editableField('description', 'A warming recipe perfect for fall evenings.', { fontSize: S.descFontSize, color: S.descColor, fontStyle: 'italic' })} />
           <div style={{ display: 'flex', justifyContent: btnJustify }}>
-            <div {...buttonEditable} style={btnStyle} className={`${buttonEditable.className} px-6 py-2 text-xs font-semibold tracking-widest`}>
-              {S.buttonLabel}
-            </div>
+            <div {...buttonField('button', S.buttonLabel, { padding: '8px 24px', fontSize: '12px', fontWeight: 600, letterSpacing: '0.1em' })} />
           </div>
         </div>
       </div>
@@ -1677,22 +1635,10 @@ function BlockContent({
           onImageClick={onImageClick}
         />
         <div className="text-center" style={{ backgroundColor: bg.backgroundColor ?? S.textBg, padding: S.textPadding.top }}>
-          <h3 {...editable}
-            style={{ ...fontStyle, fontSize: S.headingFontSize, fontWeight: S.headingWeight, marginBottom: S.headingBottomMargin }}
-            className={editable.className}>
-            Get 25% off when you book my services
-          </h3>
-          <p {...editable}
-            style={{ ...fontStyle, fontSize: S.bodyFontSize, color: S.bodyColor, fontStyle: 'italic' }}
-            className={editable.className}>
-            for the next 24 hours only.
-          </p>
+          <h3 {...editableField('heading', 'Get 25% off when you book my services', { fontSize: S.headingFontSize, fontWeight: S.headingWeight, marginBottom: S.headingBottomMargin })} />
+          <p {...editableField('body', 'for the next 24 hours only.', { fontSize: S.bodyFontSize, color: S.bodyColor, fontStyle: 'italic' })} />
           <div style={{ marginTop: 24, display: 'flex', justifyContent: btnJustify }}>
-            <div {...buttonEditable}
-              className={`${buttonEditable.className} text-xs font-semibold tracking-widest`}
-              style={{ ...btnStyle, paddingTop: S.buttonPadding.top, paddingBottom: S.buttonPadding.top, paddingLeft: S.buttonPadding.right, paddingRight: S.buttonPadding.right }}>
-              {S.buttonLabel}
-            </div>
+            <div {...buttonField('button', S.buttonLabel, { paddingTop: S.buttonPadding.top, paddingBottom: S.buttonPadding.top, paddingLeft: S.buttonPadding.right, paddingRight: S.buttonPadding.right, fontSize: '12px', fontWeight: 600, letterSpacing: '0.1em' })} />
           </div>
         </div>
       </div>
@@ -1714,16 +1660,8 @@ function BlockContent({
           onImageClick={onImageClick}
         />
         <div className="flex flex-1 flex-col justify-center gap-3">
-          <h4 {...editable}
-            style={{ ...fontStyle, fontSize: S.nameFontSize, fontWeight: S.nameWeight, letterSpacing: S.nameTracking, textTransform: 'uppercase' }}
-            className={editable.className}>
-            TESTIMONIAL NAME
-          </h4>
-          <p {...editable}
-            style={{ ...fontStyle, fontSize: S.quoteFontSize, color: S.quoteColor, lineHeight: S.quoteLineHeight }}
-            className={editable.className}>
-            Since joining, my email list has grown 4x and I&apos;ve finally found a system that works for my creative business.
-          </p>
+          <h4 {...editableField('name', 'TESTIMONIAL NAME', { fontSize: S.nameFontSize, fontWeight: S.nameWeight, letterSpacing: S.nameTracking, textTransform: 'uppercase' })} />
+          <p {...editableField('quote', "Since joining, my email list has grown 4x and I've finally found a system that works for my creative business.", { fontSize: S.quoteFontSize, color: S.quoteColor, lineHeight: S.quoteLineHeight })} />
           <div style={{ fontSize: S.starFontSize, color: S.starColor }}>{S.starsText}</div>
         </div>
       </div>
@@ -1749,7 +1687,7 @@ export const EmailEditorPanel: React.FC = () => {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [insertState, setInsertState] = useState<InsertState>(null)
   const [showTextEdit, setShowTextEdit] = useState(false)
-  const [textToolbarPosition, setTextToolbarPosition] = useState<{ top: number; left: number } | undefined>()
+  const [activeTextKey, setActiveTextKey] = useState<string | null>(null)
   const [showApprovedImages, setShowApprovedImages] = useState(false)
   const [pendingImageTarget, setPendingImageTarget] = useState<{ blockId: string; imageKey: string } | null>(null)
   // Signals EmailRightNav which tab to activate when a specific element is clicked
@@ -2018,11 +1956,25 @@ export const EmailEditorPanel: React.FC = () => {
   const handleTextClick = useCallback((e: React.MouseEvent) => {
     // Do NOT stopPropagation — let the click bubble up to the block wrapper
     // so the block gets selected and EmailRightNav stays visible.
-    setTextToolbarPosition({ top: e.clientY - 50, left: e.clientX - 60 })
     setShowTextEdit(true)
     setFocusTab((prev) => ({ tab: 'font', seq: (prev?.seq ?? 0) + 1 }))
     showAlly('text', e)
   }, [showAlly])
+
+  const handleTextFocus = useCallback((key: string) => {
+    setActiveTextKey(key)
+    setFocusTab((prev) => ({ tab: 'font', seq: (prev?.seq ?? 0) + 1 }))
+  }, [])
+
+  const handleTextFieldChange = useCallback((blockId: string, key: string, html: string) => {
+    setCanvasBlocks((prev) =>
+      prev.map((b) =>
+        b.id === blockId
+          ? { ...b, texts: { ...(b.texts ?? {}), [key]: html } }
+          : b,
+      ),
+    )
+  }, [])
 
   // Clicking the styled button element inside a layout block → show Button tab
   const handleButtonAreaClick = useCallback(() => {
@@ -2032,7 +1984,7 @@ export const EmailEditorPanel: React.FC = () => {
   const handleCanvasClick = useCallback(() => {
     setSelectedId(null)
     setInsertState(null)
-    setTextToolbarPosition(undefined)
+    setActiveTextKey(null)
     setShowTextEdit(false)
   }, [])
 
@@ -2500,6 +2452,10 @@ export const EmailEditorPanel: React.FC = () => {
                           contentButton: { position: pos, label: 'Click Here' },
                         })}
                         onContentButtonRemove={() => handleBlockPatch(block.id, { contentButton: null })}
+                        texts={block.texts}
+                        textStyles={block.textStyles}
+                        onTextChange={(key, html) => handleTextFieldChange(block.id, key, html)}
+                        onTextFocus={handleTextFocus}
                       />
                     </div>
 
@@ -2588,6 +2544,7 @@ export const EmailEditorPanel: React.FC = () => {
             onImageUpload={handleDirectImageUpload}
             onBack={() => setSelectedId(null)}
             focusTab={focusTab}
+            activeTextKey={activeTextKey ?? undefined}
           />
         ) : (
           <BlockLibrary
