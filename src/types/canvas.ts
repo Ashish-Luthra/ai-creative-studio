@@ -18,6 +18,12 @@ export interface CanvasBlock {
   imageShape?: 'circle' | 'square' | 'rounded' | 'arch' | 'diamond' | 'hexagon'
   // Social links — keyed by platform (e.g. 'instagram', 'facebook')
   socialLinks?: Record<string, string>
+  // Social icons styling
+  socialIconStyle?: 'outline' | 'filled'
+  socialIconColor?: string
+  socialIconSize?: 'S' | 'M' | 'L'
+  socialIconPosition?: 'left' | 'center' | 'right'
+  socialIconSpacing?: number
   // Button
   buttonShapeVariant?: number
   buttonFillColor?: string

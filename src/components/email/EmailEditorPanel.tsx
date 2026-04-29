@@ -1375,8 +1375,26 @@ function BlockContent({
     // Show linked platforms if any, otherwise show default placeholders
     const keysToShow = linkedKeys.length > 0 ? linkedKeys : DEFAULT_SOCIAL_KEYS
 
+    // Icon style and sizing
+    const iconStyle = block.socialIconStyle ?? 'outline'
+    const iconColor = block.socialIconColor ?? '#1F2937'
+    const iconSize = block.socialIconSize ?? 'M'
+    const iconPosition = block.socialIconPosition ?? 'center'
+    const iconSpacing = block.socialIconSpacing ?? 12
+
+    // Size mapping
+    const sizeMap = { S: 32, M: 40, L: 48 }
+    const iconPx = sizeMap[iconSize]
+    const borderWidth = iconStyle === 'filled' ? 0 : 1
+
+    // Position alignment
+    const justifyMap = { left: 'flex-start', center: 'center', right: 'flex-end' }
+
     return (
-      <div className="flex flex-wrap items-center justify-center gap-3 bg-white px-6 py-6" style={bg}>
+      <div
+        className="flex flex-wrap items-center bg-white px-6 py-6"
+        style={{ ...bg, justifyContent: justifyMap[iconPosition], gap: `${iconSpacing}px` }}
+      >
         {keysToShow.map((key) => {
           const platform = SOCIAL_PLATFORMS_CANVAS.find((p) => p.key === key)
           if (!platform) return null
@@ -1386,7 +1404,16 @@ function BlockContent({
               key={key}
               href={url}
               title={platform.title}
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 text-gray-800 shadow-sm transition-all hover:scale-110 hover:bg-gray-100"
+              className="flex items-center justify-center rounded-full transition-all hover:scale-110"
+              style={{
+                width: `${iconPx}px`,
+                height: `${iconPx}px`,
+                borderWidth: `${borderWidth}px`,
+                borderColor: iconColor,
+                borderStyle: 'solid',
+                backgroundColor: iconStyle === 'filled' ? iconColor : 'transparent',
+                color: iconStyle === 'filled' ? '#ffffff' : iconColor,
+              }}
               onClick={(e) => e.preventDefault()}
             >
               {platform.svg}

@@ -530,6 +530,13 @@ function SocialLinksSection({ block, onPatch }: { block: CanvasBlock; onPatch: (
   const socialLinks = block.socialLinks ?? {}
   const linkedPlatforms = SOCIAL_PLATFORMS.filter((p) => socialLinks[p.key])
 
+  // Icon styling
+  const iconStyle = block.socialIconStyle ?? 'outline'
+  const iconColor = block.socialIconColor ?? '#1F2937'
+  const iconSize = block.socialIconSize ?? 'M'
+  const iconPosition = block.socialIconPosition ?? 'center'
+  const iconSpacing = block.socialIconSpacing ?? 12
+
   function openPlatform(key: string) {
     setEditKey(key)
     setUrlInput(socialLinks[key] ?? '')
@@ -582,6 +589,124 @@ function SocialLinksSection({ block, onPatch }: { block: CanvasBlock; onPatch: (
       >
         Manage social links
       </button>
+
+      {/* ─── Icon Styling Controls ─────────────────────────────────────────────── */}
+
+      {/* Style selector — outline or filled */}
+      <div>
+        <SectionLabel>Icon Style</SectionLabel>
+        <div className="flex gap-2">
+          {[
+            { id: 'outline', label: 'Outline' },
+            { id: 'filled', label: 'Filled' },
+          ].map(({ id, label }) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => onPatch({ socialIconStyle: id as 'outline' | 'filled' })}
+              className={cn(
+                'flex-1 rounded-xl border py-2 text-[11px] font-medium transition-colors',
+                iconStyle === id
+                  ? 'border-blue-400 bg-blue-50 text-blue-600'
+                  : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300',
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Color picker */}
+      <ColorSwatch
+        label="Icon Color"
+        value={iconColor}
+        onChange={(v) => onPatch({ socialIconColor: v })}
+      />
+
+      {/* Size selector — S, M, L */}
+      <div>
+        <SectionLabel>Size</SectionLabel>
+        <div className="flex gap-2">
+          {[
+            { id: 'S', label: 'S', hint: '32px' },
+            { id: 'M', label: 'M', hint: '40px' },
+            { id: 'L', label: 'L', hint: '48px' },
+          ].map(({ id, label, hint }) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => onPatch({ socialIconSize: id as 'S' | 'M' | 'L' })}
+              title={hint}
+              className={cn(
+                'flex-1 rounded-xl border py-2 text-[11px] font-medium transition-colors',
+                iconSize === id
+                  ? 'border-blue-400 bg-blue-50 text-blue-600'
+                  : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300',
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Position selector — left, center, right */}
+      <div>
+        <SectionLabel>Position</SectionLabel>
+        <div className="flex gap-2">
+          {(['left', 'center', 'right'] as const).map((align) => (
+            <button
+              key={align}
+              type="button"
+              onClick={() => onPatch({ socialIconPosition: align })}
+              className={cn(
+                'flex h-10 flex-1 items-center justify-center rounded-xl border transition-colors',
+                iconPosition === align
+                  ? 'border-blue-400 bg-blue-50'
+                  : 'border-gray-200 hover:border-gray-300',
+              )}
+            >
+              <PositionIcon align={align} active={iconPosition === align} />
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Spacing slider */}
+      <div>
+        <div className="mb-2 flex items-center justify-between">
+          <SectionLabel>Spacing</SectionLabel>
+          <span className="text-[11px] text-gray-500">{iconSpacing}px</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => onPatch({ socialIconSpacing: Math.max(4, iconSpacing - 2) })}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
+            title="Decrease spacing"
+          >
+            −
+          </button>
+          <input
+            type="range"
+            min={4}
+            max={32}
+            step={2}
+            value={iconSpacing}
+            onChange={(e) => onPatch({ socialIconSpacing: Number(e.target.value) })}
+            className="flex-1 accent-gray-800"
+          />
+          <button
+            type="button"
+            onClick={() => onPatch({ socialIconSpacing: Math.min(32, iconSpacing + 2) })}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
+            title="Increase spacing"
+          >
+            +
+          </button>
+        </div>
+      </div>
 
       {/* ── Modal: Platform grid ── */}
       {showModal && (
