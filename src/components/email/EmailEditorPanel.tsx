@@ -868,15 +868,17 @@ function BlockContent({
   const btnShape  = BTN_SHAPES[buttonShapeVariant ?? 0]
   const btnFill   = buttonFillColor   ?? '#1F2937'
   const btnBorder = buttonBorderColor ?? '#1F2937'
-  const btnStyle: React.CSSProperties = {
+  // Visual (shape/color) styles — always applied to button wrapper
+  const btnVisualStyle: React.CSSProperties = {
     borderRadius:    btnShape.radius,
     backgroundColor: btnShape.filled ? btnFill : 'transparent',
     border:          `${buttonBorderWidth ?? 1}px solid ${btnBorder}`,
     color:           btnShape.filled ? '#FFFFFF' : btnFill,
-    fontFamily:      buttonFontFamily ?? fontFamily ?? undefined,
     width:           buttonWidth  ? `${buttonWidth}px`  : undefined,
     height:          buttonHeight ? `${buttonHeight}px` : undefined,
   }
+  // Keep btnStyle for backward-compat with embeddedBtn
+  const btnStyle = btnVisualStyle
   const btnJustify = { left: 'flex-start', center: 'center', right: 'flex-end' }[buttonPosition ?? 'center']
 
   // ── Font style derivation ────────────────────────────────────────────────────
@@ -957,6 +959,9 @@ function BlockContent({
 
   // Returns all props for an editable button label field
   function buttonField(key: string, defaultText: string, extraStyle: React.CSSProperties = {}) {
+    // Resolve font properties for this button field (family, size, weight, case, etc.)
+    // but exclude color — button text color is determined by fill/outline mode, not fontColor.
+    const { color: _ignored, ...btnFontStyle } = resolveFieldStyle(key, extraStyle)
     return {
       contentEditable: true as const,
       suppressContentEditableWarning: true,
@@ -965,7 +970,8 @@ function BlockContent({
       onBlur: (e: React.FocusEvent<HTMLElement>) => onTextChange?.(key, e.currentTarget.innerHTML),
       className: EDITABLE_CLASS,
       dangerouslySetInnerHTML: { __html: texts?.[key] ?? defaultText },
-      style: { ...btnStyle, ...resolveFieldStyle(key, extraStyle) },
+      // Visual styles first (shape, bg, border, text-color), font styles on top (no color override)
+      style: { ...btnVisualStyle, ...btnFontStyle },
     }
   }
 
