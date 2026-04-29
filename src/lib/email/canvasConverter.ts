@@ -112,9 +112,11 @@ function narrowLine(color = '#9CA3AF'): string {
 
 function convertLogo(cb: CanvasBlock): EmailSection {
   const src = firstImageSrc(cb) || (cb.imageSrcs?.['logo'] ?? '')
-  const logo = makeLogoBlock({ src, alt: 'Logo', isGlobal: !src })
+  // width:200 matches canvas max-w-[200px]; section padding 8px top/bottom + BlockLogo's
+  // own 16px td padding = 24px total, matching canvas py-6
+  const logo = makeLogoBlock({ src, alt: 'Logo', width: 200, isGlobal: !src })
   return makeSection('full', [[logo]], {
-    styles: sectionStyles(cb, { top: 16, right: 24, bottom: 16, left: 24 }),
+    styles: sectionStyles(cb, { top: 8, right: 24, bottom: 8, left: 24 }),
   })
 }
 
@@ -329,20 +331,21 @@ function convertImageLeftTextRight(cb: CanvasBlock): EmailSection {
   const imgBlock = makeImageBlock(imgSrc, 'Feature image')
   imgBlock.styles = imageStyles()
 
+  const hPad = { top: 0, right: S.textPaddingH, bottom: 0, left: S.textPaddingH }
   const tagline = makeTextBlock({
     content: `<p style="margin:0;font-style:italic;color:${S.taglineColor};text-align:center">From The &apos;Gram</p>`,
-    styles: textStyles(cb, { fontSize: S.taglineFontSize, color: S.taglineColor, textAlign: 'center' }),
+    styles: textStyles(cb, { fontSize: S.taglineFontSize, color: S.taglineColor, textAlign: 'center', padding: hPad }),
   })
   const heading = makeTextBlock({
     content: `<p style="margin:0;font-size:${S.headingFontSize}px;font-weight:${S.headingWeight};text-align:center">The Post That Got Everyone Talking</p>`,
-    styles: textStyles(cb, { fontSize: S.headingFontSize, fontWeight: S.headingWeight, textAlign: 'center' }),
+    styles: textStyles(cb, { fontSize: S.headingFontSize, fontWeight: S.headingWeight, textAlign: 'center', padding: hPad }),
   })
   const dividerBlock = makeTextBlock({
     content: narrowLine(S.dividerColor),
     styles: textStyles(cb, { textAlign: 'center', fontSize: 1 }),
   })
   const btn = makeButtonBlock(S.buttonLabel, '#')
-  btn.styles = buttonStyles(cb, { align: S.buttonAlign })
+  btn.styles = buttonStyles(cb, { align: S.buttonAlign, padding: { top: 8, right: 24, bottom: 8, left: 24 } })
 
   return {
     id: nanoid(),
@@ -381,7 +384,7 @@ function convertCenteredContent(cb: CanvasBlock): EmailSection {
     styles: textStyles(cb, { textAlign: 'center', fontSize: S.bodyFontSize }),
   })
   const btn = makeButtonBlock(S.buttonLabel, '#')
-  btn.styles = buttonStyles(cb, { align: S.buttonAlign })
+  btn.styles = buttonStyles(cb, { align: S.buttonAlign, padding: { top: 8, right: 24, bottom: 8, left: 24 } })
 
   return makeSection('full', [[cardBlock, btn]], {
     styles: sectionStyles(cb, S.outerPadding, S.outerBg),
@@ -414,12 +417,13 @@ function convertTextOverImage(cb: CanvasBlock): EmailSection {
 
 function convertTextLeftImageRight(cb: CanvasBlock): EmailSection {
   const S = SPECS.TEXT_LEFT_IMAGE_RIGHT
+  const hPad = { top: 0, right: S.textPaddingH, bottom: 0, left: S.textPaddingH }
   const heading = makeTextBlock({
     content: `<p style="margin:0;font-size:${S.headingFontSize}px;font-weight:${S.headingWeight};line-height:${S.headingLineHeight}">WEL&mdash;COME</p>`,
-    styles: textStyles(cb, { fontSize: S.headingFontSize, fontWeight: S.headingWeight, lineHeight: S.headingLineHeight }),
+    styles: textStyles(cb, { fontSize: S.headingFontSize, fontWeight: S.headingWeight, lineHeight: S.headingLineHeight, padding: hPad }),
   })
   const btn = makeButtonBlock(S.buttonLabel, '#')
-  btn.styles = buttonStyles(cb, { align: S.buttonAlign })
+  btn.styles = buttonStyles(cb, { align: S.buttonAlign, padding: { top: 8, right: 24, bottom: 8, left: 24 } })
 
   const imgSrc = cb.imageSrcs?.[S.imageKey] ?? firstImageSrc(cb, '')
   const imgBlock = makeImageBlock(imgSrc, 'Welcome image')
@@ -445,20 +449,22 @@ function convertRecipeCard(cb: CanvasBlock): EmailSection {
   const imgBlock = makeImageBlock(imgSrc, 'Recipe image')
   imgBlock.styles = imageStyles()
 
+  // Canvas text column uses px-4 (16px) horizontal padding
+  const hPad = { top: 0, right: 16, bottom: 0, left: 16 }
   const label = makeTextBlock({
     content: `<p style="margin:0;font-style:italic;color:${S.labelColor}">One</p>`,
-    styles: textStyles(cb, { fontSize: S.labelFontSize, color: S.labelColor }),
+    styles: textStyles(cb, { fontSize: S.labelFontSize, color: S.labelColor, padding: hPad }),
   })
   const heading = makeTextBlock({
     content: `<p style="margin:0;font-size:${S.headingFontSize}px;font-weight:${S.headingWeight}">Click here for my creamy butternut squash soup</p>`,
-    styles: textStyles(cb, { fontSize: S.headingFontSize, fontWeight: S.headingWeight }),
+    styles: textStyles(cb, { fontSize: S.headingFontSize, fontWeight: S.headingWeight, padding: hPad }),
   })
   const description = makeTextBlock({
     content: `<p style="margin:0;font-style:italic;color:${S.descColor}">A warming recipe perfect for fall evenings.</p>`,
-    styles: textStyles(cb, { fontSize: S.descFontSize, color: S.descColor }),
+    styles: textStyles(cb, { fontSize: S.descFontSize, color: S.descColor, padding: hPad }),
   })
   const btn = makeButtonBlock(S.buttonLabel, '#')
-  btn.styles = buttonStyles(cb, { align: S.buttonAlign })
+  btn.styles = buttonStyles(cb, { align: S.buttonAlign, padding: { top: 8, right: 24, bottom: 8, left: 24 } })
 
   return {
     id: nanoid(),

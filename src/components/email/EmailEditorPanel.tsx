@@ -787,6 +787,11 @@ function BlockContent({
   linkBarItems,
   footerLinks,
   socialLinks,
+  socialIconStyle,
+  socialIconColor,
+  socialIconSize,
+  socialIconPosition,
+  socialIconSpacing,
   contentHeight,
   contentButton,
   isDraggingButton,
@@ -827,6 +832,11 @@ function BlockContent({
   linkBarItems?: { label: string; url: string }[]
   footerLinks?: { label: string; url: string }[]
   socialLinks?: Record<string, string>
+  socialIconStyle?: 'outline' | 'filled'
+  socialIconColor?: string
+  socialIconSize?: 'S' | 'M' | 'L'
+  socialIconPosition?: 'left' | 'center' | 'right'
+  socialIconSpacing?: number
   contentHeight?: number
   contentButton?: { position: 'below-text' | 'on-image'; label: string } | null
   isDraggingButton?: boolean
@@ -1376,11 +1386,11 @@ function BlockContent({
     const keysToShow = linkedKeys.length > 0 ? linkedKeys : DEFAULT_SOCIAL_KEYS
 
     // Icon style and sizing
-    const iconStyle = block.socialIconStyle ?? 'outline'
-    const iconColor = block.socialIconColor ?? '#1F2937'
-    const iconSize = block.socialIconSize ?? 'M'
-    const iconPosition = block.socialIconPosition ?? 'center'
-    const iconSpacing = block.socialIconSpacing ?? 12
+    const iconStyle = socialIconStyle ?? 'outline'
+    const iconColor = socialIconColor ?? '#1F2937'
+    const iconSize = socialIconSize ?? 'M'
+    const iconPosition = socialIconPosition ?? 'center'
+    const iconSpacing = socialIconSpacing ?? 12
 
     // Size mapping
     const sizeMap = { S: 32, M: 40, L: 48 }
@@ -2478,6 +2488,11 @@ export const EmailEditorPanel: React.FC = () => {
                         linkBarItems={block.linkBarItems}
                         footerLinks={block.footerLinks}
                         socialLinks={block.socialLinks}
+                        socialIconStyle={block.socialIconStyle}
+                        socialIconColor={block.socialIconColor}
+                        socialIconSize={block.socialIconSize}
+                        socialIconPosition={block.socialIconPosition}
+                        socialIconSpacing={block.socialIconSpacing}
                         contentHeight={block.contentHeight}
                         contentButton={block.contentButton}
                         isDraggingButton={draggedBlockType === 'button'}

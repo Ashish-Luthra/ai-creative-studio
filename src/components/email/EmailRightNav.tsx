@@ -14,7 +14,7 @@ import { AlertTriangle } from 'lucide-react'
 
 // ─── Tab routing ──────────────────────────────────────────────────────────────
 
-type RightTab = 'block' | 'font' | 'button' | 'image' | 'link'
+type RightTab = 'block' | 'font' | 'button' | 'image' | 'link' | 'icons' | 'links'
 
 // Only blocks where the image has a distinct shape (circle/arch/etc.) get the Image tab.
 // Full-bleed blocks intentionally do NOT appear here.
@@ -47,6 +47,12 @@ function getTabsForBlock(blockType: string): { id: RightTab; label: string }[] {
   // Link bar / Footer — only need Block tab (link items editor + background)
   if (blockType === 'link-bar') return [K]
   if (blockType === 'footer')   return [K]
+  // Social — Icons styling, Links management, Block (bg + padding)
+  if (blockType === 'social') return [
+    { id: 'icons' as RightTab, label: 'Icons' },
+    { id: 'links' as RightTab, label: 'Links' },
+    K,
+  ]
 
   const hasShape  = IMAGE_BLOCK_TYPES.has(blockType)
   const hasButton = BUTTON_LAYOUT_TYPES.has(blockType)
@@ -520,7 +526,132 @@ const SOCIAL_PLATFORMS: SocialPlatform[] = [
   { key: 'squarespace', name: 'Squarespace', icon: <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5"><path d="M19.304 5.454a3.637 3.637 0 0 0-5.146 0L5.454 14.16a3.639 3.639 0 0 0 5.146 5.147l8.704-8.706a3.639 3.639 0 0 0 0-5.147zm-1.214 3.932L9.386 18.09a1.82 1.82 0 0 1-2.574-2.573l3.35-3.35 2.476 2.476 1.215-1.215-2.476-2.475 2.265-2.266a1.818 1.818 0 0 1 2.573 0c.71.71.71 1.864 0 2.574l-.125.125zm-9.918 9.918a3.64 3.64 0 0 1-5.147-5.147l1.214-1.215 2.573 2.573-1.215 1.215 2.574 2.574zm11.346-11.346L17.303 9.17l-2.573-2.573 2.215-2.215a1.82 1.82 0 0 1 2.573 2.573z"/></svg> },
 ]
 
-// ─── Social links section (inside BlockTab for 'social' blocks) ───────────────
+// ─── Social: Icons tab ────────────────────────────────────────────────────────
+
+function SocialIconsTab({ block, onPatch }: { block: CanvasBlock; onPatch: (p: Partial<CanvasBlock>) => void }) {
+  const iconStyle    = block.socialIconStyle    ?? 'outline'
+  const iconColor    = block.socialIconColor    ?? '#1F2937'
+  const iconSize     = block.socialIconSize     ?? 'M'
+  const iconPosition = block.socialIconPosition ?? 'center'
+  const iconSpacing  = block.socialIconSpacing  ?? 12
+
+  return (
+    <div className="flex-1 overflow-auto px-4 py-4 space-y-5">
+      {/* Style — outline / filled */}
+      <div>
+        <SectionLabel>Style</SectionLabel>
+        <div className="flex gap-2">
+          {(['outline', 'filled'] as const).map((id) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => onPatch({ socialIconStyle: id })}
+              className={cn(
+                'flex-1 rounded-xl border py-2 text-[11px] font-medium transition-colors',
+                iconStyle === id
+                  ? 'border-blue-400 bg-blue-50 text-blue-600'
+                  : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300',
+              )}
+            >
+              {id.charAt(0).toUpperCase() + id.slice(1)}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Color */}
+      <ColorSwatch
+        label="Color"
+        value={iconColor}
+        onChange={(v) => onPatch({ socialIconColor: v })}
+      />
+
+      {/* Size — S / M / L */}
+      <div>
+        <SectionLabel>Size</SectionLabel>
+        <div className="flex gap-2">
+          {([
+            { id: 'S', hint: '32px' },
+            { id: 'M', hint: '40px' },
+            { id: 'L', hint: '48px' },
+          ] as const).map(({ id, hint }) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => onPatch({ socialIconSize: id })}
+              title={hint}
+              className={cn(
+                'flex-1 rounded-xl border py-2 text-[11px] font-medium transition-colors',
+                iconSize === id
+                  ? 'border-blue-400 bg-blue-50 text-blue-600'
+                  : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300',
+              )}
+            >
+              {id}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Position — left / center / right */}
+      <div>
+        <SectionLabel>Position</SectionLabel>
+        <div className="flex gap-2">
+          {(['left', 'center', 'right'] as const).map((align) => (
+            <button
+              key={align}
+              type="button"
+              onClick={() => onPatch({ socialIconPosition: align })}
+              className={cn(
+                'flex h-10 flex-1 items-center justify-center rounded-xl border transition-colors',
+                iconPosition === align
+                  ? 'border-blue-400 bg-blue-50'
+                  : 'border-gray-200 hover:border-gray-300',
+              )}
+            >
+              <PositionIcon align={align} active={iconPosition === align} />
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Spacing */}
+      <div>
+        <div className="mb-2 flex items-center justify-between">
+          <SectionLabel>Space between icons</SectionLabel>
+          <span className="text-[11px] text-gray-500">{iconSpacing}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => onPatch({ socialIconSpacing: Math.max(4, iconSpacing - 2) })}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
+          >
+            −
+          </button>
+          <input
+            type="range"
+            min={4}
+            max={32}
+            step={2}
+            value={iconSpacing}
+            onChange={(e) => onPatch({ socialIconSpacing: Number(e.target.value) })}
+            className="flex-1 accent-gray-800"
+          />
+          <button
+            type="button"
+            onClick={() => onPatch({ socialIconSpacing: Math.min(32, iconSpacing + 2) })}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
+          >
+            +
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Social: Links tab ────────────────────────────────────────────────────────
 
 function SocialLinksSection({ block, onPatch }: { block: CanvasBlock; onPatch: (p: Partial<CanvasBlock>) => void }) {
   const [showModal, setShowModal] = useState(false)
@@ -529,13 +660,6 @@ function SocialLinksSection({ block, onPatch }: { block: CanvasBlock; onPatch: (
 
   const socialLinks = block.socialLinks ?? {}
   const linkedPlatforms = SOCIAL_PLATFORMS.filter((p) => socialLinks[p.key])
-
-  // Icon styling
-  const iconStyle = block.socialIconStyle ?? 'outline'
-  const iconColor = block.socialIconColor ?? '#1F2937'
-  const iconSize = block.socialIconSize ?? 'M'
-  const iconPosition = block.socialIconPosition ?? 'center'
-  const iconSpacing = block.socialIconSpacing ?? 12
 
   function openPlatform(key: string) {
     setEditKey(key)
@@ -555,15 +679,15 @@ function SocialLinksSection({ block, onPatch }: { block: CanvasBlock; onPatch: (
   }
 
   return (
-    <div>
+    <div className="flex-1 overflow-auto px-4 py-4 space-y-4">
       {/* Status */}
       {linkedPlatforms.length === 0 ? (
-        <div className="mb-4 rounded-xl border border-gray-200 bg-gray-50 px-4 py-4 text-center">
+        <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-4 text-center">
           <p className="text-[13px] font-semibold text-gray-800">Your social icons aren&apos;t linked</p>
           <p className="mt-1 text-[11px] text-gray-400">Add your social media links by clicking below:</p>
         </div>
       ) : (
-        <div className="mb-4 space-y-1.5">
+        <div className="space-y-1.5">
           <SectionLabel>Linked accounts</SectionLabel>
           {linkedPlatforms.map((p) => (
             <div key={p.key} className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2">
@@ -589,124 +713,6 @@ function SocialLinksSection({ block, onPatch }: { block: CanvasBlock; onPatch: (
       >
         Manage social links
       </button>
-
-      {/* ─── Icon Styling Controls ─────────────────────────────────────────────── */}
-
-      {/* Style selector — outline or filled */}
-      <div>
-        <SectionLabel>Icon Style</SectionLabel>
-        <div className="flex gap-2">
-          {[
-            { id: 'outline', label: 'Outline' },
-            { id: 'filled', label: 'Filled' },
-          ].map(({ id, label }) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => onPatch({ socialIconStyle: id as 'outline' | 'filled' })}
-              className={cn(
-                'flex-1 rounded-xl border py-2 text-[11px] font-medium transition-colors',
-                iconStyle === id
-                  ? 'border-blue-400 bg-blue-50 text-blue-600'
-                  : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300',
-              )}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Color picker */}
-      <ColorSwatch
-        label="Icon Color"
-        value={iconColor}
-        onChange={(v) => onPatch({ socialIconColor: v })}
-      />
-
-      {/* Size selector — S, M, L */}
-      <div>
-        <SectionLabel>Size</SectionLabel>
-        <div className="flex gap-2">
-          {[
-            { id: 'S', label: 'S', hint: '32px' },
-            { id: 'M', label: 'M', hint: '40px' },
-            { id: 'L', label: 'L', hint: '48px' },
-          ].map(({ id, label, hint }) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => onPatch({ socialIconSize: id as 'S' | 'M' | 'L' })}
-              title={hint}
-              className={cn(
-                'flex-1 rounded-xl border py-2 text-[11px] font-medium transition-colors',
-                iconSize === id
-                  ? 'border-blue-400 bg-blue-50 text-blue-600'
-                  : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300',
-              )}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Position selector — left, center, right */}
-      <div>
-        <SectionLabel>Position</SectionLabel>
-        <div className="flex gap-2">
-          {(['left', 'center', 'right'] as const).map((align) => (
-            <button
-              key={align}
-              type="button"
-              onClick={() => onPatch({ socialIconPosition: align })}
-              className={cn(
-                'flex h-10 flex-1 items-center justify-center rounded-xl border transition-colors',
-                iconPosition === align
-                  ? 'border-blue-400 bg-blue-50'
-                  : 'border-gray-200 hover:border-gray-300',
-              )}
-            >
-              <PositionIcon align={align} active={iconPosition === align} />
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Spacing slider */}
-      <div>
-        <div className="mb-2 flex items-center justify-between">
-          <SectionLabel>Spacing</SectionLabel>
-          <span className="text-[11px] text-gray-500">{iconSpacing}px</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => onPatch({ socialIconSpacing: Math.max(4, iconSpacing - 2) })}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
-            title="Decrease spacing"
-          >
-            −
-          </button>
-          <input
-            type="range"
-            min={4}
-            max={32}
-            step={2}
-            value={iconSpacing}
-            onChange={(e) => onPatch({ socialIconSpacing: Number(e.target.value) })}
-            className="flex-1 accent-gray-800"
-          />
-          <button
-            type="button"
-            onClick={() => onPatch({ socialIconSpacing: Math.min(32, iconSpacing + 2) })}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
-            title="Increase spacing"
-          >
-            +
-          </button>
-        </div>
-      </div>
 
       {/* ── Modal: Platform grid ── */}
       {showModal && (
@@ -910,11 +916,6 @@ function BlockTab({ block, onPatch }: { block: CanvasBlock; onPatch: (p: Partial
       {/* Footer links — only shown for footer blocks */}
       {block.type === 'footer' && (
         <FooterEditor block={block} onPatch={onPatch} />
-      )}
-
-      {/* Social links — only shown for social blocks */}
-      {block.type === 'social' && (
-        <SocialLinksSection block={block} onPatch={onPatch} />
       )}
 
       {/* Background */}
@@ -1504,6 +1505,8 @@ export function EmailRightNav({ block, onPatch, onOpenImagePicker, onImageUpload
       </div>
 
       {/* Tab content */}
+      {resolvedTab === 'icons'  && <SocialIconsTab block={block} onPatch={patch} />}
+      {resolvedTab === 'links'  && <SocialLinksSection block={block} onPatch={patch} />}
       {resolvedTab === 'block'  && <BlockTab  block={block} onPatch={patch} />}
       {resolvedTab === 'font'   && <FontTab   block={block} onPatch={patch} />}
       {resolvedTab === 'button' && <ButtonTab block={block} onPatch={patch} />}
