@@ -37,6 +37,7 @@ export interface CanvasBlock {
   fontFamily?: string
   fontSize?: number
   fontBold?: boolean
+  fontWeight?: number
   fontItalic?: boolean
   fontUnderline?: boolean
   fontColor?: string
@@ -66,6 +67,7 @@ export interface CanvasBlock {
     fontFamily?: string
     fontSize?: number
     fontBold?: boolean
+    fontWeight?: number
     fontItalic?: boolean
     fontUnderline?: boolean
     fontColor?: string

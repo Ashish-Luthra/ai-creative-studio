@@ -31,6 +31,13 @@ import {
 } from './templates'
 import { SPECS } from './blockSpecs'
 
+type FontWeightValue = TextStyles['fontWeight']
+const VALID_WEIGHTS = new Set(['100','200','300','400','500','600','700','800','900'])
+function toFontWeight(n: number): FontWeightValue {
+  const s = String(n)
+  return VALID_WEIGHTS.has(s) ? s as FontWeightValue : 'normal'
+}
+
 // ─── Style helpers ─────────────────────────────────────────────────────────────
 
 /**
@@ -56,7 +63,7 @@ function textStyles(cb: CanvasBlock, overrides: Partial<TextStyles> = {}): TextS
     // of hard-coding Arial and accidentally overriding the global choice.
     fontFamily: cb.fontFamily ?? '',
     fontSize: cb.fontSize ?? 16,
-    fontWeight: cb.fontBold ? 'bold' : 'normal',
+    fontWeight: cb.fontWeight ? toFontWeight(cb.fontWeight) : (cb.fontBold ? 'bold' : 'normal'),
     lineHeight: cb.lineHeight ?? 1.6,
     color: cb.fontColor ?? '#111827',
     textAlign: cb.textAlign ?? 'left',
@@ -103,7 +110,8 @@ function fieldTextStyles(
     ...(f && {
       ...(f.fontFamily  !== undefined && { fontFamily: f.fontFamily }),
       ...(f.fontSize    !== undefined && { fontSize:   f.fontSize }),
-      ...(f.fontBold    !== undefined && { fontWeight: f.fontBold ? 'bold' : 'normal' }),
+      ...(f.fontWeight  !== undefined && { fontWeight: toFontWeight(f.fontWeight) }),
+      ...(f.fontWeight === undefined && f.fontBold !== undefined && { fontWeight: f.fontBold ? 'bold' : 'normal' }),
       ...(f.lineHeight  !== undefined && { lineHeight: f.lineHeight }),
       ...(f.fontColor   !== undefined && { color:         f.fontColor }),
       ...(f.textAlign   !== undefined && { textAlign:     f.textAlign }),
@@ -188,9 +196,10 @@ function convertButton(cb: CanvasBlock): EmailSection {
   const block = makeButtonBlock(t(cb, 'button', 'Click Here'), cb.linkUrl ?? '#')
   const f = cb.textStyles?.['button']
   block.styles = buttonStyles(cb, {
-    ...(f?.fontFamily !== undefined && { fontFamily: f.fontFamily }),
-    ...(f?.fontSize   !== undefined && { fontSize:   f.fontSize }),
-    ...(f?.fontBold   !== undefined && { fontWeight: f.fontBold ? 'bold' : '600' }),
+    ...(f?.fontFamily  !== undefined && { fontFamily: f.fontFamily }),
+    ...(f?.fontSize    !== undefined && { fontSize:   f.fontSize }),
+    ...(f?.fontWeight  !== undefined && { fontWeight: toFontWeight(f.fontWeight) }),
+    ...(f?.fontWeight === undefined && f?.fontBold !== undefined && { fontWeight: f.fontBold ? 'bold' : '600' }),
   })
   return makeSection('full', [[block]], { styles: sectionStyles(cb) })
 }
@@ -247,8 +256,8 @@ function convertSocial(cb: CanvasBlock): EmailSection {
   const borderWidth = iconStyle === 'filled' ? 0 : 1
 
   // Alignment mapping for table
-  const alignMap = { left: 'left', center: 'center', right: 'right' }
-  const tableAlign = alignMap[iconPosition]
+  const alignMap: Record<string, 'left' | 'center' | 'right'> = { left: 'left', center: 'center', right: 'right' }
+  const tableAlign = alignMap[iconPosition] ?? 'center'
 
   const iconCells = iconsToRender.map(({ key, name, svg }) => {
     const url = links[key] || '#'

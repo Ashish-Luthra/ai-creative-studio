@@ -996,6 +996,7 @@ function FontTab({
   const currentFont     = (fieldStyle ? fieldStyle.fontFamily  : block.fontFamily)  ?? 'Arial'
   const currentSize     = (fieldStyle ? fieldStyle.fontSize     : block.fontSize)    ?? 16
   const currentColor    = (fieldStyle ? fieldStyle.fontColor    : block.fontColor)   ?? '#111827'
+  const currentWeight   = (fieldStyle ? fieldStyle.fontWeight   : block.fontWeight)  ?? ((fieldStyle ? fieldStyle.fontBold : block.fontBold) ? 700 : 400)
   const currentBold     = (fieldStyle ? fieldStyle.fontBold     : block.fontBold)    ?? false
   const currentItalic   = (fieldStyle ? fieldStyle.fontItalic   : block.fontItalic)  ?? false
   const currentUnderline = (fieldStyle ? fieldStyle.fontUnderline : block.fontUnderline) ?? false
@@ -1009,6 +1010,7 @@ function FontTab({
   const handleFont    = (v: string)  => fieldStyle !== null ? patchField({ fontFamily: v })    : onPatch({ fontFamily: v })
   const handleSize    = (v: number)  => fieldStyle !== null ? patchField({ fontSize: v })       : onPatch({ fontSize: v })
   const handleColor   = (v: string)  => fieldStyle !== null ? patchField({ fontColor: v })      : onPatch({ fontColor: v })
+  const handleWeight  = (v: number)  => fieldStyle !== null ? patchField({ fontWeight: v })          : onPatch({ fontWeight: v })
   const handleBold    = ()           => fieldStyle !== null ? patchField({ fontBold: !currentBold })       : onPatch({ fontBold: !currentBold })
   const handleItalic  = ()           => fieldStyle !== null ? patchField({ fontItalic: !currentItalic })   : onPatch({ fontItalic: !currentItalic })
   const handleUnder   = ()           => fieldStyle !== null ? patchField({ fontUnderline: !currentUnderline }) : onPatch({ fontUnderline: !currentUnderline })
@@ -1053,27 +1055,44 @@ function FontTab({
         </div>
       )}
 
-      {/* Family */}
+      {/* Family + Weight */}
       <div>
-        <SectionLabel>Font Family</SectionLabel>
-        <select
-          value={ALL_KNOWN_FONTS.has(currentFont) ? currentFont : ''}
-          onChange={(e) => handleFont(e.target.value)}
-          className={cn(
-            'w-full rounded-xl border px-3 py-2.5 text-[12px] text-gray-700 focus:outline-none',
-            isUnknownFont
-              ? 'border-amber-300 bg-amber-50 focus:border-amber-400'
-              : 'border-gray-200 bg-white focus:border-blue-400',
-          )}
-        >
-          {isUnknownFont && <option value="" disabled>— select a font —</option>}
-          <optgroup label="System Fonts">
-            {SYSTEM_FONTS.map((f) => <option key={f} value={f}>{f}</option>)}
-          </optgroup>
-          <optgroup label="Google Fonts">
-            {GOOGLE_FONT_FAMILIES.map((f) => <option key={f} value={f}>{f}</option>)}
-          </optgroup>
-        </select>
+        <SectionLabel>Font</SectionLabel>
+        <div className="flex gap-2">
+          <select
+            value={ALL_KNOWN_FONTS.has(currentFont) ? currentFont : ''}
+            onChange={(e) => handleFont(e.target.value)}
+            className={cn(
+              'min-w-0 flex-1 rounded-xl border px-3 py-2.5 text-[12px] text-gray-700 focus:outline-none',
+              isUnknownFont
+                ? 'border-amber-300 bg-amber-50 focus:border-amber-400'
+                : 'border-gray-200 bg-white focus:border-blue-400',
+            )}
+          >
+            {isUnknownFont && <option value="" disabled>— select a font —</option>}
+            <optgroup label="System Fonts">
+              {SYSTEM_FONTS.map((f) => <option key={f} value={f}>{f}</option>)}
+            </optgroup>
+            <optgroup label="Google Fonts">
+              {GOOGLE_FONT_FAMILIES.map((f) => <option key={f} value={f}>{f}</option>)}
+            </optgroup>
+          </select>
+          <select
+            value={currentWeight}
+            onChange={(e) => handleWeight(Number(e.target.value))}
+            className="w-[108px] shrink-0 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-[12px] text-gray-700 focus:outline-none focus:border-blue-400"
+          >
+            <option value={100}>Thin</option>
+            <option value={200}>Extra Light</option>
+            <option value={300}>Light</option>
+            <option value={400}>Regular</option>
+            <option value={500}>Medium</option>
+            <option value={600}>Semi Bold</option>
+            <option value={700}>Bold</option>
+            <option value={800}>Extra Bold</option>
+            <option value={900}>Black</option>
+          </select>
+        </div>
       </div>
 
       {/* Size */}

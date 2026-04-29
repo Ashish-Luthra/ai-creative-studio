@@ -770,6 +770,7 @@ function BlockContent({
   fontFamily,
   fontSize,
   fontBold,
+  fontWeight,
   fontItalic,
   fontUnderline,
   fontColor,
@@ -821,6 +822,7 @@ function BlockContent({
   fontFamily?: string
   fontSize?: number
   fontBold?: boolean
+  fontWeight?: number
   fontItalic?: boolean
   fontUnderline?: boolean
   fontColor?: string
@@ -881,7 +883,7 @@ function BlockContent({
   const fontStyle: React.CSSProperties = {
     fontFamily:      fontFamily    ?? undefined,
     fontSize:        fontSize      ? `${fontSize}px`        : undefined,
-    fontWeight:      fontBold      ? 'bold'                 : undefined,
+    fontWeight:      fontWeight    ?? (fontBold ? 700 : undefined),
     fontStyle:       fontItalic    ? 'italic'               : undefined,
     textDecoration:  fontUnderline ? 'underline'            : undefined,
     color:           fontColor     ?? undefined,
@@ -911,7 +913,8 @@ function BlockContent({
     if (ts) {
       if (ts.fontFamily  !== undefined) override.fontFamily    = ts.fontFamily
       if (ts.fontSize    !== undefined) override.fontSize      = ts.fontSize
-      if (ts.fontBold    !== undefined) override.fontWeight    = ts.fontBold    ? 'bold'      : 'normal'
+      if (ts.fontWeight  !== undefined) override.fontWeight    = ts.fontWeight
+      else if (ts.fontBold !== undefined) override.fontWeight  = ts.fontBold    ? 700         : 400
       if (ts.fontItalic  !== undefined) override.fontStyle     = ts.fontItalic  ? 'italic'    : 'normal'
       if (ts.fontUnderline !== undefined) override.textDecoration = ts.fontUnderline ? 'underline' : 'none'
       if (ts.fontColor   !== undefined) override.color         = ts.fontColor
@@ -962,7 +965,7 @@ function BlockContent({
       onBlur: (e: React.FocusEvent<HTMLElement>) => onTextChange?.(key, e.currentTarget.innerHTML),
       className: EDITABLE_CLASS,
       dangerouslySetInnerHTML: { __html: texts?.[key] ?? defaultText },
-      style: { ...btnStyle, ...extraStyle },
+      style: { ...btnStyle, ...resolveFieldStyle(key, extraStyle) },
     }
   }
 
@@ -2444,6 +2447,7 @@ export const EmailEditorPanel: React.FC = () => {
                         fontFamily={block.fontFamily ?? doc.globalStyles.fontFamily}
                         fontSize={block.fontSize}
                         fontBold={block.fontBold}
+                        fontWeight={block.fontWeight}
                         fontItalic={block.fontItalic}
                         fontUnderline={block.fontUnderline}
                         fontColor={block.fontColor}
