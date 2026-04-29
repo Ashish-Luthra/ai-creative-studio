@@ -833,7 +833,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
             <FloatPropertiesCard selectedLayer={selectedLayer} />
           )}
 
-          {mode !== 'feeds' && (
+          {mode === 'canvas' && (
             <AgentPill onSubmit={handleAgentSubmit} />
           )}
         </main>

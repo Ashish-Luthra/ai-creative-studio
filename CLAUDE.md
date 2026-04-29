@@ -420,3 +420,31 @@ CREATE TABLE clusters (
 5. When adding an AI feature: read Section 6 rules first. Gates are non-negotiable.
 6. When unsure about where logic belongs: user-facing state -> Zustand; API transformations -> lib/; Python AI work -> services/.
 7. Always run `tsc --noEmit` and `next lint` before committing.
+
+---
+
+## 12. Claude Code — Auto-Approval Rules
+
+These rules apply to all Claude Code sessions in this repository. They define what may be executed without prompting the user for confirmation.
+
+### Auto-approved (no confirmation needed)
+
+| Category | Scope |
+|---|---|
+| **File edits** | Any read, write, or edit to files inside this repo |
+| **Shell commands** | `npm`, `npx`, `pnpm`, `node`, `tsc`, `next`, `eslint`, `prettier`, standard Unix utilities (`ls`, `find`, `grep`, `cp`, `mv`, `mkdir`, `rm` on project files) |
+| **Package installs** | `npm install`, `npm ci`, `pnpm add`, and equivalent — including dev/peer deps |
+| **Git operations** | `git status`, `git diff`, `git log`, `git add`, `git commit`, `git push`, `git pull`, `git fetch`, `git checkout`, `git switch`, `git branch`, `git merge`, `git stash`, `git tag`, `git rebase` (non-interactive, forward only) |
+
+### Require explicit user confirmation before running
+
+| Command | Reason |
+|---|---|
+| `git reset --hard` | Destroys uncommitted work irreversibly |
+| `git clean -f` / `git clean -fd` / `git clean -fdx` | Deletes untracked files permanently |
+| `git push --force` / `git push --force-with-lease` to `main` or `master` | Rewrites shared history |
+| `git rebase -i` (interactive) | Rewrites commit history |
+| `git commit --amend` on already-pushed commits | Rewrites published history |
+| `git filter-branch` / `git filter-repo` | Bulk history rewrite |
+| Any `DROP TABLE` or destructive Supabase migration | Irreversible data loss |
+| Deleting or overwriting `.env*` files | Credentials loss |

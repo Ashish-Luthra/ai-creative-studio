@@ -112,6 +112,11 @@ function fieldTextStyles(
   })
 }
 
+/** Return user-edited text for a field, falling back to the design default. */
+function t(cb: CanvasBlock, key: string, defaultText: string): string {
+  return cb.texts?.[key] ?? defaultText
+}
+
 function imageStyles(overrides: Partial<ImageStyles> = {}): ImageStyles {
   return {
     width: 'full',
@@ -172,12 +177,15 @@ function convertLinkBar(cb: CanvasBlock): EmailSection {
 }
 
 function convertText(cb: CanvasBlock): EmailSection {
-  const block = makeTextBlock({ styles: fieldTextStyles(cb, 'body') })
+  const block = makeTextBlock({
+    content: `<p style="margin:0">${t(cb, 'body', 'Your text content here. Click to edit this paragraph and add your own copy.')}</p>`,
+    styles: fieldTextStyles(cb, 'body'),
+  })
   return makeSection('full', [[block]], { styles: sectionStyles(cb) })
 }
 
 function convertButton(cb: CanvasBlock): EmailSection {
-  const block = makeButtonBlock('Click Here', cb.linkUrl ?? '#')
+  const block = makeButtonBlock(t(cb, 'button', 'Click Here'), cb.linkUrl ?? '#')
   const f = cb.textStyles?.['button']
   block.styles = buttonStyles(cb, {
     ...(f?.fontFamily !== undefined && { fontFamily: f.fontFamily }),
@@ -273,7 +281,7 @@ function convertSocial(cb: CanvasBlock): EmailSection {
 
 function convertAddress(cb: CanvasBlock): EmailSection {
   const block = makeTextBlock({
-    content: `<p style="margin:0;text-align:center;color:#6B7280">123 Main Street, Suite 100 · City, State 12345 · United States</p>`,
+    content: `<p style="margin:0;text-align:center;color:#6B7280">${t(cb, 'address', '123 Main Street, Suite 100 · City, State 12345 · United States')}</p>`,
     styles: fieldTextStyles(cb, 'address', { textAlign: 'center', fontSize: 11, color: '#6B7280' }),
   })
   return makeSection('full', [[block]], {
@@ -296,7 +304,7 @@ function convertFooter(cb: CanvasBlock): EmailSection {
   const block = makeTextBlock({
     content: `<p style="margin:0 0 12px 0;text-align:center">${linkHtml}</p>` +
       `<p style="margin:0;text-align:center;color:#9CA3AF;font-size:10px">` +
-      `© ${new Date().getFullYear()} Your Company Name. All rights reserved.</p>`,
+      `${t(cb, 'copyright', `© ${new Date().getFullYear()} Your Company Name. All rights reserved.`)}</p>`,
     styles: fieldTextStyles(cb, 'copyright', { textAlign: 'center', fontSize: 11, color: '#6B7280' }),
   })
   return makeSection('full', [[block]], {
@@ -320,11 +328,11 @@ function convertContent(cb: CanvasBlock): EmailSection {
 
   if (layout === 'image-text') {
     const heading = makeTextBlock({
-      content: '<p style="margin:0;font-size:22px;font-weight:700">Content Heading</p>',
+      content: `<p style="margin:0;font-size:22px;font-weight:700">${t(cb, 'heading', 'Content Heading')}</p>`,
       styles: fieldTextStyles(cb, 'heading', { fontSize: 22, fontWeight: 'bold' }),
     })
     const body = makeTextBlock({
-      content: '<p style="margin:0">Click to edit this text. Tell your story alongside the image.</p>',
+      content: `<p style="margin:0">${t(cb, 'body', 'Click to edit this text. Tell your story alongside the image.')}</p>`,
       styles: fieldTextStyles(cb, 'body'),
     })
     const imgBlock = makeImageBlock(imgSrc, 'Content image')
@@ -336,28 +344,28 @@ function convertContent(cb: CanvasBlock): EmailSection {
 
   if (layout === '2col-text') {
     const col1 = [
-      makeTextBlock({ content: '<p style="margin:0;font-weight:700">Column One Heading</p>', styles: fieldTextStyles(cb, 'col1-heading') }),
-      makeTextBlock({ content: '<p style="margin:0">Add your text here. Click to edit this column and tell your story.</p>', styles: fieldTextStyles(cb, 'col1-body') }),
+      makeTextBlock({ content: `<p style="margin:0;font-weight:700">${t(cb, 'col1-heading', 'Column One Heading')}</p>`, styles: fieldTextStyles(cb, 'col1-heading') }),
+      makeTextBlock({ content: `<p style="margin:0">${t(cb, 'col1-body', 'Add your text here. Click to edit this column and tell your story.')}</p>`, styles: fieldTextStyles(cb, 'col1-body') }),
     ]
     const col2 = [
-      makeTextBlock({ content: '<p style="margin:0;font-weight:700">Column Two Heading</p>', styles: fieldTextStyles(cb, 'col2-heading') }),
-      makeTextBlock({ content: '<p style="margin:0">Add your text here. Click to edit this column and share more details.</p>', styles: fieldTextStyles(cb, 'col2-body') }),
+      makeTextBlock({ content: `<p style="margin:0;font-weight:700">${t(cb, 'col2-heading', 'Column Two Heading')}</p>`, styles: fieldTextStyles(cb, 'col2-heading') }),
+      makeTextBlock({ content: `<p style="margin:0">${t(cb, 'col2-body', 'Add your text here. Click to edit this column and share more details.')}</p>`, styles: fieldTextStyles(cb, 'col2-body') }),
     ]
     return makeSection('two-col', [col1, col2], { styles: sectionStyles(cb) })
   }
 
   if (layout === '3col-text') {
     const col1 = [
-      makeTextBlock({ content: '<p style="margin:0;font-weight:700">Column One</p>', styles: fieldTextStyles(cb, 'col1-heading') }),
-      makeTextBlock({ content: '<p style="margin:0">Click to edit this column.</p>', styles: fieldTextStyles(cb, 'col1-body') }),
+      makeTextBlock({ content: `<p style="margin:0;font-weight:700">${t(cb, 'col1-heading', 'Column One')}</p>`, styles: fieldTextStyles(cb, 'col1-heading') }),
+      makeTextBlock({ content: `<p style="margin:0">${t(cb, 'col1-body', 'Click to edit this column.')}</p>`, styles: fieldTextStyles(cb, 'col1-body') }),
     ]
     const col2 = [
-      makeTextBlock({ content: '<p style="margin:0;font-weight:700">Column Two</p>', styles: fieldTextStyles(cb, 'col2-heading') }),
-      makeTextBlock({ content: '<p style="margin:0">Click to edit this column.</p>', styles: fieldTextStyles(cb, 'col2-body') }),
+      makeTextBlock({ content: `<p style="margin:0;font-weight:700">${t(cb, 'col2-heading', 'Column Two')}</p>`, styles: fieldTextStyles(cb, 'col2-heading') }),
+      makeTextBlock({ content: `<p style="margin:0">${t(cb, 'col2-body', 'Click to edit this column.')}</p>`, styles: fieldTextStyles(cb, 'col2-body') }),
     ]
     const col3 = [
-      makeTextBlock({ content: '<p style="margin:0;font-weight:700">Column Three</p>', styles: fieldTextStyles(cb, 'col3-heading') }),
-      makeTextBlock({ content: '<p style="margin:0">Click to edit this column.</p>', styles: fieldTextStyles(cb, 'col3-body') }),
+      makeTextBlock({ content: `<p style="margin:0;font-weight:700">${t(cb, 'col3-heading', 'Column Three')}</p>`, styles: fieldTextStyles(cb, 'col3-heading') }),
+      makeTextBlock({ content: `<p style="margin:0">${t(cb, 'col3-body', 'Click to edit this column.')}</p>`, styles: fieldTextStyles(cb, 'col3-body') }),
     ]
     return makeSection('three-col', [col1, col2, col3], { styles: sectionStyles(cb) })
   }
@@ -375,11 +383,11 @@ function convertImageLeftTextRight(cb: CanvasBlock): EmailSection {
 
   const hPad = { top: 0, right: S.textPaddingH, bottom: 0, left: S.textPaddingH }
   const tagline = makeTextBlock({
-    content: `<p style="margin:0;font-style:italic;color:${S.taglineColor};text-align:center">From The &apos;Gram</p>`,
+    content: `<p style="margin:0;font-style:italic;color:${S.taglineColor};text-align:center">${t(cb, 'tagline', "From The 'Gram")}</p>`,
     styles: fieldTextStyles(cb, 'tagline', { fontSize: S.taglineFontSize, color: S.taglineColor, textAlign: 'center', padding: hPad }),
   })
   const heading = makeTextBlock({
-    content: `<p style="margin:0;font-size:${S.headingFontSize}px;font-weight:${S.headingWeight};text-align:center">The Post That Got Everyone Talking</p>`,
+    content: `<p style="margin:0;font-size:${S.headingFontSize}px;font-weight:${S.headingWeight};text-align:center">${t(cb, 'heading', 'The Post That Got Everyone Talking')}</p>`,
     styles: fieldTextStyles(cb, 'heading', { fontSize: S.headingFontSize, fontWeight: S.headingWeight, textAlign: 'center', padding: hPad }),
   })
   const dividerBlock = makeTextBlock({
@@ -439,7 +447,7 @@ function convertTextOverImage(cb: CanvasBlock): EmailSection {
     narrowLine(S.dividerColor) +
     `<p style="margin:0;font-size:${S.headingFontSize}px;font-weight:${S.headingWeight};` +
     `letter-spacing:${S.headingTracking};text-align:center;text-transform:uppercase">` +
-    `A Little Gift of Thanks for Joining the List.</p>` +
+    `${t(cb, 'heading', 'A Little Gift of Thanks for Joining the List.')}</p>` +
     narrowLine(S.dividerColor)
 
   const heading = makeTextBlock({
@@ -449,7 +457,7 @@ function convertTextOverImage(cb: CanvasBlock): EmailSection {
   const imgSrc = cb.imageSrcs?.[S.imageKey] ?? firstImageSrc(cb, '')
   const imgBlock = makeImageBlock(imgSrc, 'Feature image')
   imgBlock.styles = imageStyles()
-  const btn = makeButtonBlock(S.buttonLabel, '#')
+  const btn = makeButtonBlock(t(cb, 'button', S.buttonLabel), '#')
   btn.styles = buttonStyles(cb, { align: S.buttonAlign, padding: S.buttonPadding })
 
   return makeSection('full', [[heading, btn, makeSpacerBlock(16), imgBlock]], {
@@ -461,7 +469,7 @@ function convertTextLeftImageRight(cb: CanvasBlock): EmailSection {
   const S = SPECS.TEXT_LEFT_IMAGE_RIGHT
   const hPad = { top: 0, right: S.textPaddingH, bottom: 0, left: S.textPaddingH }
   const heading = makeTextBlock({
-    content: `<p style="margin:0;font-size:${S.headingFontSize}px;font-weight:${S.headingWeight};line-height:${S.headingLineHeight}">WEL&mdash;COME</p>`,
+    content: `<p style="margin:0;font-size:${S.headingFontSize}px;font-weight:${S.headingWeight};line-height:${S.headingLineHeight}">${t(cb, 'heading', 'WEL—COME')}</p>`,
     styles: fieldTextStyles(cb, 'heading', { fontSize: S.headingFontSize, fontWeight: S.headingWeight, lineHeight: S.headingLineHeight, padding: hPad }),
   })
   const btn = makeButtonBlock(S.buttonLabel, '#')
@@ -494,15 +502,15 @@ function convertRecipeCard(cb: CanvasBlock): EmailSection {
   // Canvas text column uses px-4 (16px) horizontal padding
   const hPad = { top: 0, right: 16, bottom: 0, left: 16 }
   const label = makeTextBlock({
-    content: `<p style="margin:0;font-style:italic;color:${S.labelColor}">One</p>`,
+    content: `<p style="margin:0;font-style:italic;color:${S.labelColor}">${t(cb, 'label', 'One')}</p>`,
     styles: fieldTextStyles(cb, 'label', { fontSize: S.labelFontSize, color: S.labelColor, padding: hPad }),
   })
   const heading = makeTextBlock({
-    content: `<p style="margin:0;font-size:${S.headingFontSize}px;font-weight:${S.headingWeight}">Click here for my creamy butternut squash soup</p>`,
+    content: `<p style="margin:0;font-size:${S.headingFontSize}px;font-weight:${S.headingWeight}">${t(cb, 'heading', 'Click here for my creamy butternut squash soup')}</p>`,
     styles: fieldTextStyles(cb, 'heading', { fontSize: S.headingFontSize, fontWeight: S.headingWeight, padding: hPad }),
   })
   const description = makeTextBlock({
-    content: `<p style="margin:0;font-style:italic;color:${S.descColor}">A warming recipe perfect for fall evenings.</p>`,
+    content: `<p style="margin:0;font-style:italic;color:${S.descColor}">${t(cb, 'description', 'A warming recipe perfect for fall evenings.')}</p>`,
     styles: fieldTextStyles(cb, 'description', { fontSize: S.descFontSize, color: S.descColor, padding: hPad }),
   })
   const btn = makeButtonBlock(S.buttonLabel, '#')
@@ -533,11 +541,11 @@ function convertImageTopTextBottom(cb: CanvasBlock): EmailSection[] {
   })
 
   const heading = makeTextBlock({
-    content: `<p style="margin:0 0 ${S.headingBottomMargin}px;font-size:${S.headingFontSize}px;font-weight:${S.headingWeight};text-align:center">Get 25% off when you book my services</p>`,
+    content: `<p style="margin:0 0 ${S.headingBottomMargin}px;font-size:${S.headingFontSize}px;font-weight:${S.headingWeight};text-align:center">${t(cb, 'heading', 'Get 25% off when you book my services')}</p>`,
     styles: fieldTextStyles(cb, 'heading', { textAlign: 'center', fontSize: S.headingFontSize, fontWeight: S.headingWeight }),
   })
   const body = makeTextBlock({
-    content: `<p style="margin:0;font-style:italic;color:${S.bodyColor};text-align:center">for the next 24 hours only.</p>`,
+    content: `<p style="margin:0;font-style:italic;color:${S.bodyColor};text-align:center">${t(cb, 'body', 'for the next 24 hours only.')}</p>`,
     styles: fieldTextStyles(cb, 'body', { textAlign: 'center', fontSize: S.bodyFontSize, color: S.bodyColor }),
   })
   const btn = makeButtonBlock(S.buttonLabel, '#')
@@ -562,11 +570,11 @@ function convertTestimonial(cb: CanvasBlock): EmailSection {
   }
 
   const name = makeTextBlock({
-    content: `<p style="margin:0;font-weight:${S.nameWeight};font-size:${S.nameFontSize}px;letter-spacing:${S.nameTracking};text-transform:uppercase">TESTIMONIAL NAME</p>`,
+    content: `<p style="margin:0;font-weight:${S.nameWeight};font-size:${S.nameFontSize}px;letter-spacing:${S.nameTracking};text-transform:uppercase">${t(cb, 'name', 'TESTIMONIAL NAME')}</p>`,
     styles: fieldTextStyles(cb, 'name', { fontSize: S.nameFontSize, fontWeight: S.nameWeight }),
   })
   const quote = makeTextBlock({
-    content: `<p style="margin:0;font-size:${S.quoteFontSize}px;color:${S.quoteColor};line-height:${S.quoteLineHeight}">Since joining, my email list has grown 4x and I&apos;ve finally found a system that works for my creative business.</p>`,
+    content: `<p style="margin:0;font-size:${S.quoteFontSize}px;color:${S.quoteColor};line-height:${S.quoteLineHeight}">${t(cb, 'quote', "Since joining, my email list has grown 4x and I've finally found a system that works for my creative business.")}</p>`,
     styles: fieldTextStyles(cb, 'quote', { fontSize: S.quoteFontSize, color: S.quoteColor, lineHeight: S.quoteLineHeight }),
   })
   const stars = makeTextBlock({

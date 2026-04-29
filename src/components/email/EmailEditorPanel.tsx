@@ -931,6 +931,21 @@ function BlockContent({
       onClick: onTextClick,
       onFocus: () => onTextFocus?.(key),
       onBlur: (e: React.FocusEvent<HTMLElement>) => onTextChange?.(key, e.currentTarget.innerHTML),
+      onKeyDown: (e: React.KeyboardEvent<HTMLElement>) => {
+        if (e.key === 'Enter') {
+          e.preventDefault()
+          const sel = window.getSelection()
+          if (!sel?.rangeCount) return
+          const range = sel.getRangeAt(0)
+          range.deleteContents()
+          const br = document.createElement('br')
+          range.insertNode(br)
+          range.setStartAfter(br)
+          range.collapse(true)
+          sel.removeAllRanges()
+          sel.addRange(range)
+        }
+      },
       className: EDITABLE_CLASS,
       dangerouslySetInnerHTML: { __html: texts?.[key] ?? defaultText },
       style: resolveFieldStyle(key, extraStyle),
@@ -1957,13 +1972,14 @@ export const EmailEditorPanel: React.FC = () => {
     setInsertState(null)
   }, [selectedId])
 
-  const handleTextClick = useCallback((e: React.MouseEvent) => {
-    // Do NOT stopPropagation — let the click bubble up to the block wrapper
-    // so the block gets selected and EmailRightNav stays visible.
+  const handleTextClick = useCallback((_e: React.MouseEvent) => {
+    // Do NOT call showAlly or set extra state here — any state update on click
+    // triggers a re-render that resets dangerouslySetInnerHTML and moves the
+    // cursor to position 0 before the browser finishes placing it.
+    // Tab-switching is handled by handleTextFocus (onFocus), which fires after
+    // the browser has already committed the cursor position.
     setShowTextEdit(true)
-    setFocusTab((prev) => ({ tab: 'font', seq: (prev?.seq ?? 0) + 1 }))
-    showAlly('text', e)
-  }, [showAlly])
+  }, [])
 
   const handleTextFocus = useCallback((key: string) => {
     setActiveTextKey(key)
