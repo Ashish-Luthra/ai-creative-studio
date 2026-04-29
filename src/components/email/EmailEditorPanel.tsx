@@ -776,6 +776,7 @@ function BlockContent({
   textAlign,
   lineHeight,
   letterSpacing,
+  fontCase,
   // Image settings
   imageShape,
   onButtonAreaClick,
@@ -826,6 +827,7 @@ function BlockContent({
   textAlign?: 'left' | 'center' | 'right'
   lineHeight?: number
   letterSpacing?: number
+  fontCase?: 'none' | 'lowercase' | 'uppercase'
   imageShape?: string
   /** Separate handler for button elements so they route to the Button tab, not Font tab */
   onButtonAreaClick?: (e: React.MouseEvent) => void
@@ -886,6 +888,7 @@ function BlockContent({
     textAlign:       textAlign     ?? undefined,
     lineHeight:      lineHeight    ?? undefined,
     letterSpacing:   letterSpacing ? `${letterSpacing}px`  : undefined,
+    textTransform:   fontCase && fontCase !== 'none' ? fontCase : undefined,
   }
 
   // ── Image shape clip ─────────────────────────────────────────────────────────
@@ -913,6 +916,7 @@ function BlockContent({
       if (ts.fontUnderline !== undefined) override.textDecoration = ts.fontUnderline ? 'underline' : 'none'
       if (ts.fontColor   !== undefined) override.color         = ts.fontColor
       if (ts.textAlign   !== undefined) override.textAlign     = ts.textAlign
+      if (ts.fontCase    !== undefined) override.textTransform = ts.fontCase === 'none' ? 'none' : ts.fontCase
       if (ts.lineHeight  !== undefined) override.lineHeight    = ts.lineHeight
       if (ts.letterSpacing !== undefined) override.letterSpacing = `${ts.letterSpacing}px`
     }
@@ -2430,6 +2434,7 @@ export const EmailEditorPanel: React.FC = () => {
                         textAlign={block.textAlign}
                         lineHeight={block.lineHeight}
                         letterSpacing={block.letterSpacing}
+                        fontCase={block.fontCase}
                         imageShape={block.imageShape}
                         onButtonAreaClick={handleButtonAreaClick}
                         contentLayout={block.contentLayout}

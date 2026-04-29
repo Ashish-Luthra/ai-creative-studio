@@ -41,6 +41,7 @@ export interface CanvasBlock {
   fontUnderline?: boolean
   fontColor?: string
   textAlign?: 'left' | 'center' | 'right'
+  fontCase?: 'none' | 'lowercase' | 'uppercase'
   lineHeight?: number
   letterSpacing?: number
   // Spacer
@@ -69,6 +70,7 @@ export interface CanvasBlock {
     fontUnderline?: boolean
     fontColor?: string
     textAlign?: 'left' | 'center' | 'right'
+    fontCase?: 'none' | 'lowercase' | 'uppercase'
     lineHeight?: number
     letterSpacing?: number
   }>

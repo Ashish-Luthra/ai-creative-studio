@@ -12,16 +12,11 @@ import {
   replaceOrAddImageLayer,
   seedDefaultCreative,
 } from '@/lib/canvas/fabricInit'
-import {
-  DEFAULT_CANVAS_ZOOM,
-  DEFAULT_TEXT_FONT_FAMILY,
-  DEFAULT_TEXT_FONT_SIZE,
-} from '@/lib/canvas/canvasDefaults'
+import { DEFAULT_CANVAS_ZOOM } from '@/lib/canvas/canvasDefaults'
 import { CREATIVE_PRESETS, getPresetById, isPresetId, type CreativePreset } from '@/lib/canvas/presets'
 import { TopBar } from './TopBar'
 import { ToolbarLeft, type RailTool } from './ToolbarLeft'
 import { AgentPill } from './AgentPill'
-import { FloatToolbar } from './FloatToolbar'
 import { FloatPropertiesCard } from './FloatPropertiesCard'
 import { EmailEditorPanel } from '@/components/email/EmailEditorPanel'
 import { ApprovedImagesPanel } from './ApprovedImagesPanel'
@@ -32,32 +27,11 @@ import { VariantsPanel, type CanvasVariant } from './VariantsPanel'
 import { AIAssistPanel } from './AIAssistPanel'
 import { PublishPanel, type PublishResult } from './PublishPanel'
 
-// ── Toolbar state shape ──────────────────────────────────────
-interface TbState {
-  fontFamily: string
-  fontSize: number
-  isBold: boolean
-  isItalic: boolean
-  isUnderline: boolean
-  textAlign: 'left' | 'center' | 'right'
-  color: string
-}
-
 interface CampaignMeta {
   briefId: string
   name: string
   updatedAt: string | null
   activePresetId: string
-}
-
-const DEFAULT_TB: TbState = {
-  fontFamily: DEFAULT_TEXT_FONT_FAMILY,
-  fontSize: DEFAULT_TEXT_FONT_SIZE,
-  isBold: false,
-  isItalic: false,
-  isUnderline: false,
-  textAlign: 'center',
-  color: '#FFFFFF',
 }
 
 const INSERT_FRAME_SCALE = 0.36
@@ -192,9 +166,6 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
   } = useCanvasStore()
 
   const [toolbarPos, setToolbarPos] = useState({ x: 0, y: 0 })
-  const [tbState, setTbState] = useState<TbState>(DEFAULT_TB)
-  const tbStateRef = useRef<TbState>(DEFAULT_TB)
-  tbStateRef.current = tbState
 
   const storageKey = `creative-canvas:${briefId}`
   const presetStorageKey = `${storageKey}:preset`
@@ -240,51 +211,11 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
     return { copyText, imageUrl }
   }, [])
 
-  // Read fabric text properties into toolbar state
-  const syncToolbar = useCallback((obj: FabricObject | null) => {
-    if (!obj) return
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const t = obj as any
-    if (t.text !== undefined) {
-      setTbState({
-        fontFamily: t.fontFamily ?? DEFAULT_TEXT_FONT_FAMILY,
-        fontSize: typeof t.fontSize === 'number' ? t.fontSize : DEFAULT_TEXT_FONT_SIZE,
-        isBold: t.fontWeight === 'bold' || t.fontWeight === 700,
-        isItalic: t.fontStyle === 'italic',
-        isUnderline: !!t.underline,
-        textAlign: (['left', 'center', 'right'].includes(t.textAlign) ? t.textAlign : 'center') as TbState['textAlign'],
-        color: typeof t.fill === 'string' ? t.fill : '#FFFFFF',
-      })
-    }
-  }, [])
-
   // Sync toolbar position from object bounding rect
   const syncPos = useCallback((obj: FabricObject) => {
     const br = obj.getBoundingRect()
     setToolbarPos({ x: br.left, y: br.top })
   }, [])
-
-  // Apply toolbar changes to the selected fabric object
-  const applyToLayer = useCallback((changes: Partial<TbState>) => {
-    const fc = fabricRef.current
-    if (!fc || !selectedLayer) return
-    const next = { ...tbStateRef.current, ...changes }
-    setTbState(next)
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const t = selectedLayer as any
-    if (t.text !== undefined) {
-      if ('fontFamily' in changes) t.set({ fontFamily: changes.fontFamily })
-      if ('fontSize' in changes) t.set({ fontSize: changes.fontSize })
-      if ('isBold' in changes) t.set({ fontWeight: next.isBold ? 'bold' : 'normal' })
-      if ('isItalic' in changes) t.set({ fontStyle: next.isItalic ? 'italic' : 'normal' })
-      if ('isUnderline' in changes) t.set({ underline: next.isUnderline })
-      if ('textAlign' in changes) t.set({ textAlign: changes.textAlign })
-      if ('color' in changes) t.set({ fill: changes.color })
-      fc.renderAll()
-      saveSnapshot()
-    }
-  }, [selectedLayer, saveSnapshot])
 
   // ── Init Fabric (canvas mode only) ─────────────────────────
   // Uses rAF so layout is complete before we read container dimensions.
@@ -313,7 +244,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
         height: h,
         onSelect: (obj) => {
           setSelectedLayer(obj)
-          if (obj) { syncPos(obj); syncToolbar(obj) }
+          if (obj) syncPos(obj)
         },
         onModified: () => saveSnapshot(),
       })
@@ -415,7 +346,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [briefId, campaignKey, generatedKey, initialPresetId, mode, recentCampaignsKey, resetHistory, saveSnapshot, selectedPresetId, setSelectedPresetId, storageKey, presetStorageKey, setSelectedLayer, setFabricCanvas, syncPos, syncToolbar, variantsKey])
+  }, [briefId, campaignKey, generatedKey, initialPresetId, mode, recentCampaignsKey, resetHistory, saveSnapshot, selectedPresetId, setSelectedPresetId, storageKey, presetStorageKey, setSelectedLayer, setFabricCanvas, syncPos, variantsKey])
 
   // ── Delete selected object on Delete / Backspace ──────────
   // Only fires when mode==='canvas', an object is selected, and the
@@ -783,9 +714,6 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
     return data
   }, [briefId, extractCreativeInputs, selectedPresetId])
 
-  // Show FloatToolbar only when a text object is selected
-  const isTextSelected =
-    selectedLayer?.type === 'textbox' || selectedLayer?.type === 'i-text'
   const isImageSelected = selectedLayer?.type === 'image'
 
   return (
@@ -885,27 +813,6 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
               void handleImageSelect(src)
             }}
           />
-
-          {/* Typography toolbar — shown only when a text layer is selected */}
-          {mode === 'canvas' && isTextSelected && (
-            <FloatToolbar
-              position={toolbarPos}
-              fontFamily={tbState.fontFamily}
-              fontSize={tbState.fontSize}
-              isBold={tbState.isBold}
-              isItalic={tbState.isItalic}
-              isUnderline={tbState.isUnderline}
-              textAlign={tbState.textAlign}
-              color={tbState.color}
-              onFontChange={(f) => applyToLayer({ fontFamily: f })}
-              onSizeChange={(s) => applyToLayer({ fontSize: s })}
-              onBoldToggle={() => applyToLayer({ isBold: !tbState.isBold })}
-              onItalicToggle={() => applyToLayer({ isItalic: !tbState.isItalic })}
-              onUnderlineToggle={() => applyToLayer({ isUnderline: !tbState.isUnderline })}
-              onAlignChange={(a) => applyToLayer({ textAlign: a })}
-              onColorChange={(c) => applyToLayer({ color: c })}
-            />
-          )}
 
           {mode === 'canvas' && isImageSelected && selectedLayer && (
             <ImageSelectionToolbar

@@ -364,10 +364,28 @@ CREATE TABLE clusters (
 - Per-field font overrides in `block.textStyles[key]` override block-level font properties at render time; block-level props remain as the "default" for all fields
 - `dangerouslySetInnerHTML` + `onBlur` pattern used for contentEditable to avoid cursor resets on re-render
 
+---
+
+### Session — 2026-04-29 (continued)
+
+#### Completed
+- **Per-field textStyles wired into email HTML compiler**
+  - Added `fieldTextStyles(cb, fieldKey, overrides?)` helper in `src/lib/email/canvasConverter.ts` — merges `cb.textStyles[fieldKey]` user overrides on top of block-level defaults; spec hardcoded overrides (e.g. font sizes for prebuilt blocks) are passed as `overrides` and act as the fallback, with user's field-level edits winning last
+  - Updated all block converters to use `fieldTextStyles` per named field: `text` (body), `button` (button), `address` (address), `footer` (copyright), `content` (heading/body for image-text; col1/2-heading/body for 2col; col1/2/3-heading/body for 3col), `image-left-text-right` (tagline/heading), `text-over-image` (heading), `text-left-image-right` (heading), `recipe-card` (label/heading/description), `image-top-text-bottom` (heading/body), `testimonial` (name/quote)
+  - `convertButton` merges `cb.textStyles['button']` into `buttonStyles` for font family/size/weight
+  - `centered-content` still uses a single inline HTML string for all text — per-field font export deferred (would require splitting into multiple `makeTextBlock`s)
+- **FloatToolbar removed from canvas mode**
+  - Removed `FloatToolbar` render block, import, `TbState` interface, `DEFAULT_TB`, `tbState`/`tbStateRef` state, `syncToolbar` callback, `applyToLayer` callback, and `DEFAULT_TEXT_FONT_FAMILY`/`DEFAULT_TEXT_FONT_SIZE` imports from `CanvasEditor.tsx`
+  - `syncPos` and `toolbarPos` retained — still used by `ImageSelectionToolbar`
+  - `FloatToolbar.tsx` file untouched — preserved for potential future reuse
+
+#### Architectural Decisions
+- `fieldTextStyles` precedence order (low → high): block-level defaults → spec `overrides` → user's `cb.textStyles[fieldKey]`
+- Field key names in `canvasConverter.ts` exactly match `editableField(key, ...)` keys in `BlockContent` — no aliasing
+
 #### Next Steps
-- Wire `textStyles` overrides through to the email HTML compiler (`canvasConverter.ts` / `compiler.tsx`) so per-field fonts export correctly
-- Floating toolbar (canvas mode `FloatToolbar`) still renders — remove it and confirm AI Assistant replaces it in canvas mode
-- Floating toolbar should appear only in Right Nav for email mode (already done via `TextEditPanel` and `FontTab`)
+- Split `centered-content` converter into separate `makeTextBlock`s per field so per-field font overrides export correctly (heading, body, label, number)
+- Verify exported HTML in the browser: select a block, change a field's font in Right Nav, export and inspect the HTML output
 
 ---
 

@@ -1002,6 +1002,7 @@ function FontTab({
   const currentAlign    = (fieldStyle ? fieldStyle.textAlign    : block.textAlign)   ?? 'left'
   const currentLH       = (fieldStyle ? fieldStyle.lineHeight   : block.lineHeight)  ?? 1.6
   const currentLS       = (fieldStyle ? fieldStyle.letterSpacing : block.letterSpacing) ?? 0
+  const currentCase     = (fieldStyle ? fieldStyle.fontCase     : block.fontCase)    ?? 'none'
 
   const isUnknownFont   = !!currentFont && !ALL_KNOWN_FONTS.has(currentFont)
 
@@ -1014,6 +1015,7 @@ function FontTab({
   const handleAlign   = (v: 'left' | 'center' | 'right') => fieldStyle !== null ? patchField({ textAlign: v }) : onPatch({ textAlign: v })
   const handleLH      = (v: number)  => fieldStyle !== null ? patchField({ lineHeight: v })     : onPatch({ lineHeight: v })
   const handleLS      = (v: number)  => fieldStyle !== null ? patchField({ letterSpacing: v })  : onPatch({ letterSpacing: v })
+  const handleCase    = (v: 'none' | 'lowercase' | 'uppercase') => fieldStyle !== null ? patchField({ fontCase: v }) : onPatch({ fontCase: v })
 
   return (
     <div className="flex-1 overflow-auto px-4 py-4 space-y-4">
@@ -1112,6 +1114,32 @@ function FontTab({
               )}
             >
               {icon}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Case */}
+      <div>
+        <SectionLabel>Case</SectionLabel>
+        <div className="flex gap-2">
+          {([
+            { value: 'none',      label: 'aA', title: 'Default' },
+            { value: 'lowercase', label: 'aa', title: 'Lowercase' },
+            { value: 'uppercase', label: 'AA', title: 'Uppercase' },
+          ] as const).map(({ value, label, title }) => (
+            <button
+              key={value}
+              title={title}
+              onClick={() => handleCase(value)}
+              className={cn(
+                'flex h-9 flex-1 items-center justify-center rounded-xl border text-[12px] font-semibold transition-colors',
+                currentCase === value
+                  ? 'border-blue-400 bg-blue-50 text-blue-600'
+                  : 'border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50',
+              )}
+            >
+              {label}
             </button>
           ))}
         </div>

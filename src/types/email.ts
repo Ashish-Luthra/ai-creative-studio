@@ -57,6 +57,7 @@ export interface TextStyles {
   lineHeight: number        // unitless multiplier
   color: string             // hex
   textAlign: 'left' | 'center' | 'right'
+  textTransform?: 'none' | 'lowercase' | 'uppercase'
   padding: Padding
 }
 

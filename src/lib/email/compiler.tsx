@@ -194,6 +194,7 @@ function BlockText({
             lineHeight: String(styles.lineHeight),
             color: styles.color,
             textAlign: styles.textAlign,
+            ...(styles.textTransform && styles.textTransform !== 'none' && { textTransform: styles.textTransform }),
             paddingTop: `${styles.padding.top}px`,
             paddingRight: `${styles.padding.right}px`,
             paddingBottom: `${styles.padding.bottom}px`,
