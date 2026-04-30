@@ -1,65 +1,35 @@
 'use client'
 
-import { useState } from 'react'
 import type { RailTool } from './ToolbarLeft'
 import { CREATIVE_PRESETS } from '@/lib/canvas/presets'
 
 interface RightStudioPanelProps {
   activeTool: RailTool | null
   selectedPresetId: string
-  onPresetChange: (presetId: string) => void | Promise<void>
-  onInsertAllTemplatesFromCurrentCreative?: () => void | Promise<void>
-  onAddText: () => void
-  onAddShape: () => void
-  onOpenMedia: () => void
+  onPresetChange: (presetId: string) => void
+  onAddFrame: () => void
+  onConvertToAll: () => void
 }
 
 export const RightStudioPanel: React.FC<RightStudioPanelProps> = ({
   activeTool,
   selectedPresetId,
   onPresetChange,
-  onInsertAllTemplatesFromCurrentCreative,
-  onAddText,
-  onAddShape,
-  onOpenMedia,
+  onAddFrame,
+  onConvertToAll,
 }) => {
-  const [insertingAll, setInsertingAll] = useState(false)
-
-  if (!activeTool || activeTool === 'projects' || activeTool === 'settings') return null
+  if (!activeTool || activeTool === 'projects' || activeTool === 'settings' || activeTool === 'cta') return null
 
   return (
     <aside className="absolute right-5 top-20 z-50 w-72 rounded-2xl border border-gray-200 bg-white/95 p-4 shadow-[0_10px_24px_rgba(0,0,0,0.10)] backdrop-blur-sm">
       {activeTool === 'layout' && (
         <>
           <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Layout / Template</h3>
-          <p className="mb-2 text-xs text-gray-500">
-            Add a new creative card for a preset, or drop every template using your current image and headline.
-          </p>
-          {onInsertAllTemplatesFromCurrentCreative && (
-            <button
-              type="button"
-              disabled={insertingAll}
-              onClick={async () => {
-                setInsertingAll(true)
-                try {
-                  await onInsertAllTemplatesFromCurrentCreative()
-                } finally {
-                  setInsertingAll(false)
-                }
-              }}
-              className="mb-3 w-full rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-left text-sm font-medium text-blue-800 transition-colors hover:bg-blue-100 disabled:opacity-50"
-            >
-              {insertingAll ? 'Creating templates…' : `Create all templates (${CREATIVE_PRESETS.length}) from current creative`}
-            </button>
-          )}
           <div className="space-y-2">
             {CREATIVE_PRESETS.map((preset) => (
               <button
                 key={preset.id}
-                type="button"
-                onClick={() => {
-                  void onPresetChange(preset.id)
-                }}
+                onClick={() => onPresetChange(preset.id)}
                 className={`w-full rounded-md border px-3 py-2 text-left text-sm ${
                   selectedPresetId === preset.id ? 'border-blue-300 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-700'
                 }`}
@@ -68,49 +38,31 @@ export const RightStudioPanel: React.FC<RightStudioPanelProps> = ({
                 <div className="text-xs text-gray-500">{preset.width} x {preset.height}</div>
               </button>
             ))}
+            <button
+              onClick={onAddFrame}
+              className="w-full rounded-md border border-gray-200 px-3 py-2 text-left text-sm text-gray-700 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
+            >
+              <span className="font-medium">Add Frame (1:1)</span>
+            </button>
+            <button
+              onClick={onConvertToAll}
+              className="flex w-full items-center gap-2 rounded-md border border-gray-200 px-3 py-2 text-left text-sm text-gray-700 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
+            >
+              <span className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-full border border-gray-400">
+                <span className="h-1.5 w-1.5 rounded-full bg-transparent" />
+              </span>
+              <span className="font-medium">Replicate to all sizes</span>
+            </button>
           </div>
         </>
       )}
 
-      {activeTool === 'media' && (
-        <>
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Media</h3>
-          <p className="mb-3 text-sm text-gray-600">Open approved images and replace the selected creative image.</p>
-          <button onClick={onOpenMedia} className="w-full rounded-md bg-gray-900 px-3 py-2 text-sm font-medium text-white">
-            Open Approved Images
-          </button>
-        </>
+      {activeTool === 'hand' && (
+        <Placeholder
+          title="Hand Move"
+          text="Drag the image or frame to move the whole creative block. In Hand mode, any layer in the block drags the full creative."
+        />
       )}
-
-      {activeTool === 'copy' && (
-        <>
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Copy</h3>
-          <p className="mb-3 text-sm text-gray-600">Add headline/subtext layers and edit them inline on canvas.</p>
-          <button onClick={onAddText} className="w-full rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white">
-            Add Text Layer
-          </button>
-        </>
-      )}
-
-      {activeTool === 'cta' && <Placeholder title="CTA / Action" text="Separate CTA controls are planned for a later phase." />}
-      {activeTool === 'style' && <Placeholder title="Style / Brand" text="Brand style automation is deferred; text styling works in the floating toolbar." />}
-      {activeTool === 'ai' && <Placeholder title="AI Assist" text="AI generation tools are intentionally deferred in Phase 1." />}
-      {activeTool === 'variants' && (
-        <>
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Variants</h3>
-          <p className="text-sm text-gray-600">Use this tab to generate and compare variants from current creative state.</p>
-        </>
-      )}
-      {activeTool === 'preview' && (
-        <>
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Preview</h3>
-          <p className="mb-3 text-sm text-gray-600">Use Layout presets to preview LinkedIn/Instagram output ratios.</p>
-          <button onClick={onAddShape} className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700">
-            Add Shape Overlay
-          </button>
-        </>
-      )}
-      {activeTool === 'export' && <Placeholder title="Export / Publish" text="Use the top-right Export button to download a PNG asset." />}
     </aside>
   )
 }

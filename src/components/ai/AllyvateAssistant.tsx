@@ -43,33 +43,6 @@ const MOOD_ACTIONS = [
   { id: 'playful',      label: '🎉  Playful',       prompt: 'switch the mood of this design to playful' },
 ]
 
-// ─── Mock copy variants ───────────────────────────────────────────────────────
-
-const MOCK_TEXT_VARIANTS: string[][] = [
-  [
-    'Experience the moment — every sip tells a story worth sharing.',
-    'Savour every drop. Life tastes better when shared.',
-    'From the first sip to the last, make every moment count.',
-  ],
-  [
-    'Join thousands who\'ve already made the switch.',
-    'Be part of something bigger — your story starts here.',
-    'Ready to level up? The community is waiting for you.',
-  ],
-  [
-    'Less clutter. More clarity. Your brand, amplified.',
-    'Simple, powerful, and built for creators like you.',
-    'Everything you need — nothing you don\'t.',
-  ],
-]
-
-let _variantIdx = 0
-function nextMockVariants(): string[] {
-  const v = MOCK_TEXT_VARIANTS[_variantIdx % MOCK_TEXT_VARIANTS.length]
-  _variantIdx++
-  return v
-}
-
 const MOCK_NON_TEXT_REPLY: Record<'image' | 'design', string> = {
   image:  'Here\'s a fresh image concept to try. Drop it onto the canvas to apply it.',
   design: 'I\'ve rethought the image and copy together to match your chosen mood. Apply it to the block when ready.',
@@ -190,7 +163,7 @@ export function AllyvateAssistant({
     sendMessage(`@Allyvate, ${prompt}`, activeCtx)
   }
 
-  const sendMessage = (body: string, ctx: AllyContext) => {
+  const sendMessage = async (body: string, ctx: AllyContext) => {
     if (!body.trim() || body.trim() === '@Allyvate') return
 
     const userMsg: Message = { id: nanoid(), from: 'user', body, ts: new Date().toISOString() }
@@ -198,16 +171,22 @@ export function AllyvateAssistant({
     setInput('@Allyvate ')
     setIsTyping(true)
 
-    setTimeout(() => {
-      setIsTyping(false)
+    try {
       if (ctx === 'text') {
+        const res = await fetch('/api/assistant', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: body, context: { type: ctx } }),
+        })
+        const json = await res.json() as { data?: { variants: string[] }; error?: string }
+        const variants = json.data?.variants ?? []
         setMessages((prev) => [
           ...prev,
           {
             id: nanoid(),
-            from: 'ally',
-            body: 'Here are 3 copy variants for you:',
-            variants: nextMockVariants(),
+            from: 'ally' as const,
+            body: variants.length > 0 ? 'Here are 3 copy variants for you:' : 'Sorry, I couldn\'t generate variants right now.',
+            variants: variants.length > 0 ? variants : undefined,
             ts: new Date().toISOString(),
           },
         ])
@@ -216,13 +195,25 @@ export function AllyvateAssistant({
           ...prev,
           {
             id: nanoid(),
-            from: 'ally',
+            from: 'ally' as const,
             body: MOCK_NON_TEXT_REPLY[ctx as 'image' | 'design'],
             ts: new Date().toISOString(),
           },
         ])
       }
-    }, 1000)
+    } catch {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: nanoid(),
+          from: 'ally' as const,
+          body: 'Something went wrong. Please try again.',
+          ts: new Date().toISOString(),
+        },
+      ])
+    } finally {
+      setIsTyping(false)
+    }
   }
 
   const handleSend = () => {
