@@ -462,6 +462,32 @@ CREATE TABLE clusters (
 
 ---
 
+### Session — 2026-04-30 (StudioOne branch)
+
+#### Completed
+- **`centered-content` converter fully per-field**
+  - Added `stylesToInline(s: TextStyles): string` helper in `canvasConverter.ts` — converts a resolved `TextStyles` object to an inline CSS string (fontFamily, fontSize, fontWeight, color, lineHeight, textTransform)
+  - Replaced all 4 hardcoded `<p>` tags in `convertCenteredContent` with `t(cb, key, default)` for text content and `fieldTextStyles(cb, key, specDefaults)` → `stylesToInline()` for per-field inline styles
+  - Fields: `number`, `heading`, `body`, `label` — all now respect user text edits and per-field font/case overrides in both live preview and exported HTML
+- **Real Claude API wired into AllyvateAssistant**
+  - Created `src/app/api/assistant/route.ts` — POST endpoint, Zod-validated input (`message`, `context.type`, optional `fieldContent`/`blockType`), calls `claude-sonnet-4-20250514`, parses JSON array of 3 variants, returns `{ data: { variants: string[] } }` or `{ error: string }`
+  - `AllyvateAssistant.tsx`: removed `MOCK_TEXT_VARIANTS`, `_variantIdx`, `nextMockVariants`; `sendMessage` is now `async` — calls `/api/assistant` for text-context, handles loading/error states via `isTyping` and try/catch/finally
+  - Non-text context (image/design) still uses placeholder replies — real image/mood generation is out of scope for Phase 1
+
+#### Architectural Decisions
+- `stylesToInline` accepts a fully resolved `TextStyles` (not `Partial`) — `fieldTextStyles` always returns a complete object so no nullability issues
+- `textTransform: 'none'` is never emitted as an inline style (matches compiler behaviour)
+- AI assistant API route uses server-side `ANTHROPIC_API_KEY` only — never exposed to client
+- `sendMessage` is fire-and-forget async (not awaited at call sites) — React state updates handle UI
+
+#### Open Items / Next Steps
+- Test `centered-content` in browser: edit each field, change font/case, export HTML and verify inline styles
+- Test case toggles (`aa/aA/AA`) end-to-end across all blocks: live preview + exported HTML `text-transform`
+- Verify cursor fix works across all blocks (only `text-over-image` confirmed previously)
+- Add `ANTHROPIC_API_KEY` to `.env.local` and `.env.example` if not already present
+
+---
+
 ## 10. How to Work with This Project (Claude Code Instructions)
 
 1. Always read this file at session start.

@@ -125,6 +125,18 @@ function t(cb: CanvasBlock, key: string, defaultText: string): string {
   return cb.texts?.[key] ?? defaultText
 }
 
+/** Convert a resolved TextStyles object to an inline CSS string for use inside raw HTML. */
+function stylesToInline(s: TextStyles): string {
+  const parts: string[] = []
+  if (s.fontFamily) parts.push(`font-family:${s.fontFamily}`)
+  parts.push(`font-size:${s.fontSize}px`)
+  if (s.fontWeight !== 'normal') parts.push(`font-weight:${s.fontWeight}`)
+  parts.push(`color:${s.color}`)
+  parts.push(`line-height:${s.lineHeight}`)
+  if (s.textTransform && s.textTransform !== 'none') parts.push(`text-transform:${s.textTransform}`)
+  return parts.join(';')
+}
+
 function imageStyles(overrides: Partial<ImageStyles> = {}): ImageStyles {
   return {
     width: 'full',
@@ -422,20 +434,20 @@ function convertImageLeftTextRight(cb: CanvasBlock): EmailSection {
 
 function convertCenteredContent(cb: CanvasBlock): EmailSection {
   const S = SPECS.CENTERED_CONTENT
-  // White card as a nested HTML table — gives the white-on-gray effect without
-  // CSS box-shadows (which email clients strip). Font-family is NOT set on the
-  // inner <p> tags so the <td> wrapper's buildFontStack cascade applies.
-  const bodyColor = cb.fontColor ?? S.bodyColor
+
+  const numStyle  = stylesToInline(fieldTextStyles(cb, 'number',  { fontSize: S.numberFontSize,  color: S.numberColor,  lineHeight: S.numberLineHeight,  fontWeight: '700',            textAlign: 'center' }))
+  const headStyle = stylesToInline(fieldTextStyles(cb, 'heading', { fontSize: S.headingFontSize, fontWeight: S.headingWeight,                                                           textAlign: 'center' }))
+  const bodyStyle = stylesToInline(fieldTextStyles(cb, 'body',    { fontSize: S.bodyFontSize,    color: S.bodyColor,    lineHeight: S.bodyLineHeight,                                   textAlign: 'center' }))
+  const lblStyle  = stylesToInline(fieldTextStyles(cb, 'label',   { fontSize: S.labelFontSize,   color: S.labelColor,                                                                   textAlign: 'center' }))
 
   const cardHtml =
     `<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" ` +
     `style="background-color:${S.cardBg};border-radius:${S.cardBorderRadius}px;margin:0 auto;width:100%">` +
     `<tr><td style="padding:${S.cardPadding}px;text-align:center">` +
-    `<p style="margin:0;font-size:${S.numberFontSize}px;font-weight:700;color:${S.numberColor};line-height:${S.numberLineHeight}">6</p>` +
-    `<p style="margin:8px 0 0;font-size:${S.headingFontSize}px;font-weight:${S.headingWeight}">Tips to Photograph Food</p>` +
-    `<p style="margin:12px auto 0;font-size:${S.bodyFontSize}px;color:${bodyColor};max-width:${S.bodyMaxWidthPx}px;line-height:${S.bodyLineHeight}">` +
-    `I remember my first try at food photography. I created this guide to help you get started without making all the mistakes I did.</p>` +
-    `<p style="margin:16px 0 0;font-size:${S.labelFontSize}px;color:${S.labelColor}">001</p>` +
+    `<p style="margin:0;${numStyle}">${t(cb, 'number', '6')}</p>` +
+    `<p style="margin:8px 0 0;${headStyle}">${t(cb, 'heading', 'Tips to Photograph Food')}</p>` +
+    `<p style="margin:12px auto 0;max-width:${S.bodyMaxWidthPx}px;${bodyStyle}">${t(cb, 'body', 'I remember my first try at food photography. I created this guide to help you get started without making all the mistakes I did.')}</p>` +
+    `<p style="margin:16px 0 0;${lblStyle}">${t(cb, 'label', '001')}</p>` +
     `</td></tr></table>`
 
   const cardBlock = makeTextBlock({
