@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import {
   X, Type, Image as ImageIcon, Smile,
-  ChevronLeft, ChevronRight, Send, Sparkles,
+  ChevronLeft, ChevronRight, Send, Sparkles, CornerDownLeft,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { nanoid } from 'nanoid'
@@ -16,6 +16,8 @@ interface Message {
   id: string
   from: 'user' | 'ally'
   body: string
+  /** For text-context ally replies: 3 copy variants to choose from */
+  variants?: string[]
   ts: string
 }
 
@@ -41,6 +43,38 @@ const MOOD_ACTIONS = [
   { id: 'playful',      label: '🎉  Playful',       prompt: 'switch the mood of this design to playful' },
 ]
 
+// ─── Mock copy variants ───────────────────────────────────────────────────────
+
+const MOCK_TEXT_VARIANTS: string[][] = [
+  [
+    'Experience the moment — every sip tells a story worth sharing.',
+    'Savour every drop. Life tastes better when shared.',
+    'From the first sip to the last, make every moment count.',
+  ],
+  [
+    'Join thousands who\'ve already made the switch.',
+    'Be part of something bigger — your story starts here.',
+    'Ready to level up? The community is waiting for you.',
+  ],
+  [
+    'Less clutter. More clarity. Your brand, amplified.',
+    'Simple, powerful, and built for creators like you.',
+    'Everything you need — nothing you don\'t.',
+  ],
+]
+
+let _variantIdx = 0
+function nextMockVariants(): string[] {
+  const v = MOCK_TEXT_VARIANTS[_variantIdx % MOCK_TEXT_VARIANTS.length]
+  _variantIdx++
+  return v
+}
+
+const MOCK_NON_TEXT_REPLY: Record<'image' | 'design', string> = {
+  image:  'Here\'s a fresh image concept to try. Drop it onto the canvas to apply it.',
+  design: 'I\'ve rethought the image and copy together to match your chosen mood. Apply it to the block when ready.',
+}
+
 // ─── Allyvate icon ────────────────────────────────────────────────────────────
 
 function AllyvateIcon({ size = 20 }: { size?: number }) {
@@ -65,10 +99,38 @@ function timeAgo(iso: string) {
   return `${Math.floor(s / 3600)}h ago`
 }
 
-const MOCK_REPLIES: Record<AllyContext, string> = {
-  text:   'Here\'s a revised version:\n\n"Experience the moment — every sip tells a story worth sharing."',
-  image:  'Here\'s a fresh image concept to try. Drop it onto the canvas to apply it.',
-  design: 'I\'ve rethought the image and copy together to match your chosen mood. Apply it to the block when ready.',
+// ─── Variant card ─────────────────────────────────────────────────────────────
+
+function VariantCard({
+  text,
+  index,
+  onInsert,
+}: {
+  text: string
+  index: number
+  onInsert: (text: string) => void
+}) {
+  return (
+    <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+      <div className="mb-1.5 flex items-center justify-between">
+        <span className="text-[9px] font-semibold uppercase tracking-wider text-gray-400">
+          Variant {index + 1}
+        </span>
+      </div>
+      <p className="text-[11px] leading-relaxed text-gray-700">{text}</p>
+      <div className="mt-2 flex justify-end">
+        <button
+          type="button"
+          onClick={() => onInsert(text)}
+          title="Insert this variant"
+          className="flex items-center gap-1 rounded-lg border border-[#1B51B3]/30 bg-[#1B51B3]/8 px-2.5 py-1 text-[10px] font-semibold text-[#1B51B3] transition-colors hover:bg-[#1B51B3] hover:text-white"
+        >
+          <CornerDownLeft size={10} />
+          Insert
+        </button>
+      </div>
+    </div>
+  )
 }
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -80,22 +142,24 @@ export interface AllyvateAssistantProps {
   anchorX: number
   anchorY: number
   onClose: () => void
+  /** Called when user clicks Insert on a text variant */
+  onInsert?: (text: string) => void
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function AllyvateAssistant({
-  visible, context, anchorX, anchorY, onClose,
+  visible, context, anchorX, anchorY, onClose, onInsert,
 }: AllyvateAssistantProps) {
   const [mode,            setMode]            = useState<'pill' | 'expanded'>('pill')
   const [activeCtx,       setActiveCtx]       = useState<AllyContext>(context)
   const [input,           setInput]           = useState('@Allyvate ')
   const [showActionMenu,  setShowActionMenu]  = useState(false)
   const [messages,        setMessages]        = useState<Message[]>([])
-  const [msgIdx,          setMsgIdx]          = useState(0)   // for 1/N nav
+  const [isTyping,        setIsTyping]        = useState(false)
 
-  const inputRef      = useRef<HTMLTextAreaElement>(null)
-  const messagesEnd   = useRef<HTMLDivElement>(null)
+  const inputRef    = useRef<HTMLTextAreaElement>(null)
+  const messagesEnd = useRef<HTMLDivElement>(null)
 
   // Reset on each new invocation
   useEffect(() => {
@@ -104,7 +168,7 @@ export function AllyvateAssistant({
       setActiveCtx(context)
       setInput('@Allyvate ')
       setMessages([])
-      setMsgIdx(0)
+      setIsTyping(false)
       setShowActionMenu(false)
     }
   }, [visible, context])
@@ -112,8 +176,7 @@ export function AllyvateAssistant({
   // Auto-scroll
   useEffect(() => {
     messagesEnd.current?.scrollIntoView({ behavior: 'smooth' })
-    setMsgIdx(Math.max(0, Math.floor(messages.length / 2) - 1))
-  }, [messages])
+  }, [messages, isTyping])
 
   const expand = (ctx: AllyContext) => {
     setActiveCtx(ctx)
@@ -122,33 +185,54 @@ export function AllyvateAssistant({
   }
 
   const handleActionSelect = (prompt: string) => {
-    setInput(`@Allyvate, ${prompt}`)
     setShowActionMenu(false)
-    setTimeout(() => inputRef.current?.focus(), 50)
+    // Fire immediately as if the user sent it
+    sendMessage(`@Allyvate, ${prompt}`, activeCtx)
   }
 
-  const handleSend = () => {
-    const body = input.trim()
-    if (!body || body === '@Allyvate') return
+  const sendMessage = (body: string, ctx: AllyContext) => {
+    if (!body.trim() || body.trim() === '@Allyvate') return
 
     const userMsg: Message = { id: nanoid(), from: 'user', body, ts: new Date().toISOString() }
     setMessages((prev) => [...prev, userMsg])
     setInput('@Allyvate ')
+    setIsTyping(true)
 
-    // Simulated reply
     setTimeout(() => {
-      setMessages((prev) => [
-        ...prev,
-        { id: nanoid(), from: 'ally', body: MOCK_REPLIES[activeCtx], ts: new Date().toISOString() },
-      ])
+      setIsTyping(false)
+      if (ctx === 'text') {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: nanoid(),
+            from: 'ally',
+            body: 'Here are 3 copy variants for you:',
+            variants: nextMockVariants(),
+            ts: new Date().toISOString(),
+          },
+        ])
+      } else {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: nanoid(),
+            from: 'ally',
+            body: MOCK_NON_TEXT_REPLY[ctx as 'image' | 'design'],
+            ts: new Date().toISOString(),
+          },
+        ])
+      }
     }, 1000)
+  }
+
+  const handleSend = () => {
+    sendMessage(input.trim(), activeCtx)
   }
 
   if (!visible) return null
 
   // ── Pill ──────────────────────────────────────────────────────────────────
   if (mode === 'pill') {
-    // Clamp so pill never goes off-screen top
     const pillTop  = Math.max(10, anchorY - 50)
     const pillLeft = anchorX
 
@@ -157,7 +241,6 @@ export function AllyvateAssistant({
         className="fixed z-[90] flex items-center gap-1.5 rounded-full border border-[#1B51B3]/30 bg-white/95 px-3 py-1.5 shadow-xl backdrop-blur-sm"
         style={{ left: pillLeft, top: pillTop, transform: 'translateX(-50%)' }}
       >
-        {/* Brand + label */}
         <button
           type="button"
           onClick={() => expand(activeCtx)}
@@ -169,38 +252,11 @@ export function AllyvateAssistant({
 
         <div className="mx-1 h-3.5 w-px bg-gray-200" />
 
-        {/* Context icons */}
-        <button
-          type="button"
-          onClick={() => expand('text')}
-          title="Edit text"
-          className="rounded p-0.5 text-gray-400 hover:text-[#1B51B3] transition-colors"
-        >
-          <Type size={12} />
-        </button>
-        <button
-          type="button"
-          onClick={() => expand('image')}
-          title="Edit image"
-          className="rounded p-0.5 text-gray-400 hover:text-[#1B51B3] transition-colors"
-        >
-          <ImageIcon size={12} />
-        </button>
-        <button
-          type="button"
-          onClick={() => expand('design')}
-          title="Switch mood"
-          className="rounded p-0.5 text-gray-400 hover:text-[#1B51B3] transition-colors"
-        >
-          <Smile size={12} />
-        </button>
+        <button type="button" onClick={() => expand('text')}   title="Edit text"   className="rounded p-0.5 text-gray-400 hover:text-[#1B51B3] transition-colors"><Type      size={12} /></button>
+        <button type="button" onClick={() => expand('image')}  title="Edit image"  className="rounded p-0.5 text-gray-400 hover:text-[#1B51B3] transition-colors"><ImageIcon size={12} /></button>
+        <button type="button" onClick={() => expand('design')} title="Switch mood" className="rounded p-0.5 text-gray-400 hover:text-[#1B51B3] transition-colors"><Smile     size={12} /></button>
 
-        {/* Dismiss */}
-        <button
-          type="button"
-          onClick={onClose}
-          className="ml-0.5 rounded-full p-0.5 text-gray-300 hover:text-gray-500 transition-colors"
-        >
+        <button type="button" onClick={onClose} className="ml-0.5 rounded-full p-0.5 text-gray-300 hover:text-gray-500 transition-colors">
           <X size={10} />
         </button>
       </div>
@@ -208,12 +264,11 @@ export function AllyvateAssistant({
   }
 
   // ── Expanded card ─────────────────────────────────────────────────────────
-  const actions     = activeCtx === 'text' ? TEXT_ACTIONS : activeCtx === 'image' ? IMAGE_ACTIONS : MOOD_ACTIONS
-  const ctxLabel    = activeCtx === 'text' ? 'Text' : activeCtx === 'image' ? 'Image' : 'Mood'
-  const totalRounds = Math.ceil(messages.length / 2)
+  const actions  = activeCtx === 'text' ? TEXT_ACTIONS : activeCtx === 'image' ? IMAGE_ACTIONS : MOOD_ACTIONS
+  const ctxLabel = activeCtx === 'text' ? 'Text' : activeCtx === 'image' ? 'Image' : 'Mood'
 
   return (
-    <div className="fixed right-[320px] top-1/2 z-[90] flex w-[300px] -translate-y-1/2 flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl">
+    <div className="fixed right-[320px] top-1/2 z-[90] flex w-[320px] -translate-y-1/2 flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl">
 
       {/* ── Header ── */}
       <div className="flex shrink-0 items-center justify-between border-b border-gray-100 px-4 py-3">
@@ -225,41 +280,10 @@ export function AllyvateAssistant({
           </span>
         </div>
         <div className="flex items-center gap-1">
-          {/* Round navigation */}
-          {totalRounds > 0 && (
-            <div className="flex items-center gap-0.5 text-[10px] text-gray-400">
-              <button
-                type="button"
-                onClick={() => setMsgIdx((i) => Math.max(0, i - 1))}
-                disabled={msgIdx === 0}
-                className="rounded p-0.5 hover:text-gray-700 disabled:opacity-30"
-              >
-                <ChevronLeft size={12} />
-              </button>
-              <span>{msgIdx + 1} / {totalRounds}</span>
-              <button
-                type="button"
-                onClick={() => setMsgIdx((i) => Math.min(totalRounds - 1, i + 1))}
-                disabled={msgIdx >= totalRounds - 1}
-                className="rounded p-0.5 hover:text-gray-700 disabled:opacity-30"
-              >
-                <ChevronRight size={12} />
-              </button>
-            </div>
-          )}
-          <button
-            type="button"
-            onClick={() => setMode('pill')}
-            className="rounded p-1 text-gray-300 hover:text-gray-600 transition-colors"
-            title="Collapse"
-          >
+          <button type="button" onClick={() => setMode('pill')} className="rounded p-1 text-gray-300 hover:text-gray-600 transition-colors" title="Collapse">
             <ChevronLeft size={13} />
           </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded p-1 text-gray-300 hover:text-gray-600 transition-colors"
-          >
+          <button type="button" onClick={onClose} className="rounded p-1 text-gray-300 hover:text-gray-600 transition-colors">
             <X size={13} />
           </button>
         </div>
@@ -288,12 +312,13 @@ export function AllyvateAssistant({
       </div>
 
       {/* ── Messages ── */}
-      <div className="min-h-[100px] max-h-[280px] flex-1 overflow-auto px-4 py-3 space-y-4">
-        {messages.length === 0 && (
+      <div className="min-h-[120px] max-h-[360px] flex-1 overflow-auto px-4 py-3 space-y-4">
+        {messages.length === 0 && !isTyping && (
           <p className="mt-3 text-center text-[11px] text-gray-300">
-            Describe what you'd like Allyvate to do
+            Choose a quick action or describe what you&apos;d like
           </p>
         )}
+
         {messages.map((msg) => (
           <div key={msg.id} className="flex gap-2.5">
             <div className="shrink-0 mt-0.5">
@@ -315,16 +340,39 @@ export function AllyvateAssistant({
               <p className="mt-0.5 whitespace-pre-wrap text-[11px] leading-relaxed text-gray-600">
                 {msg.body}
               </p>
+              {/* Variant cards */}
+              {msg.variants && msg.variants.length > 0 && (
+                <div className="mt-2 space-y-2">
+                  {msg.variants.map((v, i) => (
+                    <VariantCard
+                      key={i}
+                      text={v}
+                      index={i}
+                      onInsert={(text) => onInsert?.(text)}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         ))}
-        {/* New message divider */}
-        {messages.length > 0 && messages[messages.length - 1].from === 'ally' && (
-          <div className="flex items-center gap-2">
-            <div className="flex-1 h-px bg-red-200" />
-            <span className="text-[9px] font-medium text-red-400">1 new</span>
+
+        {/* Typing indicator */}
+        {isTyping && (
+          <div className="flex gap-2.5">
+            <div className="shrink-0 mt-0.5"><AllyvateIcon size={22} /></div>
+            <div className="flex items-center gap-1 pt-1">
+              {[0, 1, 2].map((i) => (
+                <span
+                  key={i}
+                  className="h-1.5 w-1.5 rounded-full bg-[#1B51B3]/40 animate-bounce"
+                  style={{ animationDelay: `${i * 0.15}s` }}
+                />
+              ))}
+            </div>
           </div>
         )}
+
         <div ref={messagesEnd} />
       </div>
 
@@ -376,7 +424,8 @@ export function AllyvateAssistant({
           <button
             type="button"
             onClick={handleSend}
-            className="mb-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#1B51B3] text-white transition-colors hover:bg-[#153d8a]"
+            disabled={isTyping}
+            className="mb-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#1B51B3] text-white transition-colors hover:bg-[#153d8a] disabled:opacity-40"
           >
             <Send size={10} />
           </button>

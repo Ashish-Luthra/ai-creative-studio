@@ -2592,6 +2592,10 @@ export const EmailEditorPanel: React.FC = () => {
         anchorX={allyAnchorX}
         anchorY={allyAnchorY}
         onClose={() => setAllyVisible(false)}
+        onInsert={(text) => {
+          if (!selectedId || !activeTextKey) return
+          handleTextFieldChange(selectedId, activeTextKey, text)
+        }}
       />
 
     </div>
