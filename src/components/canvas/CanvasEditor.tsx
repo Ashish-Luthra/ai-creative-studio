@@ -26,7 +26,6 @@ import { RightStudioPanel } from './RightStudioPanel'
 import { ImageSelectionToolbar } from './ImageSelectionToolbar'
 import { ProjectsAssetsPanel } from './ProjectsAssetsPanel'
 import { VariantsPanel, type CanvasVariant } from './VariantsPanel'
-import { AIAssistPanel } from './AIAssistPanel'
 import { PublishPanel, type PublishResult } from './PublishPanel'
 
 // ── Toolbar state shape ──────────────────────────────────────
@@ -94,6 +93,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
   const restoringRef = useRef(false)
   const [activeTool, setActiveTool] = useState<RailTool | null>(null)
   const [showApprovedImages, setShowApprovedImages] = useState(false)
+  const [agentPillVisible, setAgentPillVisible] = useState(false)
   const [generatedPresetIds, setGeneratedPresetIds] = useState<string[]>([])
   const [variants, setVariants] = useState<CanvasVariant[]>([])
   const [campaign, setCampaign] = useState<CampaignMeta>({
@@ -216,6 +216,13 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
     }
   }, [selectedLayer, saveSnapshot])
 
+  const isTextLikeObject = useCallback((obj: FabricObject | null | undefined) => {
+    if (!obj) return false
+    if (obj.type === 'textbox' || obj.type === 'i-text') return true
+    const dataKind = (obj as FabricObject & { data?: { kind?: string } }).data?.kind
+    return dataKind === 'creative-text'
+  }, [])
+
   // ── Init Fabric (canvas mode only) ─────────────────────────
   // Uses rAF so layout is complete before we read container dimensions.
   // The `cancelled` flag stops the async chain if the effect cleans up first
@@ -243,6 +250,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
         height: h,
         onSelect: (obj) => {
           setSelectedLayer(obj)
+          setAgentPillVisible(isTextLikeObject(obj))
           if (obj) { syncPos(obj); syncToolbar(obj) }
         },
         onModified: (target) => {
@@ -455,7 +463,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [briefId, campaignKey, generatedKey, initialPresetId, mode, recentCampaignsKey, resetHistory, saveSnapshot, selectedPresetId, setSelectedPresetId, storageKey, presetStorageKey, savedFlagKey, setSelectedLayer, setFabricCanvas, syncPos, syncToolbar, variantsKey])
+  }, [briefId, campaignKey, generatedKey, initialPresetId, isTextLikeObject, mode, recentCampaignsKey, resetHistory, saveSnapshot, selectedPresetId, setSelectedPresetId, storageKey, presetStorageKey, savedFlagKey, setSelectedLayer, setFabricCanvas, syncPos, syncToolbar, variantsKey])
 
   // ── Delete selected object on Delete / Backspace ──────────
   // Only fires when mode==='canvas', an object is selected, and the
@@ -527,6 +535,12 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
       setSelectedLayer(null)
     }
   }, [mode, selectedLayer, setSelectedLayer])
+
+  useEffect(() => {
+    if (mode !== 'canvas') {
+      setAgentPillVisible(false)
+    }
+  }, [mode])
 
   const handleZoomIn = useCallback(() => {
     setZoom(Math.min(ZOOM_MAX, zoom + ZOOM_STEP))
@@ -791,40 +805,6 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
         )
       : false
 
-  const selectedText = selectedLayer && (selectedLayer.type === 'textbox' || selectedLayer.type === 'i-text')
-    ? String((selectedLayer as { text?: string }).text ?? '')
-    : null
-
-  const handleApplyAICopy = useCallback((text: string) => {
-    const canvas = fabricRef.current
-    if (!canvas || !selectedLayer) return
-    if (selectedLayer.type !== 'textbox' && selectedLayer.type !== 'i-text') return
-    ;(selectedLayer as { set: (payload: Record<string, unknown>) => void }).set({ text })
-    canvas.renderAll()
-    saveSnapshot()
-  }, [selectedLayer, saveSnapshot])
-
-  const handleSuggestLayout = useCallback(() => {
-    const canvas = fabricRef.current
-    if (!canvas) return
-    const objects = canvas.getObjects()
-    const textObj = objects.find((obj) => obj.type === 'textbox' || obj.type === 'i-text')
-    const imageObj = objects.find((obj) => obj.type === 'image')
-    if (textObj) {
-      const imgBounds = imageObj?.getBoundingRect()
-      const fallbackY = canvas.getHeight() * 0.72
-      const targetY = imgBounds ? imgBounds.top + imgBounds.height * 0.72 : fallbackY
-      textObj.set({
-        left: canvas.getWidth() * 0.15,
-        width: canvas.getWidth() * 0.7,
-        top: targetY,
-      })
-      canvas.setActiveObject(textObj)
-    }
-    canvas.renderAll()
-    saveSnapshot()
-  }, [saveSnapshot])
-
   const handlePublish = useCallback(async (args: {
     platform: 'instagram' | 'linkedin'
     placement: string
@@ -920,12 +900,6 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
                     void handleExportVariant(variantId)
                   }}
                 />
-              ) : activeTool === 'ai' ? (
-                <AIAssistPanel
-                  selectedText={selectedText}
-                  onApplyCopy={handleApplyAICopy}
-                  onSuggestLayout={handleSuggestLayout}
-                />
               ) : activeTool === 'export' ? (
                 <PublishPanel onPublish={handlePublish} />
               ) : (
@@ -998,7 +972,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
             />
           )}
 
-          {mode !== 'feeds' && (
+          {mode === 'canvas' && agentPillVisible && (
             <AgentPill onSubmit={handleAgentSubmit} />
           )}
         </main>

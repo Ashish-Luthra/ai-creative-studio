@@ -35,12 +35,12 @@ export const AgentPill: React.FC<AgentPillProps> = ({
   return (
     <div
       className={cn(
-        // Spec: position fixed, bottom 24px, centered, pill shape
-        'fixed bottom-6 left-1/2 -translate-x-1/2',
+        // Place inside canvas container so visibility follows canvas interactions.
+        'absolute bottom-6 left-1/2 -translate-x-1/2',
         'flex min-w-[440px] items-center gap-2.5 rounded-full',
         'border border-gray-300 bg-white px-4 py-2.5',
         'shadow-[0_2px_8px_rgba(0,0,0,0.08),0_1px_2px_rgba(0,0,0,0.04)]',
-        'z-[60]',
+        'z-[120]',
         className
       )}
     >

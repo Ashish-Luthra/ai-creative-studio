@@ -1,6 +1,6 @@
 'use client'
 
-import { Folder, Grid2X2, Image, Type, MousePointer2, Hand, Palette, Sparkles, Shuffle, Smartphone, Upload, Settings, Square } from 'lucide-react'
+import { Folder, Grid2X2, Image, Type, MousePointer2, Hand, Palette, Shuffle, Smartphone, Upload, Settings, Square } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useState } from 'react'
 
@@ -13,7 +13,6 @@ export type RailTool =
   | 'hand'
   | 'cta'
   | 'style'
-  | 'ai'
   | 'variants'
   | 'preview'
   | 'export'
@@ -58,7 +57,6 @@ export const ToolbarLeft: React.FC<ToolbarLeftProps> = ({ onToolAction }) => {
     { id: 'hand', icon: <Hand size={15} />, title: 'Hand Move' },
     { id: 'cta', icon: <MousePointer2 size={15} />, title: 'CTA / Action' },
     { id: 'style', icon: <Palette size={15} />, title: 'Style / Brand' },
-    { id: 'ai', icon: <Sparkles size={15} />, title: 'AI Assist' },
     { id: 'variants', icon: <Shuffle size={15} />, title: 'Variants' },
     { id: 'preview', icon: <Smartphone size={15} />, title: 'Preview' },
     { id: 'export', icon: <Upload size={15} />, title: 'Export / Publish' },
