@@ -9,9 +9,6 @@ interface RightStudioPanelProps {
   onPresetChange: (presetId: string) => void
   onAddFrame: () => void
   onConvertToAll: () => void
-  onAddText: () => void
-  onAddShape: () => void
-  onOpenMedia: () => void
 }
 
 export const RightStudioPanel: React.FC<RightStudioPanelProps> = ({
@@ -20,11 +17,8 @@ export const RightStudioPanel: React.FC<RightStudioPanelProps> = ({
   onPresetChange,
   onAddFrame,
   onConvertToAll,
-  onAddText,
-  onAddShape,
-  onOpenMedia,
 }) => {
-  if (!activeTool || activeTool === 'projects' || activeTool === 'settings') return null
+  if (!activeTool || activeTool === 'projects' || activeTool === 'settings' || activeTool === 'cta') return null
 
   return (
     <aside className="absolute right-5 top-20 z-50 w-72 rounded-2xl border border-gray-200 bg-white/95 p-4 shadow-[0_10px_24px_rgba(0,0,0,0.10)] backdrop-blur-sm">
@@ -63,42 +57,12 @@ export const RightStudioPanel: React.FC<RightStudioPanelProps> = ({
         </>
       )}
 
-      {activeTool === 'media' && null}
-
-      {activeTool === 'copy' && (
-        <>
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Copy</h3>
-          <p className="mb-3 text-sm text-gray-600">Add headline/subtext layers and edit them inline on canvas.</p>
-          <button onClick={onAddText} className="w-full rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white">
-            Add Text Layer
-          </button>
-        </>
-      )}
-
       {activeTool === 'hand' && (
         <Placeholder
           title="Hand Move"
           text="Drag the image or frame to move the whole creative block. In Hand mode, any layer in the block drags the full creative."
         />
       )}
-      {activeTool === 'cta' && <Placeholder title="CTA / Action" text="Separate CTA controls are planned for a later phase." />}
-      {activeTool === 'style' && <Placeholder title="Style / Brand" text="Brand style automation is deferred; text styling works in the floating toolbar." />}
-      {activeTool === 'variants' && (
-        <>
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Variants</h3>
-          <p className="text-sm text-gray-600">Use this tab to generate and compare variants from current creative state.</p>
-        </>
-      )}
-      {activeTool === 'preview' && (
-        <>
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Preview</h3>
-          <p className="mb-3 text-sm text-gray-600">Use Layout presets to preview LinkedIn/Instagram output ratios.</p>
-          <button onClick={onAddShape} className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700">
-            Add Shape Overlay
-          </button>
-        </>
-      )}
-      {activeTool === 'export' && <Placeholder title="Export / Publish" text="Use the top-right Export button to download a PNG asset." />}
     </aside>
   )
 }

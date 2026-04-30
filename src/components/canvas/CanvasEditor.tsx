@@ -5,8 +5,6 @@ import type { Canvas, FabricObject } from 'fabric'
 import { useCanvasStore } from '@/lib/canvas/canvasStore'
 import {
   addBlankCreativeFrame,
-  addShapeLayer,
-  addTextLayer,
   disposeCanvas,
   ensureCreativeMetadata,
   getCreativeIdFromObject,
@@ -16,17 +14,15 @@ import {
   seedDefaultCreative,
 } from '@/lib/canvas/fabricInit'
 import { CREATIVE_PRESETS, getPresetById, isPresetId } from '@/lib/canvas/presets'
-import { TopBar } from './TopBar'
 import { ToolbarLeft, type RailTool } from './ToolbarLeft'
 import { AgentPill } from './AgentPill'
-import { FloatToolbar } from './FloatToolbar'
 import { EmailEditorPanel } from '@/components/email/EmailEditorPanel'
 import { ApprovedImagesPanel } from './ApprovedImagesPanel'
 import { RightStudioPanel } from './RightStudioPanel'
 import { ImageSelectionToolbar } from './ImageSelectionToolbar'
 import { ProjectsAssetsPanel } from './ProjectsAssetsPanel'
-import { VariantsPanel, type CanvasVariant } from './VariantsPanel'
-import { PublishPanel, type PublishResult } from './PublishPanel'
+import type { CanvasVariant } from './VariantsPanel'
+import type { PublishResult } from './PublishPanel'
 
 // ── Toolbar state shape ──────────────────────────────────────
 interface TbState {
@@ -55,10 +51,6 @@ const DEFAULT_TB: TbState = {
   textAlign: 'center',
   color: '#FFFFFF',
 }
-const ZOOM_MIN = 0.25
-const ZOOM_MAX = 4
-const ZOOM_STEP = 0.1
-
 const normalizeTextboxScale = (obj: FabricObject | undefined | null) => {
   if (!obj) return false
   if (obj.type !== 'textbox' && obj.type !== 'i-text') return false
@@ -373,7 +365,6 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
         c.setActiveObject(target)
         setSelectedLayer(target)
         syncPos(target)
-        setActiveTool('media')
         setShowApprovedImages(true)
       })
       const storedPresetId = localStorage.getItem(presetStorageKey)
@@ -511,20 +502,6 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
     return () => ro.disconnect()
   }, [])
 
-  // Keep Fabric viewport zoom synced with store value.
-  useEffect(() => {
-    if (mode !== 'canvas') return
-    const canvas = fabricRef.current
-    if (!canvas) return
-    const clamped = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zoom))
-    if (clamped !== zoom) {
-      setZoom(clamped)
-      return
-    }
-    canvas.setZoom(clamped)
-    canvas.renderAll()
-  }, [mode, zoom, setZoom])
-
   // Guard against stale selection references when canvas objects are cleared/replaced.
   useEffect(() => {
     if (mode !== 'canvas') return
@@ -542,14 +519,6 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
     }
   }, [mode])
 
-  const handleZoomIn = useCallback(() => {
-    setZoom(Math.min(ZOOM_MAX, zoom + ZOOM_STEP))
-  }, [zoom, setZoom])
-
-  const handleZoomOut = useCallback(() => {
-    setZoom(Math.max(ZOOM_MIN, zoom - ZOOM_STEP))
-  }, [zoom, setZoom])
-
   const handleAgentSubmit = useCallback((cmd: string) => {
     console.log('[AgentPill] command:', cmd)
   }, [])
@@ -563,27 +532,6 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
     link.download = `${briefId}-${selectedPresetId}.png`
     link.click()
   }, [briefId, selectedPresetId])
-
-  const handleSaveCanvas = useCallback(() => {
-    saveSnapshot()
-    localStorage.setItem(savedFlagKey, '1')
-    updateCampaignMeta()
-  }, [saveSnapshot, savedFlagKey, updateCampaignMeta])
-
-  const handleClearCanvas = useCallback(() => {
-    const canvas = fabricRef.current
-    if (!canvas) return
-    restoringRef.current = true
-    try {
-      canvas.clear()
-      setSelectedLayer(null)
-      localStorage.removeItem(savedFlagKey)
-      resetHistory()
-      saveSnapshot()
-    } finally {
-      restoringRef.current = false
-    }
-  }, [resetHistory, saveSnapshot, savedFlagKey, setSelectedLayer])
 
   const handlePresetChange = useCallback(async (presetId: string) => {
     const canvas = fabricRef.current
@@ -758,17 +706,10 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
     const canvas = fabricRef.current
     if (mode !== 'canvas' || !canvas) return
 
-    if (tool === 'copy') {
-      await addTextLayer(canvas, 'Add your headline')
-      saveSnapshot()
-    } else if (tool === 'frame') {
+    if (tool === 'frame') {
       await handleAddFrame()
-    } else if (tool === 'media') {
-      setShowApprovedImages(true)
-    } else if (tool === 'preview' || tool === 'layout') {
+    } else if (tool === 'layout') {
       // open right panel only
-    } else if (tool === 'export') {
-      handleCanvasExport()
     } else if (tool === 'projects') {
       // projects panel view
     }
@@ -842,15 +783,6 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-[#FDFDFD]">
-      <TopBar
-        fileName={campaign.name || 'Untitled'}
-        onSave={handleSaveCanvas}
-        onClear={handleClearCanvas}
-        zoomPercent={Math.round(zoom * 100)}
-        onZoomIn={handleZoomIn}
-        onZoomOut={handleZoomOut}
-      />
-
       <div className="flex flex-1 overflow-hidden">
         <ToolbarLeft onToolAction={handleToolAction} />
 
@@ -889,19 +821,6 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
                     window.location.href = `/studio/${nextBriefId}/canvas?preset=${presetId}`
                   }}
                 />
-              ) : activeTool === 'variants' ? (
-                <VariantsPanel
-                  variants={variants}
-                  onGenerate={handleGenerateVariants}
-                  onApply={(variantId) => {
-                    void handleApplyVariant(variantId)
-                  }}
-                  onExport={(variantId) => {
-                    void handleExportVariant(variantId)
-                  }}
-                />
-              ) : activeTool === 'export' ? (
-                <PublishPanel onPublish={handlePublish} />
               ) : (
                 <RightStudioPanel
                   activeTool={activeTool}
@@ -913,15 +832,6 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
                   onConvertToAll={() => {
                     void handleReplicateToAll()
                   }}
-                  onAddText={() => {
-                    if (!fabricRef.current) return
-                    void addTextLayer(fabricRef.current).then(saveSnapshot)
-                  }}
-                  onAddShape={() => {
-                    if (!fabricRef.current) return
-                    void addShapeLayer(fabricRef.current).then(saveSnapshot)
-                  }}
-                  onOpenMedia={() => setShowApprovedImages(true)}
                 />
               )}
             </>
@@ -934,27 +844,6 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
               void handleImageSelect(src)
             }}
           />
-
-          {/* Typography toolbar — shown only when a text layer is selected */}
-          {mode === 'canvas' && isTextSelected && (
-            <FloatToolbar
-              position={toolbarPos}
-              fontFamily={tbState.fontFamily}
-              fontSize={tbState.fontSize}
-              isBold={tbState.isBold}
-              isItalic={tbState.isItalic}
-              isUnderline={tbState.isUnderline}
-              textAlign={tbState.textAlign}
-              color={tbState.color}
-              onFontChange={(f) => applyToLayer({ fontFamily: f })}
-              onSizeChange={(s) => applyToLayer({ fontSize: s })}
-              onBoldToggle={() => applyToLayer({ isBold: !tbState.isBold })}
-              onItalicToggle={() => applyToLayer({ isItalic: !tbState.isItalic })}
-              onUnderlineToggle={() => applyToLayer({ isUnderline: !tbState.isUnderline })}
-              onAlignChange={(a) => applyToLayer({ textAlign: a })}
-              onColorChange={(c) => applyToLayer({ color: c })}
-            />
-          )}
 
           {mode === 'canvas' && isImageSelected && selectedLayer && (
             <ImageSelectionToolbar
