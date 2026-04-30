@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import {
-  Layers, LayoutGrid, Palette, FileText,
+  LayoutGrid, Palette,
   Monitor, Smartphone, ChevronUp, ChevronDown, Trash2,
   Type, Plus, X, MousePointer2, ChevronsUpDown,
   Star, Link2, Share2, MapPin, Mail, Layout,
@@ -28,7 +28,8 @@ import { SPECS } from '@/lib/email/blockSpecs'
 // Re-export so existing imports of CanvasBlock from this file continue to work.
 export type { CanvasBlock } from '@/types/canvas'
 
-type EmailTab = 'tree' | 'sections' | 'text' | 'content' | 'style'
+type EmailTab = 'sections' | 'images'
+type SectionSubTab = 'text' | 'content' | 'style'
 
 // afterId: null = insert at very top; string = insert after that block id
 type InsertState = { afterId: string | null } | null
@@ -1709,6 +1710,7 @@ function BlockContent({
 export const EmailEditorPanel: React.FC = () => {
   const [activeTab, setActiveTab] = useState<EmailTab>('sections')
   const [panelOpen, setPanelOpen] = useState(true)
+  const [activeSectionTab, setActiveSectionTab] = useState<SectionSubTab>('content')
 
   // Canvas state
   const [canvasBlocks, setCanvasBlocks] = useState<CanvasBlock[]>(makeDefaultBlocks)
@@ -1735,6 +1737,14 @@ export const EmailEditorPanel: React.FC = () => {
     setAllyAnchorY(e.clientY)
     setAllyVisible(true)
   }, [])
+
+  // Auto-switch to Sections when a block is selected so sub-tabs are immediately visible
+  useEffect(() => {
+    if (selectedId !== null) {
+      setActiveTab('sections')
+      setPanelOpen(true)
+    }
+  }, [selectedId])
 
   // ── Persistence state ───────────────────────────────────────────────────────
   const [currentEmailerId, setCurrentEmailerId] = useState<string | null>(null)
@@ -1894,16 +1904,18 @@ export const EmailEditorPanel: React.FC = () => {
   }, [updateSubject, updatePreheader, setEmailerName])
 
   const handleTabClick = (tab: EmailTab) => {
+    if (tab === 'images') {
+      setPendingImageTarget(null)
+      setShowApprovedImages(true)
+      return
+    }
     if (activeTab === tab) setPanelOpen((o) => !o)
     else { setActiveTab(tab); setPanelOpen(true) }
   }
 
   const RAIL_ITEMS: { id: EmailTab; icon: React.ReactNode; label: string }[] = [
-    { id: 'tree',     icon: <Layers size={14} />,     label: 'Tree' },
     { id: 'sections', icon: <LayoutGrid size={14} />, label: 'Sections' },
-    { id: 'text',     icon: <Type size={14} />,       label: 'Text' },
-    { id: 'content',  icon: <FileText size={14} />,   label: 'Content' },
-    { id: 'style',    icon: <Palette size={14} />,    label: 'Style' },
+    { id: 'images',   icon: <ImageIcon size={14} />,  label: 'Images' },
   ]
 
   // ── Canvas block actions ────────────────────────────────────────────────────
@@ -2096,24 +2108,10 @@ export const EmailEditorPanel: React.FC = () => {
             key={item.id}
             icon={item.icon}
             label={item.label}
-            active={activeTab === item.id && panelOpen}
+            active={item.id === 'images' ? showApprovedImages : activeTab === item.id && panelOpen}
             onClick={() => handleTabClick(item.id)}
           />
         ))}
-
-        {/* Divider */}
-        <div className="my-1 w-7 border-t border-gray-200" />
-
-        {/* Image Library shortcut */}
-        <RailBtn
-          icon={<ImageIcon size={14} />}
-          label="Images"
-          active={showApprovedImages && !pendingImageTarget}
-          onClick={() => {
-            setPendingImageTarget(null)
-            setShowApprovedImages(true)
-          }}
-        />
       </aside>
 
       {/* ── Slide-out Sub-panel ──────────────────────────── */}
@@ -2125,26 +2123,39 @@ export const EmailEditorPanel: React.FC = () => {
       >
         {panelOpen && (
           <>
-            {activeTab === 'tree'     && (
-              <TreePanel
-                blocks={canvasBlocks}
-                selectedId={selectedId}
-                onSelect={setSelectedId}
-                onMoveUp={handleMoveUp}
-                onMoveDown={handleMoveDown}
-                onDelete={handleDelete}
-              />
-            )}
             {activeTab === 'sections' && (
-              <SectionsPanel
-                onInsert={handleAppendInsert}
-                onBlockDragStart={setDraggedBlockType}
-                onBlockDragEnd={() => setDraggedBlockType(null)}
-              />
+              selectedId === null ? (
+                <SectionsPanel
+                  onInsert={handleAppendInsert}
+                  onBlockDragStart={setDraggedBlockType}
+                  onBlockDragEnd={() => setDraggedBlockType(null)}
+                />
+              ) : (
+                <div className="flex flex-1 flex-col overflow-hidden">
+                  {/* Sub-tab bar */}
+                  <div className="flex shrink-0 gap-0.5 border-b border-gray-100 px-2 py-1.5">
+                    {(['text', 'content', 'style'] as SectionSubTab[]).map((t) => (
+                      <button
+                        key={t}
+                        onClick={() => setActiveSectionTab(t)}
+                        className={cn(
+                          'flex-1 rounded-lg py-1 text-[10px] font-semibold capitalize transition-colors',
+                          activeSectionTab === t
+                            ? 'bg-[#1B51B3] text-white'
+                            : 'text-gray-500 hover:bg-gray-100',
+                        )}
+                      >
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+                  {/* Sub-tab content */}
+                  {activeSectionTab === 'text'    && <TextBlocksPanel onInsert={handleAppendInsert} />}
+                  {activeSectionTab === 'content' && <ContentPanel selectedBlock={selectedBlock} onBlockColorChange={handleBlockColorChange} />}
+                  {activeSectionTab === 'style'   && <StylePanel />}
+                </div>
+              )
             )}
-            {activeTab === 'text'     && <TextBlocksPanel onInsert={handleAppendInsert} />}
-            {activeTab === 'content'  && <ContentPanel selectedBlock={selectedBlock} onBlockColorChange={handleBlockColorChange} />}
-            {activeTab === 'style'    && <StylePanel />}
           </>
         )}
       </aside>

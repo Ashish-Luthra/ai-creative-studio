@@ -2,22 +2,152 @@
 // Always import Fabric dynamically (client-side only, never SSR).
 
 import type { Canvas, FabricObject } from 'fabric'
-import {
-  DEFAULT_TEXT_FONT_FAMILY,
-  DEFAULT_TEXT_FONT_SIZE,
-  DEFAULT_TEXT_FONT_WEIGHT,
-} from '@/lib/canvas/canvasDefaults'
-import type { CreativePreset } from './presets'
+import { getPresetById, type CreativePreset } from './presets'
 
 // Tracks live Canvas instances by their host element so we can dispose before reinit.
 const canvasRegistry = new WeakMap<HTMLCanvasElement, Canvas>()
+
+interface CreativeFrame {
+  left: number
+  top: number
+  width: number
+  height: number
+  rx?: number
+  ry?: number
+}
+
+type CreativeRole = 'frame' | 'image' | 'scrim' | 'text'
+
+interface CreativeData {
+  kind: 'creative-frame' | 'creative-image' | 'creative-scrim' | 'creative-text'
+  creativeId: string
+  role: CreativeRole
+  frame?: CreativeFrame
+  cropPending?: boolean
+  moveHandle?: boolean
+}
+
+interface CreativeFrameBounds {
+  left: number
+  top: number
+  width: number
+  height: number
+}
+
+interface BlankCreativeFrameOptions {
+  frameBounds?: CreativeFrameBounds
+  preset?: CreativePreset
+}
 
 export interface FabricInitOptions {
   canvasEl: HTMLCanvasElement
   width: number
   height: number
   onSelect: (obj: FabricObject | null) => void
-  onModified: () => void
+  onModified: (target?: FabricObject) => void
+}
+
+const createCreativeId = () => `creative-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+
+const asCreativeData = (obj?: FabricObject | null): CreativeData | undefined => {
+  if (!obj) return undefined
+  return (obj as FabricObject & { data?: CreativeData }).data
+}
+
+export const getCreativeIdFromObject = (obj?: FabricObject | null) => asCreativeData(obj)?.creativeId
+
+export const getCreativeObjects = (canvas: Canvas, creativeId: string) =>
+  canvas.getObjects().filter((obj) => asCreativeData(obj)?.creativeId === creativeId)
+
+const updateImageFrameState = (obj: FabricObject, frame: CreativeFrame) => {
+  const image = obj as FabricObject & { clipPath?: FabricObject & { left?: number; top?: number; width?: number; height?: number; rx?: number; ry?: number } }
+  if (image.clipPath) {
+    image.clipPath.set({
+      left: frame.left,
+      top: frame.top,
+      width: frame.width,
+      height: frame.height,
+      rx: frame.rx ?? 12,
+      ry: frame.ry ?? 12,
+    })
+  }
+  const data = asCreativeData(obj)
+  if (data?.kind === 'creative-image') {
+    ;(obj as FabricObject & { data?: CreativeData }).data = {
+      ...data,
+      frame,
+    }
+  }
+}
+
+export const moveCreativeBlock = (
+  canvas: Canvas,
+  creativeId: string,
+  dx: number,
+  dy: number,
+  exclude?: FabricObject | null,
+) => {
+  if (!dx && !dy) return
+  const group = getCreativeObjects(canvas, creativeId)
+  for (const obj of group) {
+    if (exclude && obj === exclude) {
+      const data = asCreativeData(obj)
+      if (data?.kind === 'creative-image' && data.frame) {
+        updateImageFrameState(obj, {
+          ...data.frame,
+          left: data.frame.left + dx,
+          top: data.frame.top + dy,
+        })
+      }
+      continue
+    }
+    obj.set({
+      left: (obj.left ?? 0) + dx,
+      top: (obj.top ?? 0) + dy,
+    })
+    const data = asCreativeData(obj)
+    if (data?.kind === 'creative-image' && data.frame) {
+      updateImageFrameState(obj, {
+        ...data.frame,
+        left: data.frame.left + dx,
+        top: data.frame.top + dy,
+      })
+    }
+  }
+}
+
+const roleFromKind = (kind?: CreativeData['kind']): CreativeRole | null => {
+  if (!kind) return null
+  if (kind === 'creative-frame') return 'frame'
+  if (kind === 'creative-image') return 'image'
+  if (kind === 'creative-scrim') return 'scrim'
+  if (kind === 'creative-text') return 'text'
+  return null
+}
+
+export const ensureCreativeMetadata = (canvas: Canvas) => {
+  const creativeObjects = canvas.getObjects().filter((obj) => {
+    const kind = asCreativeData(obj)?.kind
+    return kind === 'creative-frame' || kind === 'creative-image' || kind === 'creative-scrim' || kind === 'creative-text'
+  })
+  if (!creativeObjects.length) return
+
+  const existingId = creativeObjects
+    .map((obj) => asCreativeData(obj)?.creativeId)
+    .find((id): id is string => typeof id === 'string' && id.length > 0)
+  const creativeId = existingId ?? createCreativeId()
+
+  for (const obj of creativeObjects) {
+    const data = asCreativeData(obj)
+    if (!data) continue
+    const role = roleFromKind(data.kind)
+    if (!role) continue
+    ;(obj as FabricObject & { data?: CreativeData }).data = {
+      ...data,
+      creativeId: data.creativeId ?? creativeId,
+      role: data.role ?? role,
+    }
+  }
 }
 
 export async function initFabricCanvas({
@@ -38,7 +168,7 @@ export async function initFabricCanvas({
   const canvas = new FabricCanvas(canvasEl, {
     width,
     height,
-    backgroundColor: '#FDFDFD',
+    backgroundColor: '#F5F5F5',
     selection: true,
     preserveObjectStacking: true,
   })
@@ -56,8 +186,8 @@ export async function initFabricCanvas({
   })
   canvas.on('selection:cleared', () => onSelect(null))
 
-  canvas.on('object:modified', () => {
-    onModified()
+  canvas.on('object:modified', (e) => {
+    onModified(e.target as FabricObject | undefined)
   })
 
   canvasRegistry.set(canvasEl, canvas)
@@ -76,6 +206,23 @@ export function applySelectionStyle(obj: FabricObject) {
   })
 }
 
+const applyTextboxResizeBehavior = (obj: FabricObject) => {
+  if (obj.type !== 'textbox' && obj.type !== 'i-text') return
+  obj.set({
+    lockScalingY: true,
+    lockSkewingX: true,
+    lockSkewingY: true,
+  })
+  obj.setControlsVisibility({
+    mt: false,
+    mb: false,
+    tl: false,
+    tr: false,
+    bl: false,
+    br: false,
+  })
+}
+
 export function disposeCanvas(canvas: Canvas, canvasEl?: HTMLCanvasElement) {
   if (canvasEl) {
     canvasRegistry.delete(canvasEl)
@@ -91,16 +238,11 @@ export function disposeCanvas(canvas: Canvas, canvasEl?: HTMLCanvasElement) {
   }
 }
 
-/** Pixel size and origin for a creative frame (layout + optional insert position). */
-export function getCreativeFrameBounds(
-  canvas: Canvas,
-  preset: CreativePreset,
-  options?: { frameLeft?: number; frameTop?: number; frameScale?: number },
-) {
+function getFrameBounds(canvas: Canvas, preset: CreativePreset) {
   const cw = canvas.getWidth()
   const ch = canvas.getHeight()
   const ratio = preset.width / preset.height
-  const maxW = cw * (options?.frameScale ?? 0.62)
+  const maxW = cw * 0.62
   const maxH = ch * 0.78
 
   let frameW = maxW
@@ -113,8 +255,8 @@ export function getCreativeFrameBounds(
   return {
     width: frameW,
     height: frameH,
-    left: options?.frameLeft ?? (cw - frameW) / 2,
-    top: options?.frameTop ?? (ch - frameH) / 2,
+    left: (cw - frameW) / 2,
+    top: (ch - frameH) / 2,
   }
 }
 
@@ -124,25 +266,27 @@ export async function seedDefaultCreative(
   imageUrl: string,
   copyText: string,
   preset: CreativePreset,
-  options?: { frameLeft?: number; frameTop?: number; frameScale?: number },
+  frameBounds?: CreativeFrameBounds,
 ) {
   const { FabricImage, Textbox, Rect, Shadow, Gradient } = await import('fabric')
 
-  const { width: FRAME_W, height: FRAME_H, left: fx, top: fy } = getCreativeFrameBounds(canvas, preset, options)
+  const { width: FRAME_W, height: FRAME_H, left: fx, top: fy } = frameBounds ?? getFrameBounds(canvas, preset)
+  const creativeId = createCreativeId()
+  const frameState: CreativeFrame = { left: fx, top: fy, width: FRAME_W, height: FRAME_H, rx: 0, ry: 0 }
 
-  // ── Background frame (rounded rect) ─────────────────────
+  // ── Background frame (square light-gray frame) ──────────
   const frame = new Rect({
     left: fx,
     top: fy,
     width: FRAME_W,
     height: FRAME_H,
-    rx: 12,
-    ry: 12,
-    fill: '#1a1a2e',
+    rx: 0,
+    ry: 0,
+    fill: '#D1D5DB',
     selectable: false,
     evented: false,
     hoverCursor: 'default',
-    data: { kind: 'creative-frame', presetId: preset.id },
+    data: { kind: 'creative-frame', creativeId, role: 'frame' } satisfies CreativeData,
   })
   canvas.add(frame)
 
@@ -159,8 +303,8 @@ export async function seedDefaultCreative(
       top: fy,
       width: FRAME_W,
       height: FRAME_H,
-      rx: 12,
-      ry: 12,
+      rx: 0,
+      ry: 0,
       absolutePositioned: true,
     })
     img.clipPath = clip
@@ -172,7 +316,13 @@ export async function seedDefaultCreative(
       scaleX: scale,
       scaleY: scale,
       selectable: true,
-      data: { kind: 'creative-image' },
+      data: {
+        kind: 'creative-image',
+        creativeId,
+        role: 'image',
+        frame: frameState,
+        cropPending: false,
+      } satisfies CreativeData,
     })
     applySelectionStyle(img)
     canvas.add(img)
@@ -213,10 +363,11 @@ export async function seedDefaultCreative(
       top: fy + FRAME_H * 0.55,
       width: FRAME_W,
       height: FRAME_H * 0.45,
-      rx: 12,
-      ry: 12,
+      rx: 0,
+      ry: 0,
       absolutePositioned: true,
     }),
+    data: { kind: 'creative-scrim', creativeId, role: 'scrim' } satisfies CreativeData,
   })
   canvas.add(scrim)
 
@@ -225,17 +376,18 @@ export async function seedDefaultCreative(
     left: fx + 28,
     top: fy + FRAME_H - 110,
     width: FRAME_W - 56,
-    fontFamily: DEFAULT_TEXT_FONT_FAMILY,
-    fontSize: DEFAULT_TEXT_FONT_SIZE,
+    fontFamily: 'Georgia',
+    fontSize: 40,
     fill: '#FFFFFF',
     textAlign: 'center',
-    fontWeight: DEFAULT_TEXT_FONT_WEIGHT,
+    fontWeight: 'bold',
     shadow: new Shadow({ color: 'rgba(0,0,0,0.55)', blur: 10, offsetX: 0, offsetY: 2 }),
     editable: true,
     selectable: true,
-    data: { kind: 'creative-text' },
+    data: { kind: 'creative-text', creativeId, role: 'text' } satisfies CreativeData,
   })
   applySelectionStyle(txt)
+  applyTextboxResizeBehavior(txt)
   canvas.add(txt)
 
   canvas.renderAll()
@@ -247,9 +399,9 @@ export async function addTextLayer(canvas: Canvas, text = 'Headline text') {
     left: canvas.getWidth() * 0.25,
     top: canvas.getHeight() * 0.2,
     width: canvas.getWidth() * 0.5,
-    fontFamily: DEFAULT_TEXT_FONT_FAMILY,
-    fontSize: DEFAULT_TEXT_FONT_SIZE,
-    fontWeight: DEFAULT_TEXT_FONT_WEIGHT,
+    fontFamily: 'Inter',
+    fontSize: 48,
+    fontWeight: 'bold',
     fill: '#FFFFFF',
     textAlign: 'center',
     shadow: new Shadow({ color: 'rgba(0,0,0,0.45)', blur: 8, offsetX: 0, offsetY: 1 }),
@@ -257,6 +409,7 @@ export async function addTextLayer(canvas: Canvas, text = 'Headline text') {
     data: { kind: 'creative-text' },
   })
   applySelectionStyle(textbox)
+  applyTextboxResizeBehavior(textbox)
   canvas.add(textbox)
   canvas.setActiveObject(textbox)
   canvas.renderAll()
@@ -281,32 +434,163 @@ export async function addShapeLayer(canvas: Canvas) {
   canvas.renderAll()
 }
 
+export async function addBlankCreativeFrame(canvas: Canvas, options: BlankCreativeFrameOptions = {}) {
+  const { Rect, Textbox } = await import('fabric')
+  const preset = options.preset ?? getPresetById('instagram-1-1')
+  const bounds = options.frameBounds ?? getFrameBounds(canvas, preset)
+  const creativeId = createCreativeId()
+
+  const frameLabel = new Textbox(`Frame ${preset.ratioLabel}`, {
+    left: bounds.left,
+    top: Math.max(12, bounds.top - 24),
+    width: Math.max(120, bounds.width),
+    fontFamily: 'Inter',
+    fontSize: 12,
+    fontWeight: 500,
+    fill: '#6B7280',
+    editable: true,
+    selectable: true,
+    hoverCursor: 'move',
+    data: {
+      kind: 'creative-text',
+      creativeId,
+      role: 'text',
+      moveHandle: true,
+    } satisfies CreativeData,
+  })
+  applySelectionStyle(frameLabel)
+
+  const frame = new Rect({
+    left: bounds.left,
+    top: bounds.top,
+    width: bounds.width,
+    height: bounds.height,
+    rx: 0,
+    ry: 0,
+    fill: '#FFFFFF',
+    stroke: '#D1D5DB',
+    strokeWidth: 1,
+    selectable: true,
+    evented: true,
+    hoverCursor: 'move',
+    data: { kind: 'creative-frame', creativeId, role: 'frame' } satisfies CreativeData,
+  })
+  canvas.add(frameLabel)
+  applySelectionStyle(frame)
+  canvas.add(frame)
+  canvas.setActiveObject(frame)
+  canvas.renderAll()
+}
+
 export async function replaceOrAddImageLayer(canvas: Canvas, imageUrl: string, selected?: FabricObject | null) {
-  const { FabricImage } = await import('fabric')
+  const { FabricImage, Rect } = await import('fabric')
   const img = await FabricImage.fromURL(imageUrl, { crossOrigin: 'anonymous' })
   const target = selected?.type === 'image' ? selected : null
 
+  const fallbackFrame = (): CreativeFrame => {
+    const frameObj = canvas
+      .getObjects()
+      .find((obj) => (obj as { data?: { kind?: string } }).data?.kind === 'creative-frame')
+    if (!frameObj) {
+      return {
+        left: canvas.getWidth() * 0.2,
+        top: canvas.getHeight() * 0.12,
+        width: canvas.getWidth() * 0.6,
+        height: canvas.getHeight() * 0.76,
+        rx: 12,
+        ry: 12,
+      }
+    }
+    const frameBounds = frameObj.getBoundingRect()
+    return {
+      left: frameBounds.left,
+      top: frameBounds.top,
+      width: frameBounds.width,
+      height: frameBounds.height,
+      rx: 12,
+      ry: 12,
+    }
+  }
+
+  const getFrameFromImage = (object: FabricObject) => {
+    const data = (object as { data?: { frame?: CreativeFrame } }).data
+    if (data?.frame) {
+      return {
+        left: data.frame.left,
+        top: data.frame.top,
+        width: data.frame.width,
+        height: data.frame.height,
+        rx: data.frame.rx ?? 12,
+        ry: data.frame.ry ?? 12,
+      }
+    }
+    const clip = (object as { clipPath?: { left?: number; top?: number; width?: number; height?: number; rx?: number; ry?: number } }).clipPath
+    if (clip?.left != null && clip?.top != null && clip?.width != null && clip?.height != null) {
+      return {
+        left: clip.left,
+        top: clip.top,
+        width: clip.width,
+        height: clip.height,
+        rx: clip.rx ?? 12,
+        ry: clip.ry ?? 12,
+      }
+    }
+    return fallbackFrame()
+  }
+
+  const resolveCreativeId = () => {
+    const selectedId = getCreativeIdFromObject(target ?? undefined)
+    if (selectedId) return selectedId
+    const existing = canvas
+      .getObjects()
+      .find((obj) => (asCreativeData(obj)?.kind === 'creative-frame' || asCreativeData(obj)?.kind === 'creative-image'))
+    return getCreativeIdFromObject(existing) ?? createCreativeId()
+  }
+
   if (target) {
-    const bounds = target.getBoundingRect()
-    const scale = Math.max(bounds.width / (img.width ?? 1), bounds.height / (img.height ?? 1))
+    const frame = getFrameFromImage(target)
+    const creativeId = resolveCreativeId()
+    const scale = Math.max(frame.width / (img.width ?? 1), frame.height / (img.height ?? 1))
+    img.clipPath = new Rect({
+      left: frame.left,
+      top: frame.top,
+      width: frame.width,
+      height: frame.height,
+      rx: frame.rx,
+      ry: frame.ry,
+      absolutePositioned: true,
+    })
     img.set({
-      left: bounds.left + bounds.width / 2,
-      top: bounds.top + bounds.height / 2,
+      left: frame.left + frame.width / 2,
+      top: frame.top + frame.height / 2,
       originX: 'center',
       originY: 'center',
       scaleX: scale,
       scaleY: scale,
-      data: { kind: 'creative-image' },
+      data: { kind: 'creative-image', creativeId, role: 'image', frame, cropPending: false } satisfies CreativeData,
     })
     canvas.remove(target)
   } else {
-    const scale = Math.max((canvas.getWidth() * 0.4) / (img.width ?? 1), (canvas.getHeight() * 0.4) / (img.height ?? 1))
+    const frame = fallbackFrame()
+    const creativeId = resolveCreativeId()
+    const scale = Math.max(frame.width / (img.width ?? 1), frame.height / (img.height ?? 1))
+    img.clipPath = new Rect({
+      left: frame.left,
+      top: frame.top,
+      width: frame.width,
+      height: frame.height,
+      rx: frame.rx,
+      ry: frame.ry,
+      absolutePositioned: true,
+    })
     img.set({
-      left: canvas.getWidth() * 0.3,
-      top: canvas.getHeight() * 0.2,
+      left: frame.left + frame.width / 2,
+      top: frame.top + frame.height / 2,
+      originX: 'center',
+      originY: 'center',
       scaleX: scale,
       scaleY: scale,
-      data: { kind: 'creative-image' },
+      data: { kind: 'creative-image', creativeId, role: 'image', frame, cropPending: false } satisfies CreativeData,
     })
   }
 

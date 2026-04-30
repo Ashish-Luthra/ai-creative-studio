@@ -2,21 +2,9 @@
 
 import type { FabricObject } from 'fabric'
 import { Sparkles } from 'lucide-react'
-import { DEFAULT_TEXT_FONT_FAMILY, DEFAULT_TEXT_FONT_SIZE } from '@/lib/canvas/canvasDefaults'
 import { cn } from '@/lib/utils'
 
 const SWATCHES = ['#111827', '#2563EB', '#7C3AED', '#DC2626', '#16A34A', '#D97706']
-
-/** Fabric `fill` may be a string, Gradient, Pattern, etc. — only strings are valid React text. */
-function fabricFillToDisplay(fill: unknown): string {
-  if (typeof fill === 'string') return fill
-  if (fill && typeof fill === 'object' && 'type' in fill) {
-    const t = String((fill as { type?: string }).type)
-    if (t === 'linear' || t === 'radial') return 'Gradient'
-    return 'Fill'
-  }
-  return '—'
-}
 
 export interface FloatPropertiesCardProps {
   selectedLayer: FabricObject
@@ -32,13 +20,21 @@ export const FloatPropertiesCard: React.FC<FloatPropertiesCardProps> = ({
 }) => {
   // Extract properties from the Fabric object (best-effort — works for IText/Textbox)
   const obj = selectedLayer as unknown as Record<string, unknown>
-  const fontFamily  = (obj.fontFamily  as string)  ?? DEFAULT_TEXT_FONT_FAMILY
-  const fontSize    = (obj.fontSize    as number)   ?? DEFAULT_TEXT_FONT_SIZE
+  const fontFamily  = (obj.fontFamily  as string)  ?? 'Inter'
+  const fontSize    = (obj.fontSize    as number)   ?? 16
   const fontWeight  = (obj.fontWeight  as string | number) ?? 400
   const lineHeight  = (obj.lineHeight  as number)   ?? 1.2
-  const fillRaw = obj.fill
-  const fillDisplay = fabricFillToDisplay(fillRaw)
-  const fillForSwatch = typeof fillRaw === 'string' ? fillRaw : null
+  const fillRaw     = obj.fill
+  const fillHex     = typeof fillRaw === 'string' ? fillRaw : null
+  const fillGradient = isGradientFill(fillRaw) ? fillRaw : null
+  const gradientType = fillGradient?.type ?? null
+  const gradientStops = fillGradient?.colorStops?.length ?? 0
+  const fillLabel   =
+    typeof fillRaw === 'string'
+      ? fillRaw
+      : fillRaw == null
+        ? '#111827'
+        : `${capitalize(gradientType ?? 'gradient')} gradient`
   const left        = Math.round((obj.left  as number) ?? 0)
   const top         = Math.round((obj.top   as number) ?? 0)
 
@@ -67,18 +63,23 @@ export const FloatPropertiesCard: React.FC<FloatPropertiesCardProps> = ({
       {/* Color */}
       <Section label="Color">
         <div className="mb-1 flex gap-1">
-          {SWATCHES.map((hex, i) => (
+          {SWATCHES.map((hex) => (
             <div
-              key={`swatch-${i}-${hex}`}
+              key={hex}
               style={{ background: hex }}
               className={cn(
                 'h-5 w-5 cursor-pointer rounded-[4px] border-2 transition-transform hover:scale-110',
-                fillForSwatch === hex ? 'border-blue-500' : 'border-transparent'
+                fillHex === hex ? 'border-blue-500' : 'border-transparent'
               )}
             />
           ))}
         </div>
-        <p className="text-[10px] text-gray-400">{fillDisplay}</p>
+        <p className="text-[10px] text-gray-400">{fillLabel}</p>
+        {fillGradient && (
+          <p className="text-[10px] text-gray-400">
+            {capitalize(gradientType ?? 'gradient')} • {gradientStops} stops
+          </p>
+        )}
       </Section>
 
       {/* Position */}
@@ -137,3 +138,21 @@ const AiBtn: React.FC<{
     {children}
   </button>
 )
+
+interface GradientStop {
+  offset: number
+  color: string
+}
+
+interface GradientFillShape {
+  type: string
+  colorStops: GradientStop[]
+}
+
+const isGradientFill = (value: unknown): value is GradientFillShape => {
+  if (!value || typeof value !== 'object') return false
+  const candidate = value as Record<string, unknown>
+  return typeof candidate.type === 'string' && Array.isArray(candidate.colorStops)
+}
+
+const capitalize = (value: string) => value.charAt(0).toUpperCase() + value.slice(1)
