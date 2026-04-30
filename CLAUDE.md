@@ -429,6 +429,39 @@ CREATE TABLE clusters (
 
 ---
 
+### Session — 2026-04-30 (continued)
+
+#### Completed
+- **Font Weight dropdown added to FontTab**
+  - Added `fontWeight?: number` to `CanvasBlock` block-level and per-field `textStyles` shape (`src/types/canvas.ts`)
+  - Extended `TextStyles.fontWeight` and `ButtonStyles.fontWeight` unions to `'100'–'900'` (`src/types/email.ts`)
+  - `FontTab` in `EmailRightNav`: Font Family + Weight now side-by-side; weight picker has Thin → Black (100–900)
+  - `canvasConverter.ts`: added `toFontWeight()` helper; `textStyles()` and `fieldTextStyles()` resolve numeric `fontWeight` over `fontBold`
+  - `EmailEditorPanel`: `fontStyle` uses numeric `fontWeight` with `fontBold` as fallback; `resolveFieldStyle` prefers `fontWeight` over `fontBold`
+
+- **Button font controls fully replicated + shape preview fixed**
+  - `ButtonTab` in `EmailRightNav` now has full font section: Font Family + Weight, Size, Style (B/I/U), Case, Text Align, Line Height, Letter Spacing — all stored in `textStyles['button']`
+  - `EmailEditorPanel`: separated `btnVisualStyle` (shape/bg/border/text-color) from font styles; `buttonField` merges visual styles first then `resolveFieldStyle` (minus `color` so fill/outline color is preserved)
+  - Button shape `borderRadius` now correctly applies in live preview
+
+- **AI Assistant — 3 copy variants with Insert button**
+  - `AllyvateAssistant`: all text-context responses generate 3 variants; each rendered as a `VariantCard` with label + Insert button (↵)
+  - Quick actions fire immediately (no manual send step)
+  - Typing indicator (3-dot bounce) added
+  - `onInsert` prop wired in `EmailEditorPanel` → calls `handleTextFieldChange(selectedId, activeTextKey, text)` to replace focused field content
+
+#### Architectural Decisions
+- Button font settings stored in `textStyles['button']` — no new block-level props needed; reuses per-field override mechanism
+- `btnVisualStyle` (shape/bg/border/color) is always applied first; `resolveFieldStyle` font styles layer on top without overwriting `color`
+- AI Insert requires `activeTextKey` to be set (user must focus a text field first); silently no-ops otherwise
+
+#### Open Items / Next Steps
+- Split `centered-content` converter into per-field `makeTextBlock`s
+- Test case toggles end-to-end in browser
+- Wire real Claude API call in `AllyvateAssistant` to replace mock variants
+
+---
+
 ## 10. How to Work with This Project (Claude Code Instructions)
 
 1. Always read this file at session start.
