@@ -14,6 +14,7 @@ import {
   seedDefaultCreative,
 } from '@/lib/canvas/fabricInit'
 import { CREATIVE_PRESETS, getPresetById, isPresetId } from '@/lib/canvas/presets'
+import { cn } from '@/lib/utils'
 import { ToolbarLeft, type RailTool } from './ToolbarLeft'
 import { AgentPill } from './AgentPill'
 import { EmailEditorPanel } from '@/components/email/EmailEditorPanel'
@@ -98,7 +99,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
 
   const {
     mode, selectedLayer, selectedPresetId, zoom,
-    setSelectedLayer, setFabricCanvas, setSelectedPresetId, setZoom, pushUndo, resetHistory,
+    setSelectedLayer, setFabricCanvas, setSelectedPresetId, setZoom, pushUndo, resetHistory, setMode,
   } = useCanvasStore()
 
   const [toolbarPos, setToolbarPos] = useState({ x: 0, y: 0 })
@@ -783,6 +784,24 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-[#FDFDFD]">
+      {/* ── Top Nav ─────────────────────────────────────────── */}
+      <header className="flex h-10 shrink-0 items-center justify-between border-b border-gray-200 bg-white px-4">
+        <div className="flex items-center gap-1 rounded-lg bg-gray-100 p-0.5">
+          {(['canvas', 'email'] as const).map((m) => (
+            <button
+              key={m}
+              onClick={() => setMode(m)}
+              className={cn(
+                'rounded-md px-3 py-1 text-[11px] font-semibold transition-colors',
+                mode === m ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700',
+              )}
+            >
+              {m === 'canvas' ? 'Ad Canvas' : 'Email'}
+            </button>
+          ))}
+        </div>
+      </header>
+
       <div className="flex flex-1 overflow-hidden">
         <ToolbarLeft onToolAction={handleToolAction} />
 

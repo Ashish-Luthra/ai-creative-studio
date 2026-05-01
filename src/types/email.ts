@@ -58,6 +58,7 @@ export interface TextStyles {
   color: string             // hex
   textAlign: 'left' | 'center' | 'right'
   textTransform?: 'none' | 'lowercase' | 'uppercase'
+  letterSpacing?: number   // px
   padding: Padding
 }
 

@@ -115,7 +115,8 @@ function fieldTextStyles(
       ...(f.lineHeight  !== undefined && { lineHeight: f.lineHeight }),
       ...(f.fontColor   !== undefined && { color:         f.fontColor }),
       ...(f.textAlign   !== undefined && { textAlign:     f.textAlign }),
-      ...(f.fontCase    !== undefined && { textTransform: f.fontCase === 'none' ? 'none' : f.fontCase }),
+      ...(f.fontCase      !== undefined && { textTransform: f.fontCase === 'none' ? 'none' : f.fontCase }),
+      ...(f.letterSpacing !== undefined && { letterSpacing: f.letterSpacing }),
     }),
   })
 }
@@ -133,6 +134,8 @@ function stylesToInline(s: TextStyles): string {
   if (s.fontWeight !== 'normal') parts.push(`font-weight:${s.fontWeight}`)
   parts.push(`color:${s.color}`)
   parts.push(`line-height:${s.lineHeight}`)
+  if (s.textAlign) parts.push(`text-align:${s.textAlign}`)
+  if (s.letterSpacing) parts.push(`letter-spacing:${s.letterSpacing}px`)
   if (s.textTransform && s.textTransform !== 'none') parts.push(`text-transform:${s.textTransform}`)
   return parts.join(';')
 }
