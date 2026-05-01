@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
+
+export const runtime = 'nodejs'
 import { z } from 'zod'
 
 const RequestSchema = z.object({

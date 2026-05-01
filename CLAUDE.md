@@ -488,6 +488,42 @@ CREATE TABLE clusters (
 
 ---
 
+### Session — 2026-05-01
+
+#### Completed
+- **`centered-content` label field made editable**
+  - Replaced hardcoded `<span>001</span>` with `editableField('label', '001', {...})` in `EmailEditorPanel.tsx` (centered-content case)
+  - `label` now participates in the same `onFocus / onBlur / onTextChange` machinery as `number`, `heading`, and `body`
+  - `activeTextKey` becomes `'label'` on focus → FontTab "Editing: label" chip shows; per-field font/case overrides apply
+  - On blur, `cb.texts['label']` is persisted; `t(cb, 'label', '001')` in the converter picks it up → exports correctly
+
+#### Architectural Decisions
+- **"Split `centered-content` into per-field `makeTextBlock` calls" is closed as not applicable.** The card visual (white background, border-radius, inner padding grouping all four fields) requires a wrapping HTML `<table>`. Splitting into independent `makeTextBlock` blocks would destroy that layout. The current single-`makeTextBlock` approach with per-field `stylesToInline` inline styles is correct: inner `<p>` inline styles always win over inherited `<td>` styles in email clients, so font/case overrides export accurately.
+
+#### Open Items / Next Steps
+- Test case toggles (`aa/aA/AA`) end-to-end: live preview + exported HTML `text-transform`
+- Verify cursor fix works across all blocks (only `text-over-image` confirmed previously)
+
+---
+
+### Session — 2026-05-01 (continued)
+
+#### Completed
+- **Fixed `ReadableByteStreamController is not implemented` error on `/api/assistant`**
+  - Added `export const runtime = 'nodejs'` to `src/app/api/assistant/route.ts`
+  - Root cause: Turbopack's bundled fetch polyfill does not implement `ReadableByteStreamController`; the Anthropic SDK uses it internally even for non-streaming calls
+  - Fix forces the route to use the real Node.js runtime, bypassing Turbopack's polyfill
+
+#### Architectural Decisions
+- Any Next.js API route that imports `@anthropic-ai/sdk` must include `export const runtime = 'nodejs'` when running under Turbopack, to avoid the `ReadableByteStreamController` polyfill gap
+
+#### Open Items / Next Steps
+- Test case toggles (`aa/aA/AA`) end-to-end: live preview + exported HTML `text-transform`
+- Verify cursor fix works across all blocks (only `text-over-image` confirmed previously)
+- Wire real Claude API call end-to-end in AllyvateAssistant: confirm variants appear and Insert button populates the focused text field
+
+---
+
 ## 10. How to Work with This Project (Claude Code Instructions)
 
 1. Always read this file at session start.
