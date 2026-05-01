@@ -53,10 +53,12 @@ export interface Border {
 export interface TextStyles {
   fontFamily: string
   fontSize: number          // px
-  fontWeight: 'normal' | 'bold' | '300' | '400' | '500' | '600' | '700'
+  fontWeight: 'normal' | 'bold' | '100' | '200' | '300' | '400' | '500' | '600' | '700' | '800' | '900'
   lineHeight: number        // unitless multiplier
   color: string             // hex
   textAlign: 'left' | 'center' | 'right'
+  textTransform?: 'none' | 'lowercase' | 'uppercase'
+  letterSpacing?: number   // px
   padding: Padding
 }
 
@@ -73,7 +75,7 @@ export interface ButtonStyles {
   color: string
   fontFamily: string
   fontSize: number
-  fontWeight: 'normal' | 'bold' | '600' | '700'
+  fontWeight: 'normal' | 'bold' | '100' | '200' | '300' | '400' | '500' | '600' | '700' | '800' | '900'
   padding: Padding
   border?: Border
   borderRadius: number

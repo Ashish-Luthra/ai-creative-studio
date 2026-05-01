@@ -37,10 +37,12 @@ export interface CanvasBlock {
   fontFamily?: string
   fontSize?: number
   fontBold?: boolean
+  fontWeight?: number
   fontItalic?: boolean
   fontUnderline?: boolean
   fontColor?: string
   textAlign?: 'left' | 'center' | 'right'
+  fontCase?: 'none' | 'lowercase' | 'uppercase'
   lineHeight?: number
   letterSpacing?: number
   // Spacer
@@ -60,4 +62,20 @@ export interface CanvasBlock {
   linkType?: 'url' | 'file' | 'checkout'
   linkUrl?: string
   linkAction?: string
+  // Per-field text content — keyed by a field name (e.g. 'heading', 'tagline', 'body')
+  texts?: Record<string, string>
+  // Per-field font overrides — same keys as texts
+  textStyles?: Record<string, {
+    fontFamily?: string
+    fontSize?: number
+    fontBold?: boolean
+    fontWeight?: number
+    fontItalic?: boolean
+    fontUnderline?: boolean
+    fontColor?: string
+    textAlign?: 'left' | 'center' | 'right'
+    fontCase?: 'none' | 'lowercase' | 'uppercase'
+    lineHeight?: number
+    letterSpacing?: number
+  }>
 }

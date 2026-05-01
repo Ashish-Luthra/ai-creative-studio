@@ -342,6 +342,212 @@ CREATE TABLE clusters (
 
 ---
 
+## 11. Session Log
+
+### Session — 2026-04-29
+
+#### Completed
+- **Per-field text editing for all email blocks**
+  - Added `texts?: Record<string, string>` and `textStyles?: Record<string, TextStyle>` to `CanvasBlock` type (`src/types/canvas.ts`)
+  - Replaced shared `editable` spread in `BlockContent` with `editableField(key, defaultText, extraStyle)` and `buttonField(key, defaultText, extraStyle)` helpers — text is persisted via `onBlur`, no cursor resets during typing
+  - All blocks now store text per named key: `heading`, `body`, `tagline`, `button`, `label`, `description`, `quote`, `name`, `address`, `copyright`, `col1-heading`, `col1-body`, `col2-heading`, `col2-body`, `col3-heading`, `col3-body`, etc.
+  - Blocks updated: `text`, `button`, `address`, `footer`, `2col-text`, `3col-text`, `image-text`, `image-left-text-right`, `centered-content`, `text-over-image`, `text-left-image-right`, `recipe-card`, `image-top-text-bottom`, `testimonial`
+- **Per-field font styling in Right Nav**
+  - `FontTab` in `EmailRightNav` now shows a blue "Editing: [field]" chip with a Reset button when a text field is focused
+  - All font controls (family, size, colour, bold/italic/underline, alignment, line height, letter spacing) read/write the focused field's `textStyles[key]` override; fall back to block-level defaults when no field is active
+  - Added `activeTextKey` state in `EmailEditorPanel`, wired via `onTextFocus` callback from `BlockContent`
+- **Cleanup**
+  - Removed dead `textToolbarPosition` state and unused `FloatingTextToolbar` import from `EmailEditorPanel`
+
+#### Architectural Decisions
+- Text content stored as HTML strings in `block.texts[key]` (via `innerHTML`) to preserve inline formatting (bold, italic, etc.) applied by `execCommand`
+- Per-field font overrides in `block.textStyles[key]` override block-level font properties at render time; block-level props remain as the "default" for all fields
+- `dangerouslySetInnerHTML` + `onBlur` pattern used for contentEditable to avoid cursor resets on re-render
+
+---
+
+### Session — 2026-04-29 (continued)
+
+#### Completed
+- **Per-field textStyles wired into email HTML compiler**
+  - Added `fieldTextStyles(cb, fieldKey, overrides?)` helper in `src/lib/email/canvasConverter.ts` — merges `cb.textStyles[fieldKey]` user overrides on top of block-level defaults; spec hardcoded overrides (e.g. font sizes for prebuilt blocks) are passed as `overrides` and act as the fallback, with user's field-level edits winning last
+  - Updated all block converters to use `fieldTextStyles` per named field: `text` (body), `button` (button), `address` (address), `footer` (copyright), `content` (heading/body for image-text; col1/2-heading/body for 2col; col1/2/3-heading/body for 3col), `image-left-text-right` (tagline/heading), `text-over-image` (heading), `text-left-image-right` (heading), `recipe-card` (label/heading/description), `image-top-text-bottom` (heading/body), `testimonial` (name/quote)
+  - `convertButton` merges `cb.textStyles['button']` into `buttonStyles` for font family/size/weight
+  - `centered-content` still uses a single inline HTML string for all text — per-field font export deferred (would require splitting into multiple `makeTextBlock`s)
+- **FloatToolbar removed from canvas mode**
+  - Removed `FloatToolbar` render block, import, `TbState` interface, `DEFAULT_TB`, `tbState`/`tbStateRef` state, `syncToolbar` callback, `applyToLayer` callback, and `DEFAULT_TEXT_FONT_FAMILY`/`DEFAULT_TEXT_FONT_SIZE` imports from `CanvasEditor.tsx`
+  - `syncPos` and `toolbarPos` retained — still used by `ImageSelectionToolbar`
+  - `FloatToolbar.tsx` file untouched — preserved for potential future reuse
+
+#### Architectural Decisions
+- `fieldTextStyles` precedence order (low → high): block-level defaults → spec `overrides` → user's `cb.textStyles[fieldKey]`
+- Field key names in `canvasConverter.ts` exactly match `editableField(key, ...)` keys in `BlockContent` — no aliasing
+
+#### Next Steps
+- Split `centered-content` converter into separate `makeTextBlock`s per field so per-field font overrides export correctly (heading, body, label, number)
+- Verify exported HTML in the browser: select a block, change a field's font in Right Nav, export and inspect the HTML output
+
+---
+
+### Session — 2026-04-29 (continued 2)
+
+#### Completed
+- **Text case controls in FontTab (`aa / aA / AA`)**
+  - Added `fontCase?: 'none' | 'lowercase' | 'uppercase'` to `CanvasBlock` block-level font fields and per-field `textStyles` shape (`src/types/canvas.ts`)
+  - Added `textTransform?: 'none' | 'lowercase' | 'uppercase'` to `TextStyles` in `src/types/email.ts`
+  - `canvasConverter.ts`: `textStyles()` derives `textTransform` from `cb.fontCase`; `fieldTextStyles()` merges per-field `fontCase → textTransform` override
+  - `compiler.tsx`: `textTransform` applied as inline style on `<td>` (only when set and not `'none'`)
+  - `EmailEditorPanel.tsx`: `fontCase` destructured and wired into `fontStyle` (block-level) and `resolveFieldStyle` (per-field) for live editor preview; prop passed into `BlockContent`
+  - `EmailRightNav.tsx` FontTab: added `currentCase` resolved value, `handleCase` handler, and three toggle buttons (`aA` default / `aa` lowercase / `AA` uppercase) — placed between Style and Alignment sections; respects per-field mode when a text field is focused
+
+#### Architectural Decisions
+- `aA` = `'none'` (no transform, preserves original case) is the default
+- `fontCase` on `CanvasBlock` mirrors the same pattern as `fontBold`, `fontItalic`, etc. — block-level default, overridable per field via `textStyles[key].fontCase`
+- `textTransform: none` is never emitted as an inline style in exported HTML (only lowercase/uppercase are)
+
+#### Next Steps
+- Test case toggles in browser: verify live preview and exported HTML both reflect the transform
+- Split `centered-content` converter into separate `makeTextBlock`s per field so per-field font overrides (including case) export correctly
+
+---
+
+### Session — 2026-04-30
+
+#### Completed
+- **All prebuilt block text edits now export correctly**
+  - Added `t(cb, key, defaultText)` helper in `canvasConverter.ts` — reads `cb.texts?.[key]` with fallback to hardcoded default
+  - Updated every converter to use `t()`: `convertText`, `convertButton`, `convertAddress`, `convertFooter`, `convertContent` (image-text / 2col-text / 3col-text), `convertImageLeftTextRight`, `convertTextOverImage`, `convertTextLeftImageRight`, `convertRecipeCard`, `convertImageTopTextBottom`, `convertTestimonial`
+  - `centered-content` remains deferred — text is embedded in a single inline HTML string; requires structural split into per-field `makeTextBlock` calls
+- **Claude Code auto-approval rules added to CLAUDE.md** (Section 12)
+  - Auto-approve: file edits, shell/npm commands, package installs, safe git operations
+  - Require confirmation: `git reset --hard`, `git clean`, force-push to main, interactive rebase, amend on published commits, history rewrite tools, destructive DB migrations, `.env` overwrites
+
+#### Open Items / Next Steps
+- Split `centered-content` converter into per-field `makeTextBlock`s (heading, body, label, number) — unlocks both text-edit export and per-field font/case overrides
+- Test case toggles (`aa/aA/AA`) end-to-end: live preview + exported HTML `text-transform` inline style
+- Verify cursor fix works across all blocks (only `text-over-image` confirmed by user so far)
+
+---
+
+### Session — 2026-04-30 (continued)
+
+#### Completed
+- **Font Weight dropdown added to FontTab**
+  - Added `fontWeight?: number` to `CanvasBlock` block-level and per-field `textStyles` shape (`src/types/canvas.ts`)
+  - Extended `TextStyles.fontWeight` and `ButtonStyles.fontWeight` unions to `'100'–'900'` (`src/types/email.ts`)
+  - `FontTab` in `EmailRightNav`: Font Family + Weight now side-by-side; weight picker has Thin → Black (100–900)
+  - `canvasConverter.ts`: added `toFontWeight()` helper; `textStyles()` and `fieldTextStyles()` resolve numeric `fontWeight` over `fontBold`
+  - `EmailEditorPanel`: `fontStyle` uses numeric `fontWeight` with `fontBold` as fallback; `resolveFieldStyle` prefers `fontWeight` over `fontBold`
+
+- **Button font controls fully replicated + shape preview fixed**
+  - `ButtonTab` in `EmailRightNav` now has full font section: Font Family + Weight, Size, Style (B/I/U), Case, Text Align, Line Height, Letter Spacing — all stored in `textStyles['button']`
+  - `EmailEditorPanel`: separated `btnVisualStyle` (shape/bg/border/text-color) from font styles; `buttonField` merges visual styles first then `resolveFieldStyle` (minus `color` so fill/outline color is preserved)
+  - Button shape `borderRadius` now correctly applies in live preview
+
+- **AI Assistant — 3 copy variants with Insert button**
+  - `AllyvateAssistant`: all text-context responses generate 3 variants; each rendered as a `VariantCard` with label + Insert button (↵)
+  - Quick actions fire immediately (no manual send step)
+  - Typing indicator (3-dot bounce) added
+  - `onInsert` prop wired in `EmailEditorPanel` → calls `handleTextFieldChange(selectedId, activeTextKey, text)` to replace focused field content
+
+#### Architectural Decisions
+- Button font settings stored in `textStyles['button']` — no new block-level props needed; reuses per-field override mechanism
+- `btnVisualStyle` (shape/bg/border/color) is always applied first; `resolveFieldStyle` font styles layer on top without overwriting `color`
+- AI Insert requires `activeTextKey` to be set (user must focus a text field first); silently no-ops otherwise
+
+#### Open Items / Next Steps
+- Split `centered-content` converter into per-field `makeTextBlock`s
+- Test case toggles end-to-end in browser
+- Wire real Claude API call in `AllyvateAssistant` to replace mock variants
+
+---
+
+### Session — 2026-04-30 (StudioOne branch)
+
+#### Completed
+- **`centered-content` converter fully per-field**
+  - Added `stylesToInline(s: TextStyles): string` helper in `canvasConverter.ts` — converts a resolved `TextStyles` object to an inline CSS string (fontFamily, fontSize, fontWeight, color, lineHeight, textTransform)
+  - Replaced all 4 hardcoded `<p>` tags in `convertCenteredContent` with `t(cb, key, default)` for text content and `fieldTextStyles(cb, key, specDefaults)` → `stylesToInline()` for per-field inline styles
+  - Fields: `number`, `heading`, `body`, `label` — all now respect user text edits and per-field font/case overrides in both live preview and exported HTML
+- **Real Claude API wired into AllyvateAssistant**
+  - Created `src/app/api/assistant/route.ts` — POST endpoint, Zod-validated input (`message`, `context.type`, optional `fieldContent`/`blockType`), calls `claude-sonnet-4-20250514`, parses JSON array of 3 variants, returns `{ data: { variants: string[] } }` or `{ error: string }`
+  - `AllyvateAssistant.tsx`: removed `MOCK_TEXT_VARIANTS`, `_variantIdx`, `nextMockVariants`; `sendMessage` is now `async` — calls `/api/assistant` for text-context, handles loading/error states via `isTyping` and try/catch/finally
+  - Non-text context (image/design) still uses placeholder replies — real image/mood generation is out of scope for Phase 1
+
+#### Architectural Decisions
+- `stylesToInline` accepts a fully resolved `TextStyles` (not `Partial`) — `fieldTextStyles` always returns a complete object so no nullability issues
+- `textTransform: 'none'` is never emitted as an inline style (matches compiler behaviour)
+- AI assistant API route uses server-side `ANTHROPIC_API_KEY` only — never exposed to client
+- `sendMessage` is fire-and-forget async (not awaited at call sites) — React state updates handle UI
+
+#### Open Items / Next Steps
+- Test `centered-content` in browser: edit each field, change font/case, export HTML and verify inline styles
+- Test case toggles (`aa/aA/AA`) end-to-end across all blocks: live preview + exported HTML `text-transform`
+- Verify cursor fix works across all blocks (only `text-over-image` confirmed previously)
+- Add `ANTHROPIC_API_KEY` to `.env.local` and `.env.example` if not already present
+
+---
+
+### Session — 2026-05-01
+
+#### Completed
+- **`centered-content` label field made editable**
+  - Replaced hardcoded `<span>001</span>` with `editableField('label', '001', {...})` in `EmailEditorPanel.tsx` (centered-content case)
+  - `label` now participates in the same `onFocus / onBlur / onTextChange` machinery as `number`, `heading`, and `body`
+  - `activeTextKey` becomes `'label'` on focus → FontTab "Editing: label" chip shows; per-field font/case overrides apply
+  - On blur, `cb.texts['label']` is persisted; `t(cb, 'label', '001')` in the converter picks it up → exports correctly
+
+#### Architectural Decisions
+- **"Split `centered-content` into per-field `makeTextBlock` calls" is closed as not applicable.** The card visual (white background, border-radius, inner padding grouping all four fields) requires a wrapping HTML `<table>`. Splitting into independent `makeTextBlock` blocks would destroy that layout. The current single-`makeTextBlock` approach with per-field `stylesToInline` inline styles is correct: inner `<p>` inline styles always win over inherited `<td>` styles in email clients, so font/case overrides export accurately.
+
+#### Open Items / Next Steps
+- Test case toggles (`aa/aA/AA`) end-to-end: live preview + exported HTML `text-transform`
+- Verify cursor fix works across all blocks (only `text-over-image` confirmed previously)
+
+---
+
+### Session — 2026-05-01 (continued)
+
+#### Completed
+- **Fixed `ReadableByteStreamController is not implemented` error on `/api/assistant`**
+  - Added `export const runtime = 'nodejs'` to `src/app/api/assistant/route.ts`
+  - Root cause: Turbopack's bundled fetch polyfill does not implement `ReadableByteStreamController`; the Anthropic SDK uses it internally even for non-streaming calls
+  - Fix forces the route to use the real Node.js runtime, bypassing Turbopack's polyfill
+
+#### Architectural Decisions
+- Any Next.js API route that imports `@anthropic-ai/sdk` must include `export const runtime = 'nodejs'` when running under Turbopack, to avoid the `ReadableByteStreamController` polyfill gap
+
+#### Open Items / Next Steps
+- Test case toggles (`aa/aA/AA`) end-to-end: live preview + exported HTML `text-transform`
+- Verify cursor fix works across all blocks (only `text-over-image` confirmed previously)
+- Wire real Claude API call end-to-end in AllyvateAssistant: confirm variants appear and Insert button populates the focused text field
+
+---
+
+### Session — 2026-05-01 (continued 2)
+
+#### Completed
+- **Social block icon SVGs fixed — Pinterest and X/Twitter**
+  - Pinterest: replaced 511×511 complex filled path (rendered as dark blob at small size) with clean 24×24 `viewBox` path in `SOCIAL_PLATFORMS_CANVAS` (`EmailEditorPanel.tsx` line 84)
+  - X/Twitter `twitter` key: replaced 1226×1226 oversized path (rendered as prohibition symbol inside outline circle) with the same clean 24×24 X path already used by `twitter_x`
+  - `canvasConverter.ts` and `EmailRightNav.tsx` were already using correct 24×24 paths — no change needed there
+- **Merged StudioOne → main**
+  - All 4 StudioOne commits fast-forwarded into local `main`
+  - Rebased on 2 remote commits already on `origin/main`
+  - Pushed to `origin/main` (`efb038e`) — all work now on main
+
+#### Architectural Decisions
+- All future work to be done directly on `main` branch — StudioOne branch was a session branch and is now merged
+- Turbopack's compiled chunk cache (`.next/dev/`) can persist stale compiled output even after source edits; full `.next` wipe + server restart clears it, but browser HTTP cache may also need a hard reload
+
+#### Open Items / Next Steps
+- Verify social icon fix visually in browser (Turbopack cache made in-session verification inconclusive — icons confirmed correct in source and compiler output)
+- Test case toggles (`aa/aA/AA`) end-to-end: live preview + exported HTML `text-transform`
+- Verify cursor fix works across all blocks (only `text-over-image` confirmed previously)
+- Wire real Claude API call end-to-end in AllyvateAssistant
+
+---
+
 ## 10. How to Work with This Project (Claude Code Instructions)
 
 1. Always read this file at session start.
@@ -379,3 +585,33 @@ CREATE TABLE clusters (
   - Verify cursor fix works across all blocks (only `text-over-image` confirmed previously)
   - Wire real Claude API call end-to-end in AllyvateAssistant — confirm variants appear and Insert button populates the focused text field
 - Optional: remove the now-empty `/Users/ashishluthra/Projects/` directory if not used by other projects
+
+---
+
+## 12. Claude Code — Auto-Approval Rules
+
+These rules apply to all Claude Code sessions in this repository. They define what may be executed without prompting the user for confirmation.
+
+**Do not ask for confirmation before reading, writing, or editing any file. Only ask before running `git reset --hard`, `git clean`, or any destructive git history operation.**
+
+### Auto-approved (no confirmation needed)
+
+| Category | Scope |
+|---|---|
+| **File edits** | Any read, write, or edit to files inside this repo |
+| **Shell commands** | `npm`, `npx`, `pnpm`, `node`, `tsc`, `next`, `eslint`, `prettier`, standard Unix utilities (`ls`, `find`, `grep`, `cp`, `mv`, `mkdir`, `rm` on project files) |
+| **Package installs** | `npm install`, `npm ci`, `pnpm add`, and equivalent — including dev/peer deps |
+| **Git operations** | `git status`, `git diff`, `git log`, `git add`, `git commit`, `git push`, `git pull`, `git fetch`, `git checkout`, `git switch`, `git branch`, `git merge`, `git stash`, `git tag`, `git rebase` (non-interactive, forward only) |
+
+### Require explicit user confirmation before running
+
+| Command | Reason |
+|---|---|
+| `git reset --hard` | Destroys uncommitted work irreversibly |
+| `git clean -f` / `git clean -fd` / `git clean -fdx` | Deletes untracked files permanently |
+| `git push --force` / `git push --force-with-lease` to `main` or `master` | Rewrites shared history |
+| `git rebase -i` (interactive) | Rewrites commit history |
+| `git commit --amend` on already-pushed commits | Rewrites published history |
+| `git filter-branch` / `git filter-repo` | Bulk history rewrite |
+| Any `DROP TABLE` or destructive Supabase migration | Irreversible data loss |
+| Deleting or overwriting `.env*` files | Credentials loss |

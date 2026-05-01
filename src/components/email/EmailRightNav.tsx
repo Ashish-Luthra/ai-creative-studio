@@ -964,23 +964,92 @@ function BlockTab({ block, onPatch }: { block: CanvasBlock; onPatch: (p: Partial
 
 // ─── Tab: Font ─────────────────────────────────────────────────────────────────
 
-function FontTab({ block, onPatch }: { block: CanvasBlock; onPatch: (p: Partial<CanvasBlock>) => void }) {
-  const currentFont = block.fontFamily ?? 'Arial'
-  const isUnknownFont = !!block.fontFamily && !ALL_KNOWN_FONTS.has(block.fontFamily)
+function FontTab({
+  block,
+  onPatch,
+  activeTextKey,
+}: {
+  block: CanvasBlock
+  onPatch: (p: Partial<CanvasBlock>) => void
+  activeTextKey?: string
+}) {
+  // When a text field is focused, read/write its per-field style override.
+  // Otherwise fall back to block-level font properties.
+  const fieldStyle = activeTextKey ? (block.textStyles?.[activeTextKey] ?? {}) : null
+
+  const patchField = (updates: NonNullable<CanvasBlock['textStyles']>[string]) => {
+    if (!activeTextKey) return
+    onPatch({
+      textStyles: {
+        ...(block.textStyles ?? {}),
+        [activeTextKey]: { ...(block.textStyles?.[activeTextKey] ?? {}), ...updates },
+      },
+    })
+  }
+
+  const clearField = () => {
+    if (!activeTextKey) return
+    const next = { ...(block.textStyles ?? {}) }
+    delete next[activeTextKey]
+    onPatch({ textStyles: Object.keys(next).length ? next : undefined })
+  }
+
+  // Resolved values — field overrides take priority over block defaults
+  const currentFont     = (fieldStyle ? fieldStyle.fontFamily  : block.fontFamily)  ?? 'Arial'
+  const currentSize     = (fieldStyle ? fieldStyle.fontSize     : block.fontSize)    ?? 16
+  const currentColor    = (fieldStyle ? fieldStyle.fontColor    : block.fontColor)   ?? '#111827'
+  const currentWeight   = (fieldStyle ? fieldStyle.fontWeight   : block.fontWeight)  ?? ((fieldStyle ? fieldStyle.fontBold : block.fontBold) ? 700 : 400)
+  const currentBold     = (fieldStyle ? fieldStyle.fontBold     : block.fontBold)    ?? false
+  const currentItalic   = (fieldStyle ? fieldStyle.fontItalic   : block.fontItalic)  ?? false
+  const currentUnderline = (fieldStyle ? fieldStyle.fontUnderline : block.fontUnderline) ?? false
+  const currentAlign    = (fieldStyle ? fieldStyle.textAlign    : block.textAlign)   ?? 'left'
+  const currentLH       = (fieldStyle ? fieldStyle.lineHeight   : block.lineHeight)  ?? 1.6
+  const currentLS       = (fieldStyle ? fieldStyle.letterSpacing : block.letterSpacing) ?? 0
+  const currentCase     = (fieldStyle ? fieldStyle.fontCase     : block.fontCase)    ?? 'none'
+
+  const isUnknownFont   = !!currentFont && !ALL_KNOWN_FONTS.has(currentFont)
+
+  const handleFont    = (v: string)  => fieldStyle !== null ? patchField({ fontFamily: v })    : onPatch({ fontFamily: v })
+  const handleSize    = (v: number)  => fieldStyle !== null ? patchField({ fontSize: v })       : onPatch({ fontSize: v })
+  const handleColor   = (v: string)  => fieldStyle !== null ? patchField({ fontColor: v })      : onPatch({ fontColor: v })
+  const handleWeight  = (v: number)  => fieldStyle !== null ? patchField({ fontWeight: v })          : onPatch({ fontWeight: v })
+  const handleBold    = ()           => fieldStyle !== null ? patchField({ fontBold: !currentBold })       : onPatch({ fontBold: !currentBold })
+  const handleItalic  = ()           => fieldStyle !== null ? patchField({ fontItalic: !currentItalic })   : onPatch({ fontItalic: !currentItalic })
+  const handleUnder   = ()           => fieldStyle !== null ? patchField({ fontUnderline: !currentUnderline }) : onPatch({ fontUnderline: !currentUnderline })
+  const handleAlign   = (v: 'left' | 'center' | 'right') => fieldStyle !== null ? patchField({ textAlign: v }) : onPatch({ textAlign: v })
+  const handleLH      = (v: number)  => fieldStyle !== null ? patchField({ lineHeight: v })     : onPatch({ lineHeight: v })
+  const handleLS      = (v: number)  => fieldStyle !== null ? patchField({ letterSpacing: v })  : onPatch({ letterSpacing: v })
+  const handleCase    = (v: 'none' | 'lowercase' | 'uppercase') => fieldStyle !== null ? patchField({ fontCase: v }) : onPatch({ fontCase: v })
 
   return (
     <div className="flex-1 overflow-auto px-4 py-4 space-y-4">
+
+      {/* ── Active field indicator ───────────────────────────────────────────── */}
+      {activeTextKey && (
+        <div className="flex items-center justify-between rounded-xl border border-blue-200 bg-blue-50 px-3 py-2">
+          <span className="text-[11px] font-medium text-blue-700 capitalize">
+            Editing: <strong>{activeTextKey.replace(/-/g, ' ')}</strong>
+          </span>
+          {block.textStyles?.[activeTextKey] && (
+            <button
+              onClick={clearField}
+              className="text-[10px] text-blue-500 hover:text-blue-700 underline transition-colors"
+              title="Reset to block style"
+            >
+              Reset
+            </button>
+          )}
+        </div>
+      )}
 
       {/* ── Unknown-font warning ─────────────────────────────────────────────── */}
       {isUnknownFont && (
         <div className="flex gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5">
           <AlertTriangle size={14} className="mt-0.5 shrink-0 text-amber-500" />
           <div className="min-w-0">
-            <p className="text-[11px] font-semibold text-amber-700">
-              Font not available in editor
-            </p>
+            <p className="text-[11px] font-semibold text-amber-700">Font not available in editor</p>
             <p className="mt-0.5 text-[10px] leading-snug text-amber-600">
-              <span className="font-mono">&ldquo;{block.fontFamily}&rdquo;</span> isn&apos;t in
+              <span className="font-mono">&ldquo;{currentFont}&rdquo;</span> isn&apos;t in
               the font list and won&apos;t render correctly in the email.
               Please select a replacement below.
             </p>
@@ -988,30 +1057,44 @@ function FontTab({ block, onPatch }: { block: CanvasBlock; onPatch: (p: Partial<
         </div>
       )}
 
-      {/* Family */}
+      {/* Family + Weight */}
       <div>
-        <SectionLabel>Font Family</SectionLabel>
-        <select
-          value={ALL_KNOWN_FONTS.has(currentFont) ? currentFont : ''}
-          onChange={(e) => onPatch({ fontFamily: e.target.value })}
-          className={cn(
-            'w-full rounded-xl border px-3 py-2.5 text-[12px] text-gray-700 focus:outline-none',
-            isUnknownFont
-              ? 'border-amber-300 bg-amber-50 focus:border-amber-400'
-              : 'border-gray-200 bg-white focus:border-blue-400',
-          )}
-        >
-          {/* Placeholder shown only when current font is unknown */}
-          {isUnknownFont && (
-            <option value="" disabled>— select a font —</option>
-          )}
-          <optgroup label="System Fonts">
-            {SYSTEM_FONTS.map((f) => <option key={f} value={f}>{f}</option>)}
-          </optgroup>
-          <optgroup label="Google Fonts">
-            {GOOGLE_FONT_FAMILIES.map((f) => <option key={f} value={f}>{f}</option>)}
-          </optgroup>
-        </select>
+        <SectionLabel>Font</SectionLabel>
+        <div className="flex gap-2">
+          <select
+            value={ALL_KNOWN_FONTS.has(currentFont) ? currentFont : ''}
+            onChange={(e) => handleFont(e.target.value)}
+            className={cn(
+              'min-w-0 flex-1 rounded-xl border px-3 py-2.5 text-[12px] text-gray-700 focus:outline-none',
+              isUnknownFont
+                ? 'border-amber-300 bg-amber-50 focus:border-amber-400'
+                : 'border-gray-200 bg-white focus:border-blue-400',
+            )}
+          >
+            {isUnknownFont && <option value="" disabled>— select a font —</option>}
+            <optgroup label="System Fonts">
+              {SYSTEM_FONTS.map((f) => <option key={f} value={f}>{f}</option>)}
+            </optgroup>
+            <optgroup label="Google Fonts">
+              {GOOGLE_FONT_FAMILIES.map((f) => <option key={f} value={f}>{f}</option>)}
+            </optgroup>
+          </select>
+          <select
+            value={currentWeight}
+            onChange={(e) => handleWeight(Number(e.target.value))}
+            className="w-[108px] shrink-0 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-[12px] text-gray-700 focus:outline-none focus:border-blue-400"
+          >
+            <option value={100}>Thin</option>
+            <option value={200}>Extra Light</option>
+            <option value={300}>Light</option>
+            <option value={400}>Regular</option>
+            <option value={500}>Medium</option>
+            <option value={600}>Semi Bold</option>
+            <option value={700}>Bold</option>
+            <option value={800}>Extra Bold</option>
+            <option value={900}>Black</option>
+          </select>
+        </div>
       </div>
 
       {/* Size */}
@@ -1019,11 +1102,9 @@ function FontTab({ block, onPatch }: { block: CanvasBlock; onPatch: (p: Partial<
         <SectionLabel>Size</SectionLabel>
         <div className="flex items-center gap-1 rounded-xl border border-gray-200 px-3 py-2.5">
           <input
-            type="number"
-            min={8}
-            max={72}
-            value={block.fontSize ?? 16}
-            onChange={(e) => onPatch({ fontSize: Number(e.target.value) })}
+            type="number" min={8} max={72}
+            value={currentSize}
+            onChange={(e) => handleSize(Number(e.target.value))}
             className="w-full text-[12px] text-gray-700 focus:outline-none"
           />
           <span className="text-[10px] text-gray-400">px</span>
@@ -1031,33 +1112,55 @@ function FontTab({ block, onPatch }: { block: CanvasBlock; onPatch: (p: Partial<
       </div>
 
       {/* Font Color */}
-      <ColorSwatch
-        label="Font Color"
-        value={block.fontColor ?? '#111827'}
-        onChange={(v) => onPatch({ fontColor: v })}
-      />
+      <ColorSwatch label="Font Color" value={currentColor} onChange={handleColor} />
 
       {/* Style toggles */}
       <div>
         <SectionLabel>Style</SectionLabel>
         <div className="flex gap-2">
           {[
-            { icon: <Bold size={13} />,      key: 'fontBold'      as const, label: 'Bold' },
-            { icon: <Italic size={13} />,    key: 'fontItalic'    as const, label: 'Italic' },
-            { icon: <Underline size={13} />, key: 'fontUnderline' as const, label: 'Underline' },
-          ].map(({ icon, key, label }) => (
+            { icon: <Bold size={13} />,      active: currentBold,      handler: handleBold,   label: 'Bold' },
+            { icon: <Italic size={13} />,    active: currentItalic,    handler: handleItalic, label: 'Italic' },
+            { icon: <Underline size={13} />, active: currentUnderline, handler: handleUnder,  label: 'Underline' },
+          ].map(({ icon, active, handler, label }) => (
             <button
-              key={key}
+              key={label}
               title={label}
-              onClick={() => onPatch({ [key]: !block[key] })}
+              onClick={handler}
               className={cn(
                 'flex h-9 w-9 items-center justify-center rounded-xl border transition-colors',
-                block[key]
+                active
                   ? 'border-blue-400 bg-blue-50 text-blue-600'
                   : 'border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50',
               )}
             >
               {icon}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Case */}
+      <div>
+        <SectionLabel>Case</SectionLabel>
+        <div className="flex gap-2">
+          {([
+            { value: 'none',      label: 'aA', title: 'Default' },
+            { value: 'lowercase', label: 'aa', title: 'Lowercase' },
+            { value: 'uppercase', label: 'AA', title: 'Uppercase' },
+          ] as const).map(({ value, label, title }) => (
+            <button
+              key={value}
+              title={title}
+              onClick={() => handleCase(value)}
+              className={cn(
+                'flex h-9 flex-1 items-center justify-center rounded-xl border text-[12px] font-semibold transition-colors',
+                currentCase === value
+                  ? 'border-blue-400 bg-blue-50 text-blue-600'
+                  : 'border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50',
+              )}
+            >
+              {label}
             </button>
           ))}
         </div>
@@ -1074,10 +1177,10 @@ function FontTab({ block, onPatch }: { block: CanvasBlock; onPatch: (p: Partial<
           ].map(({ icon, value }) => (
             <button
               key={value}
-              onClick={() => onPatch({ textAlign: value })}
+              onClick={() => handleAlign(value)}
               className={cn(
                 'flex h-9 w-9 items-center justify-center rounded-xl border transition-colors',
-                (block.textAlign ?? 'left') === value
+                currentAlign === value
                   ? 'border-blue-400 bg-blue-50 text-blue-600'
                   : 'border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50',
               )}
@@ -1092,12 +1195,12 @@ function FontTab({ block, onPatch }: { block: CanvasBlock; onPatch: (p: Partial<
       <div>
         <div className="mb-2 flex items-center justify-between">
           <SectionLabel>Line Height</SectionLabel>
-          <span className="text-[11px] text-gray-500">{(block.lineHeight ?? 1.6).toFixed(1)}</span>
+          <span className="text-[11px] text-gray-500">{currentLH.toFixed(1)}</span>
         </div>
         <input
           type="range" min={1} max={3} step={0.1}
-          value={block.lineHeight ?? 1.6}
-          onChange={(e) => onPatch({ lineHeight: Number(e.target.value) })}
+          value={currentLH}
+          onChange={(e) => handleLH(Number(e.target.value))}
           className="w-full accent-blue-500"
         />
       </div>
@@ -1106,15 +1209,25 @@ function FontTab({ block, onPatch }: { block: CanvasBlock; onPatch: (p: Partial<
       <div>
         <div className="mb-2 flex items-center justify-between">
           <SectionLabel>Letter Spacing</SectionLabel>
-          <span className="text-[11px] text-gray-500">{block.letterSpacing ?? 0}px</span>
+          <span className="text-[11px] text-gray-500">{currentLS}px</span>
         </div>
         <input
           type="range" min={-2} max={10} step={0.5}
-          value={block.letterSpacing ?? 0}
-          onChange={(e) => onPatch({ letterSpacing: Number(e.target.value) })}
+          value={currentLS}
+          onChange={(e) => handleLS(Number(e.target.value))}
           className="w-full accent-blue-500"
         />
       </div>
+
+      {/* Block-level defaults separator */}
+      {activeTextKey && (
+        <div className="border-t border-gray-100 pt-3">
+          <p className="text-[10px] text-gray-400 text-center">
+            Changes above apply to the <strong>{activeTextKey.replace(/-/g, ' ')}</strong> field only.
+            Click elsewhere to edit block-level defaults.
+          </p>
+        </div>
+      )}
     </div>
   )
 }
@@ -1134,46 +1247,35 @@ function PositionIcon({ align, active }: { align: 'left' | 'center' | 'right'; a
 }
 
 function ButtonTab({ block, onPatch }: { block: CanvasBlock; onPatch: (p: Partial<CanvasBlock>) => void }) {
-  const selectedVariant  = block.buttonShapeVariant  ?? 0
-  const fillColor        = block.buttonFillColor      ?? '#1F2937'
-  const borderColor      = block.buttonBorderColor    ?? '#1F2937'
-  const position         = block.buttonPosition       ?? 'center'
-  const buttonFontFamily = block.buttonFontFamily     ?? block.fontFamily ?? 'Arial'
+  const selectedVariant = block.buttonShapeVariant ?? 0
+  const fillColor       = block.buttonFillColor    ?? '#1F2937'
+  const borderColor     = block.buttonBorderColor  ?? '#1F2937'
+  const position        = block.buttonPosition     ?? 'center'
+
+  // Button font is stored in textStyles['button'] — same per-field mechanism as text fields
+  const bf = block.textStyles?.['button'] ?? {}
+  const patchBF = (updates: NonNullable<CanvasBlock['textStyles']>[string]) =>
+    onPatch({ textStyles: { ...(block.textStyles ?? {}), button: { ...bf, ...updates } } })
+
+  const bFont      = bf.fontFamily    ?? block.buttonFontFamily ?? block.fontFamily ?? 'Arial'
+  const bSize      = bf.fontSize      ?? block.fontSize ?? 14
+  const bWeight    = bf.fontWeight    ?? (bf.fontBold ? 700 : 600)
+  const bBold      = bf.fontBold      ?? false
+  const bItalic    = bf.fontItalic    ?? false
+  const bUnderline = bf.fontUnderline ?? false
+  const bCase      = bf.fontCase      ?? 'none'
+  const bAlign     = bf.textAlign     ?? 'center'
+  const bLH        = bf.lineHeight    ?? 1.2
+  const bLS        = bf.letterSpacing ?? 0
+  const isUnknown  = !!bFont && !ALL_KNOWN_FONTS.has(bFont)
 
   return (
     <div className="flex-1 overflow-auto">
-      {/* Saved styles */}
-      <div className="border-b border-gray-100 px-4 py-4">
-        <p className="text-[13px] font-semibold text-gray-800">Saved styles</p>
-        <p className="mt-0.5 mb-3 text-[11px] text-gray-400">
-          Save your button settings as a style you can easily reuse
-        </p>
-        <button className="w-full rounded-xl border border-gray-200 py-2.5 text-[12px] font-semibold text-gray-700 transition-colors hover:bg-gray-50">
-          Save this button style
-        </button>
-      </div>
-
       <div className="px-4 py-4 space-y-5">
-        {/* Font Family — independent from text font */}
-        <div>
-          <SectionLabel>Font Family</SectionLabel>
-          <select
-            value={ALL_KNOWN_FONTS.has(buttonFontFamily) ? buttonFontFamily : (block.fontFamily ?? 'Arial')}
-            onChange={(e) => onPatch({ buttonFontFamily: e.target.value })}
-            className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-[12px] text-gray-700 focus:border-blue-400 focus:outline-none"
-          >
-            <optgroup label="System Fonts">
-              {SYSTEM_FONTS.map((f) => <option key={f} value={f}>{f}</option>)}
-            </optgroup>
-            <optgroup label="Google Fonts">
-              {GOOGLE_FONT_FAMILIES.map((f) => <option key={f} value={f}>{f}</option>)}
-            </optgroup>
-          </select>
-        </div>
 
-        {/* Shape variants — 4 × 2 grid */}
+        {/* ── Shape ────────────────────────────────────────────────────────── */}
         <div>
-          <SectionLabel>Style</SectionLabel>
+          <SectionLabel>Shape</SectionLabel>
           <div className="grid grid-cols-4 gap-2">
             {BUTTON_SHAPES.map((v) => (
               <button
@@ -1193,13 +1295,13 @@ function ButtonTab({ block, onPatch }: { block: CanvasBlock; onPatch: (p: Partia
           </div>
         </div>
 
-        {/* Colors — each on its own row so the palette dropdown has full width */}
+        {/* ── Colors ───────────────────────────────────────────────────────── */}
         <div className="space-y-4">
           <ColorSwatch label="Fill color"   value={fillColor}   onChange={(v) => onPatch({ buttonFillColor: v })} />
           <ColorSwatch label="Border color" value={borderColor} onChange={(v) => onPatch({ buttonBorderColor: v })} />
         </div>
 
-        {/* Position */}
+        {/* ── Position ─────────────────────────────────────────────────────── */}
         <div>
           <SectionLabel>Position</SectionLabel>
           <div className="flex gap-2">
@@ -1209,9 +1311,7 @@ function ButtonTab({ block, onPatch }: { block: CanvasBlock; onPatch: (p: Partia
                 onClick={() => onPatch({ buttonPosition: align })}
                 className={cn(
                   'flex h-10 flex-1 items-center justify-center rounded-xl border transition-colors',
-                  position === align
-                    ? 'border-blue-400 bg-blue-50'
-                    : 'border-gray-200 hover:border-gray-300',
+                  position === align ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:border-gray-300',
                 )}
               >
                 <PositionIcon align={align} active={position === align} />
@@ -1219,13 +1319,141 @@ function ButtonTab({ block, onPatch }: { block: CanvasBlock; onPatch: (p: Partia
             ))}
           </div>
         </div>
+
+        {/* ── Font Family + Weight ──────────────────────────────────────────── */}
+        <div>
+          <SectionLabel>Font</SectionLabel>
+          <div className="flex gap-2">
+            <select
+              value={ALL_KNOWN_FONTS.has(bFont) ? bFont : ''}
+              onChange={(e) => { patchBF({ fontFamily: e.target.value }); onPatch({ buttonFontFamily: e.target.value }) }}
+              className={cn(
+                'min-w-0 flex-1 rounded-xl border px-3 py-2.5 text-[12px] text-gray-700 focus:outline-none',
+                isUnknown ? 'border-amber-300 bg-amber-50' : 'border-gray-200 bg-white focus:border-blue-400',
+              )}
+            >
+              {isUnknown && <option value="" disabled>— select a font —</option>}
+              <optgroup label="System Fonts">
+                {SYSTEM_FONTS.map((f) => <option key={f} value={f}>{f}</option>)}
+              </optgroup>
+              <optgroup label="Google Fonts">
+                {GOOGLE_FONT_FAMILIES.map((f) => <option key={f} value={f}>{f}</option>)}
+              </optgroup>
+            </select>
+            <select
+              value={bWeight}
+              onChange={(e) => patchBF({ fontWeight: Number(e.target.value) })}
+              className="w-[108px] shrink-0 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-[12px] text-gray-700 focus:outline-none focus:border-blue-400"
+            >
+              <option value={100}>Thin</option>
+              <option value={200}>Extra Light</option>
+              <option value={300}>Light</option>
+              <option value={400}>Regular</option>
+              <option value={500}>Medium</option>
+              <option value={600}>Semi Bold</option>
+              <option value={700}>Bold</option>
+              <option value={800}>Extra Bold</option>
+              <option value={900}>Black</option>
+            </select>
+          </div>
+        </div>
+
+        {/* ── Size ─────────────────────────────────────────────────────────── */}
+        <div>
+          <SectionLabel>Size</SectionLabel>
+          <div className="flex items-center gap-1 rounded-xl border border-gray-200 px-3 py-2.5">
+            <input
+              type="number" min={8} max={48}
+              value={bSize}
+              onChange={(e) => patchBF({ fontSize: Number(e.target.value) })}
+              className="w-full text-[12px] text-gray-700 focus:outline-none"
+            />
+            <span className="text-[10px] text-gray-400">px</span>
+          </div>
+        </div>
+
+        {/* ── Style toggles ─────────────────────────────────────────────────── */}
+        <div>
+          <SectionLabel>Style</SectionLabel>
+          <div className="flex gap-2">
+            {[
+              { icon: <Bold size={13} />,      active: bBold,      handler: () => patchBF({ fontBold: !bBold }),           label: 'Bold' },
+              { icon: <Italic size={13} />,    active: bItalic,    handler: () => patchBF({ fontItalic: !bItalic }),       label: 'Italic' },
+              { icon: <Underline size={13} />, active: bUnderline, handler: () => patchBF({ fontUnderline: !bUnderline }), label: 'Underline' },
+            ].map(({ icon, active, handler, label }) => (
+              <button key={label} title={label} onClick={handler}
+                className={cn(
+                  'flex h-9 w-9 items-center justify-center rounded-xl border transition-colors',
+                  active ? 'border-blue-400 bg-blue-50 text-blue-600' : 'border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50',
+                )}
+              >{icon}</button>
+            ))}
+          </div>
+        </div>
+
+        {/* ── Case ──────────────────────────────────────────────────────────── */}
+        <div>
+          <SectionLabel>Case</SectionLabel>
+          <div className="flex gap-2">
+            {([
+              { value: 'none',      label: 'aA', title: 'Default' },
+              { value: 'lowercase', label: 'aa', title: 'Lowercase' },
+              { value: 'uppercase', label: 'AA', title: 'Uppercase' },
+            ] as const).map(({ value, label, title }) => (
+              <button key={value} title={title} onClick={() => patchBF({ fontCase: value })}
+                className={cn(
+                  'flex h-9 flex-1 items-center justify-center rounded-xl border text-[12px] font-semibold transition-colors',
+                  bCase === value ? 'border-blue-400 bg-blue-50 text-blue-600' : 'border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50',
+                )}
+              >{label}</button>
+            ))}
+          </div>
+        </div>
+
+        {/* ── Alignment ─────────────────────────────────────────────────────── */}
+        <div>
+          <SectionLabel>Text Align</SectionLabel>
+          <div className="flex gap-2">
+            {([
+              { value: 'left',   icon: <AlignLeft   size={14} /> },
+              { value: 'center', icon: <AlignCenter size={14} /> },
+              { value: 'right',  icon: <AlignRight  size={14} /> },
+            ] as const).map(({ value, icon }) => (
+              <button key={value} onClick={() => patchBF({ textAlign: value })}
+                className={cn(
+                  'flex h-9 flex-1 items-center justify-center rounded-xl border transition-colors',
+                  bAlign === value ? 'border-blue-400 bg-blue-50 text-blue-600' : 'border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50',
+                )}
+              >{icon}</button>
+            ))}
+          </div>
+        </div>
+
+        {/* ── Line Height & Letter Spacing ──────────────────────────────────── */}
+        {([
+          { label: 'Line Height',    value: bLH, min: 0.8, max: 3,  step: 0.1, handler: (v: number) => patchBF({ lineHeight: v }) },
+          { label: 'Letter Spacing', value: bLS, min: -2,  max: 20, step: 0.5, handler: (v: number) => patchBF({ letterSpacing: v }) },
+        ] as const).map(({ label, value, min, max, step, handler }) => (
+          <div key={label}>
+            <div className="mb-1.5 flex items-center justify-between">
+              <SectionLabel>{label}</SectionLabel>
+              <span className="text-[10px] text-gray-400">{value.toFixed(1)}</span>
+            </div>
+            <input
+              type="range" min={min} max={max} step={step} value={value}
+              onChange={(e) => handler(Number(e.target.value))}
+              className="w-full accent-blue-500"
+            />
+          </div>
+        ))}
+
       </div>
 
-      {/* Border & sizing accordion */}
+      {/* ── Border & sizing accordion ──────────────────────────────────────── */}
       <Accordion title="Border and sizing">
         <div className="space-y-3">
           {[
-            { label: 'Border Width', key: 'buttonBorderWidth' as const, min: 0, max: 10,  unit: 'px', def: 1   },
+            { label: 'Border Width', key: 'buttonBorderWidth' as const, min: 0,  max: 10,  unit: 'px', def: 1   },
             { label: 'Button Width', key: 'buttonWidth'       as const, min: 60, max: 500, unit: 'px', def: 160 },
             { label: 'Button Height',key: 'buttonHeight'      as const, min: 28, max: 120, unit: 'px', def: 44  },
           ].map(({ label, key, min, max, unit, def }) => (
@@ -1233,9 +1461,7 @@ function ButtonTab({ block, onPatch }: { block: CanvasBlock; onPatch: (p: Partia
               <label className="mb-1.5 block text-[10px] font-medium text-gray-500">{label}</label>
               <div className="flex items-center gap-2 rounded-xl border border-gray-200 px-3 py-2">
                 <input
-                  type="number"
-                  min={min}
-                  max={max}
+                  type="number" min={min} max={max}
                   value={(block[key] as number | undefined) ?? def}
                   onChange={(e) => onPatch({ [key]: Number(e.target.value) })}
                   className="w-full text-[12px] text-gray-700 focus:outline-none"
@@ -1457,9 +1683,11 @@ export interface EmailRightNavProps {
    * the same tab is requested twice in a row.
    */
   focusTab?: { tab: string; seq: number }
+  /** The text field key that currently has focus (e.g. 'heading', 'body') */
+  activeTextKey?: string
 }
 
-export function EmailRightNav({ block, onPatch, onOpenImagePicker, onImageUpload, onBack, focusTab }: EmailRightNavProps) {
+export function EmailRightNav({ block, onPatch, onOpenImagePicker, onImageUpload, onBack, focusTab, activeTextKey }: EmailRightNavProps) {
   const tabs = getTabsForBlock(block.type)
   const [activeTab, setActiveTab] = useState<RightTab>(tabs[0].id)
 
@@ -1510,7 +1738,7 @@ export function EmailRightNav({ block, onPatch, onOpenImagePicker, onImageUpload
       {resolvedTab === 'icons'  && <SocialIconsTab block={block} onPatch={patch} />}
       {resolvedTab === 'links'  && <SocialLinksSection block={block} onPatch={patch} />}
       {resolvedTab === 'block'  && <BlockTab  block={block} onPatch={patch} />}
-      {resolvedTab === 'font'   && <FontTab   block={block} onPatch={patch} />}
+      {resolvedTab === 'font'   && <FontTab   block={block} onPatch={patch} activeTextKey={activeTextKey} />}
       {resolvedTab === 'button' && <ButtonTab block={block} onPatch={patch} />}
       {resolvedTab === 'image'  && (
         <ImageTab

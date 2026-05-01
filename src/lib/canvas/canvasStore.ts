@@ -1,8 +1,7 @@
 import { create } from 'zustand'
 import type { Canvas, FabricObject } from 'fabric'
-import { DEFAULT_CANVAS_ZOOM } from '@/lib/canvas/canvasDefaults'
 
-export type CanvasMode = 'canvas' | 'email' | 'feeds'
+export type CanvasMode = 'canvas' | 'email'
 
 interface CanvasState {
   mode: CanvasMode
@@ -28,11 +27,11 @@ interface CanvasState {
 export const useCanvasStore = create<CanvasState>((set, get) => ({
   mode: 'canvas',
   selectedLayer: null,
-  zoom: DEFAULT_CANVAS_ZOOM,
+  zoom: 1,
   undoStack: [],
   redoStack: [],
   fabricCanvas: null,
-  selectedPresetId: 'instagram-4-5',
+  selectedPresetId: 'instagram-1-1',
 
   setMode: (mode) => set({ mode, selectedLayer: null }),
   setSelectedLayer: (obj) => set({ selectedLayer: obj }),

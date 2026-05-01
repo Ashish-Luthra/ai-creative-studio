@@ -1,20 +1,15 @@
 'use client'
 
-import { Folder, Grid2X2, Image, Type, MousePointer2, Palette, Sparkles, Shuffle, Smartphone, Upload, Settings } from 'lucide-react'
+import { Folder, Grid2X2, MousePointer2, Hand, Settings, Square } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useState } from 'react'
 
 export type RailTool =
   | 'projects'
   | 'layout'
-  | 'media'
-  | 'copy'
+  | 'frame'
+  | 'hand'
   | 'cta'
-  | 'style'
-  | 'ai'
-  | 'variants'
-  | 'preview'
-  | 'export'
   | 'settings'
 
 interface RailButtonProps {
@@ -50,14 +45,9 @@ export const ToolbarLeft: React.FC<ToolbarLeftProps> = ({ onToolAction }) => {
   const tools: { id: RailTool; icon: React.ReactNode; title: string }[] = [
     { id: 'projects', icon: <Folder size={15} />, title: 'Projects / Assets' },
     { id: 'layout', icon: <Grid2X2 size={15} />, title: 'Layout / Template' },
-    { id: 'media', icon: <Image size={15} />, title: 'Media' },
-    { id: 'copy', icon: <Type size={15} />, title: 'Copy' },
+    { id: 'frame', icon: <Square size={15} />, title: 'Add Frame (1:1)' },
+    { id: 'hand', icon: <Hand size={15} />, title: 'Hand Move' },
     { id: 'cta', icon: <MousePointer2 size={15} />, title: 'CTA / Action' },
-    { id: 'style', icon: <Palette size={15} />, title: 'Style / Brand' },
-    { id: 'ai', icon: <Sparkles size={15} />, title: 'AI Assist' },
-    { id: 'variants', icon: <Shuffle size={15} />, title: 'Variants' },
-    { id: 'preview', icon: <Smartphone size={15} />, title: 'Preview' },
-    { id: 'export', icon: <Upload size={15} />, title: 'Export / Publish' },
   ]
 
   const handleToolClick = (tool: RailTool) => {
