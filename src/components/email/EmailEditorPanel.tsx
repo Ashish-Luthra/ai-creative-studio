@@ -1570,7 +1570,7 @@ function BlockContent({
           <h3 {...editableField('heading', 'Tips to Photograph Food', { fontSize: S.headingFontSize, fontWeight: S.headingWeight, marginTop: 8 })} />
           <p {...editableField('body', 'I remember my first try at food photography. I created this guide to help you get started without making all the mistakes I did.', { fontSize: S.bodyFontSize, color: S.bodyColor, maxWidth: S.bodyMaxWidthPx, margin: '12px auto 0', lineHeight: S.bodyLineHeight })} />
           <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', justifyContent: btnJustify, gap: 12 }}>
-            <span style={{ fontSize: S.labelFontSize, color: S.labelColor }}>001</span>
+            <span {...editableField('label', '001', { fontSize: S.labelFontSize, color: S.labelColor })} />
             <div {...buttonField('button', S.buttonLabel, { padding: '8px 24px', fontSize: '12px', fontWeight: 600, letterSpacing: '0.1em' })} />
           </div>
         </div>
