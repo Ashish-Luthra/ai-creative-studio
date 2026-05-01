@@ -524,6 +524,30 @@ CREATE TABLE clusters (
 
 ---
 
+### Session — 2026-05-01 (continued 2)
+
+#### Completed
+- **Social block icon SVGs fixed — Pinterest and X/Twitter**
+  - Pinterest: replaced 511×511 complex filled path (rendered as dark blob at small size) with clean 24×24 `viewBox` path in `SOCIAL_PLATFORMS_CANVAS` (`EmailEditorPanel.tsx` line 84)
+  - X/Twitter `twitter` key: replaced 1226×1226 oversized path (rendered as prohibition symbol inside outline circle) with the same clean 24×24 X path already used by `twitter_x`
+  - `canvasConverter.ts` and `EmailRightNav.tsx` were already using correct 24×24 paths — no change needed there
+- **Merged StudioOne → main**
+  - All 4 StudioOne commits fast-forwarded into local `main`
+  - Rebased on 2 remote commits already on `origin/main`
+  - Pushed to `origin/main` (`efb038e`) — all work now on main
+
+#### Architectural Decisions
+- All future work to be done directly on `main` branch — StudioOne branch was a session branch and is now merged
+- Turbopack's compiled chunk cache (`.next/dev/`) can persist stale compiled output even after source edits; full `.next` wipe + server restart clears it, but browser HTTP cache may also need a hard reload
+
+#### Open Items / Next Steps
+- Verify social icon fix visually in browser (Turbopack cache made in-session verification inconclusive — icons confirmed correct in source and compiler output)
+- Test case toggles (`aa/aA/AA`) end-to-end: live preview + exported HTML `text-transform`
+- Verify cursor fix works across all blocks (only `text-over-image` confirmed previously)
+- Wire real Claude API call end-to-end in AllyvateAssistant
+
+---
+
 ## 10. How to Work with This Project (Claude Code Instructions)
 
 1. Always read this file at session start.
