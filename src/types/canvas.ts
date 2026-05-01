@@ -54,6 +54,8 @@ export interface CanvasBlock {
   footerLinks?: { label: string; url: string }[]
   // Content block inner layout
   contentLayout?: '2col-text' | '3col-text' | 'image' | 'image-text'
+  // Logo
+  logoWidth?: number
   // Link
   linkType?: 'url' | 'file' | 'checkout'
   linkUrl?: string

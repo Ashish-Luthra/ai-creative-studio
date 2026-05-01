@@ -351,3 +351,31 @@ CREATE TABLE clusters (
 5. When adding an AI feature: read Section 6 rules first. Gates are non-negotiable.
 6. When unsure about where logic belongs: user-facing state -> Zustand; API transformations -> lib/; Python AI work -> services/.
 7. Always run `tsc --noEmit` and `next lint` before committing.
+
+---
+
+## 11. Session Log
+
+### Session — 2026-05-01 (social icon replacement)
+
+#### Completed
+- **Replaced all social icons** with 5 user-supplied SVGs (Facebook, Instagram, Pinterest, Twitter/X, YouTube)
+  - `src/components/email/EmailEditorPanel.tsx` — `SOCIAL_PLATFORMS_CANVAS` trimmed from 17 to 5 entries; `DEFAULT_SOCIAL_KEYS` now `['facebook','instagram','pinterest','twitter','youtube']`
+  - `src/components/email/EmailRightNav.tsx` — `SOCIAL_PLATFORMS` trimmed from 33 to 5 entries
+  - `src/lib/email/canvasConverter.ts` — `ALL_SOCIAL_ICONS` trimmed from 17 to 5 entries; `DEFAULT_KEYS` updated to include youtube
+  - SVG path data taken from `~/Library/Mobile Documents/com~apple~CloudDocs/Desktop/Allyvate_work/3.UI Image work/Brand logos/SocialTool/{facebook,Instagram,pinterest,twitter,Youtube}.svg`
+  - Native viewBoxes preserved (76×151, 150×150, 123×150, 147×150, 199×150) — content scales via Tailwind `h-5 w-5` with default `xMidYMid meet` aspect preservation
+- **Verified end-to-end in browser preview** — confirmed all 5 icons render with new viewBoxes via `preview_eval` DOM inspection
+- **Deleted stale project copy** at `/Users/ashishluthra/Projects/ai-creative-studio/` — earlier in the session I had been editing this stale copy thinking it was the live project. The actual active project is `/Users/ashishluthra/ai-creative-studio/`
+
+#### Architectural Decisions
+- **Project root is `/Users/ashishluthra/ai-creative-studio/`** (not `/Users/ashishluthra/Projects/ai-creative-studio/`). The dev server's `.claude/launch.json` resolves to this path. Always verify the `pwd` before editing.
+- Social platform list is now the same minimal 5 across all three locations (canvas renderer, right-nav picker, HTML compiler) — no aliasing, no `twitter_x` duplicate
+- Kept user-provided SVGs at their native viewBox dimensions rather than re-normalising to 24×24 — visually identical when scaled and avoids path data transformation
+
+#### Open Items / Next Steps
+- Carry-over from previous sessions:
+  - Test case toggles (`aa/aA/AA`) end-to-end: live preview + exported HTML `text-transform`
+  - Verify cursor fix works across all blocks (only `text-over-image` confirmed previously)
+  - Wire real Claude API call end-to-end in AllyvateAssistant — confirm variants appear and Insert button populates the focused text field
+- Optional: remove the now-empty `/Users/ashishluthra/Projects/` directory if not used by other projects
