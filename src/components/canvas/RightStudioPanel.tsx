@@ -18,7 +18,7 @@ export const RightStudioPanel: React.FC<RightStudioPanelProps> = ({
   onAddFrame,
   onConvertToAll,
 }) => {
-  if (!activeTool || activeTool === 'projects' || activeTool === 'settings' || activeTool === 'cta') return null
+  if (!activeTool || activeTool === 'projects' || activeTool === 'settings' || activeTool === 'cta' || activeTool === 'text') return null
 
   return (
     <aside className="absolute right-5 top-20 z-50 w-72 rounded-2xl border border-gray-200 bg-white/95 p-4 shadow-[0_10px_24px_rgba(0,0,0,0.10)] backdrop-blur-sm">

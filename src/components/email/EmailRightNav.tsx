@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import {
   ChevronDown, Upload,
   Bold, Italic, Underline,
@@ -11,6 +11,14 @@ import { cn } from '@/lib/utils'
 import type { CanvasBlock } from './EmailEditorPanel'
 import { GOOGLE_FONT_FAMILIES } from '@/lib/canvas/googleFonts'
 import { AlertTriangle } from 'lucide-react'
+import {
+  SectionLabel,
+  ColorSwatch,
+  TextStyleControls,
+  SYSTEM_FONTS,
+  ALL_KNOWN_FONTS,
+  type TextStyleValue,
+} from '@/components/shared/TextStyleControls'
 
 // ─── Tab routing ──────────────────────────────────────────────────────────────
 
@@ -87,29 +95,6 @@ const IMAGE_SHAPES: { id: CanvasBlock['imageShape']; path: string }[] = [
   { id: 'hexagon',  path: 'M16 0L32 9.3V22.7L16 32L0 22.7V9.3Z' },
 ]
 
-// Web-safe system fonts — always available regardless of network / email client
-const SYSTEM_FONTS = [
-  'Arial', 'Georgia', 'Helvetica', 'Tahoma',
-  'Times New Roman', 'Trebuchet MS', 'Verdana', 'Courier New',
-]
-
-// Combined set used for "is this font known?" checks
-const ALL_KNOWN_FONTS = new Set([...SYSTEM_FONTS, ...GOOGLE_FONT_FAMILIES])
-
-// ─── Preset soft-colour palette (matches ColorPickerPopup) ────────────────────
-const PRESET_COLORS = [
-  // Row 1 — warm neutrals + slate
-  '#D4B5A7','#B07B7B','#F5E6E8','#C9A89C','#E8D5C4','#C9C5A3','#A8A67E','#8FA095','#9EA5A3','#B8CDE0','#000814',
-  // Row 2 — blush + sage + sky
-  '#E8BBA8','#D4A5A5','#E8D5C4','#D4B5A7','#F5D5C4','#C9D5C4','#7FBC8C','#A8C9C5','#B8CDE0','#D5E0C9','#3D4149',
-  // Row 3 — terracotta + teal + lime
-  '#E87B5C','#C96B5C','#F5A5A5','#E85C7B','#C96B5C','#E89C5C','#5FBC8C','#A8D5C9','#C9E0D5','#E0E8C9','#5A5D66',
-  // Row 4 — deep reds + greens + blues
-  '#BC4B3C','#7B3D3D','#C97B8C','#BC3D5C','#E87B5C','#E8A85C','#8FD5A8','#A8C9B8','#C9D5C4','#E0E8D5','#1A3D3D',
-  // Row 5 — wine + cobalt + cool grays
-  '#8C3D3D','#C9A89C','#C97B9C','#BC5C7B','#E8A87B','#5FBC8C','#7BA8A8','#7BB8D5','#0047AB','#A8B8C9','#8899AA',
-]
-
 const LINK_ACTIONS = [
   'Add to segment',
   'Remove from segment',
@@ -118,156 +103,6 @@ const LINK_ACTIONS = [
   'Set custom field value',
 ]
 
-// ─── Shared micro-components ──────────────────────────────────────────────────
-
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="mb-2.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400">
-      {children}
-    </p>
-  )
-}
-
-// ─── Quick-access preset dots shown inline inside ColorSwatch ─────────────────
-// A curated diverse set — their variety of hues makes it visually obvious
-// these are "preset colour options", not a single-purpose picker control.
-const QUICK_PRESETS = [
-  '#000000', '#ffffff', '#E87B5C', '#5FBC8C',
-  '#0047AB', '#FFCC00', '#9B59B6', '#C9A89C',
-]
-
-function ColorSwatch({
-  label, value, onChange,
-}: { label: string; value: string; onChange: (v: string) => void }) {
-  const [showPalette, setShowPalette] = useState(false)
-  const [hex, setHex] = useState(value)
-  const panelRef = useRef<HTMLDivElement>(null)
-
-  // Keep local hex in sync when value changes externally
-  useEffect(() => { setHex(value) }, [value])
-
-  // Close full palette on outside click
-  useEffect(() => {
-    if (!showPalette) return
-    const handler = (e: MouseEvent) => {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
-        setShowPalette(false)
-      }
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [showPalette])
-
-  return (
-    <div className="relative" ref={panelRef}>
-      {label && <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-gray-400">{label}</p>}
-
-      {/* ── Row 1: current colour square + hex input + rainbow picker ── */}
-      <div className="flex items-center gap-2 rounded-xl border border-gray-200 px-2.5 py-2">
-        {/* Current colour — ROUNDED SQUARE (not a circle).
-            This is purely a value indicator, not a clickable control. */}
-        <div
-          className="h-7 w-7 shrink-0 rounded-[6px] border border-black/10 shadow-sm"
-          style={{ backgroundColor: value }}
-        />
-
-        {/* Hex text input — always editable */}
-        <input
-          type="text"
-          value={hex}
-          onChange={(e) => {
-            setHex(e.target.value)
-            if (/^#[0-9a-fA-F]{6}$/.test(e.target.value)) onChange(e.target.value)
-          }}
-          maxLength={7}
-          placeholder="#000000"
-          className="flex-1 font-mono text-[12px] text-gray-700 focus:outline-none"
-        />
-
-        {/* Gradient icon = native OS colour picker trigger */}
-        <label
-          className="relative flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center transition-transform hover:scale-105"
-          title="Open colour picker"
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/icons/colour-picker.svg" alt="Colour picker" className="h-5 w-5" />
-          <input
-            type="color"
-            value={value}
-            onChange={(e) => { onChange(e.target.value); setHex(e.target.value) }}
-            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-          />
-        </label>
-      </div>
-
-      {/* ── Row 2: preset colour dots (always visible) + "more" expander ──
-          These small, multi-coloured circles are visually unmistakeable as
-          "preset palette options" — clearly different from the rainbow picker above. */}
-      <div className="mt-2 flex items-center gap-1.5 px-0.5">
-        <span className="mr-0.5 text-[8px] font-semibold uppercase tracking-wider text-gray-300">Palette</span>
-        {QUICK_PRESETS.map((c, i) => (
-          <button
-            key={`quick-${i}-${c}`}
-            type="button"
-            onClick={() => { onChange(c); setHex(c) }}
-            title={c}
-            className={cn(
-              'h-[14px] w-[14px] shrink-0 rounded-full border-2 transition-all hover:scale-125',
-              value.toLowerCase() === c.toLowerCase()
-                ? 'border-[#1B51B3] scale-110'
-                : 'border-transparent hover:border-gray-300',
-              // White needs a visible border so it doesn't disappear
-              c === '#ffffff' && 'border-gray-200',
-            )}
-            style={{ backgroundColor: c }}
-          />
-        ))}
-        {/* Expand to full palette — ColourPalette icon */}
-        <button
-          type="button"
-          onClick={() => setShowPalette((o) => !o)}
-          title="Colour palette"
-          className={cn(
-            'flex h-5 w-5 shrink-0 items-center justify-center rounded transition-opacity',
-            showPalette ? 'opacity-100' : 'opacity-60 hover:opacity-100',
-          )}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/icons/colour-palette.svg" alt="Colour palette" className="h-4 w-4" />
-        </button>
-      </div>
-
-      {/* ── Full palette dropdown ── */}
-      {showPalette && (
-        <div className="absolute left-0 top-[calc(100%+6px)] z-50 w-[268px] max-w-[calc(100vw-2rem)] rounded-2xl border border-gray-200 bg-white p-3 shadow-2xl">
-          <div className="mb-2 flex items-center justify-between">
-            <div className="flex items-center gap-1.5">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/icons/colour-palette.svg" alt="" className="h-4 w-4 opacity-70" />
-              <p className="text-[9px] font-semibold uppercase tracking-wider text-gray-400">Colour Palette</p>
-            </div>
-            <button type="button" onClick={() => setShowPalette(false)} className="text-[13px] leading-none text-gray-400 hover:text-gray-700">✕</button>
-          </div>
-          <div className="grid grid-cols-11 gap-1">
-            {PRESET_COLORS.map((c, i) => (
-              <button
-                key={`preset-${i}-${c}`}
-                type="button"
-                onClick={() => { onChange(c); setHex(c); setShowPalette(false) }}
-                title={c}
-                className={cn(
-                  'h-5 w-5 rounded-full border-2 transition-all hover:scale-110',
-                  value === c ? 'border-[#1B51B3] scale-110' : 'border-transparent hover:border-blue-300',
-                )}
-                style={{ backgroundColor: c }}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
 
 function Accordion({
   title, children, defaultOpen = false,
@@ -976,6 +811,7 @@ function FontTab({
   // When a text field is focused, read/write its per-field style override.
   // Otherwise fall back to block-level font properties.
   const fieldStyle = activeTextKey ? (block.textStyles?.[activeTextKey] ?? {}) : null
+  const usingField = fieldStyle !== null
 
   const patchField = (updates: NonNullable<CanvasBlock['textStyles']>[string]) => {
     if (!activeTextKey) return
@@ -1009,17 +845,74 @@ function FontTab({
 
   const isUnknownFont   = !!currentFont && !ALL_KNOWN_FONTS.has(currentFont)
 
-  const handleFont    = (v: string)  => fieldStyle !== null ? patchField({ fontFamily: v })    : onPatch({ fontFamily: v })
-  const handleSize    = (v: number)  => fieldStyle !== null ? patchField({ fontSize: v })       : onPatch({ fontSize: v })
-  const handleColor   = (v: string)  => fieldStyle !== null ? patchField({ fontColor: v })      : onPatch({ fontColor: v })
-  const handleWeight  = (v: number)  => fieldStyle !== null ? patchField({ fontWeight: v })          : onPatch({ fontWeight: v })
-  const handleBold    = ()           => fieldStyle !== null ? patchField({ fontBold: !currentBold })       : onPatch({ fontBold: !currentBold })
-  const handleItalic  = ()           => fieldStyle !== null ? patchField({ fontItalic: !currentItalic })   : onPatch({ fontItalic: !currentItalic })
-  const handleUnder   = ()           => fieldStyle !== null ? patchField({ fontUnderline: !currentUnderline }) : onPatch({ fontUnderline: !currentUnderline })
-  const handleAlign   = (v: 'left' | 'center' | 'right') => fieldStyle !== null ? patchField({ textAlign: v }) : onPatch({ textAlign: v })
-  const handleLH      = (v: number)  => fieldStyle !== null ? patchField({ lineHeight: v })     : onPatch({ lineHeight: v })
-  const handleLS      = (v: number)  => fieldStyle !== null ? patchField({ letterSpacing: v })  : onPatch({ letterSpacing: v })
-  const handleCase    = (v: 'none' | 'lowercase' | 'uppercase') => fieldStyle !== null ? patchField({ fontCase: v }) : onPatch({ fontCase: v })
+  const value: TextStyleValue = {
+    fontFamily: currentFont,
+    fontWeight: currentWeight,
+    fontSize: currentSize,
+    color: currentColor,
+    bold: currentBold,
+    italic: currentItalic,
+    underline: currentUnderline,
+    textCase: currentCase,
+    textAlign: currentAlign,
+    lineHeight: currentLH,
+    letterSpacing: currentLS,
+  }
+
+  const handleChange = (patch: Partial<TextStyleValue>) => {
+    // Translate the flat patch back to the email block model. Each property
+    // routes either to per-field override (patchField) or block default (onPatch).
+    const blockPatch: Partial<CanvasBlock> = {}
+    const fieldPatch: NonNullable<CanvasBlock['textStyles']>[string] = {}
+
+    if ('fontFamily' in patch && patch.fontFamily !== undefined) {
+      if (usingField) fieldPatch.fontFamily = patch.fontFamily
+      else blockPatch.fontFamily = patch.fontFamily
+    }
+    if ('fontWeight' in patch && patch.fontWeight !== undefined) {
+      if (usingField) fieldPatch.fontWeight = patch.fontWeight
+      else blockPatch.fontWeight = patch.fontWeight
+    }
+    if ('fontSize' in patch && patch.fontSize !== undefined) {
+      if (usingField) fieldPatch.fontSize = patch.fontSize
+      else blockPatch.fontSize = patch.fontSize
+    }
+    if ('color' in patch && patch.color !== undefined) {
+      if (usingField) fieldPatch.fontColor = patch.color
+      else blockPatch.fontColor = patch.color
+    }
+    if ('bold' in patch && patch.bold !== undefined) {
+      if (usingField) fieldPatch.fontBold = patch.bold
+      else blockPatch.fontBold = patch.bold
+    }
+    if ('italic' in patch && patch.italic !== undefined) {
+      if (usingField) fieldPatch.fontItalic = patch.italic
+      else blockPatch.fontItalic = patch.italic
+    }
+    if ('underline' in patch && patch.underline !== undefined) {
+      if (usingField) fieldPatch.fontUnderline = patch.underline
+      else blockPatch.fontUnderline = patch.underline
+    }
+    if ('textAlign' in patch && patch.textAlign !== undefined) {
+      if (usingField) fieldPatch.textAlign = patch.textAlign
+      else blockPatch.textAlign = patch.textAlign
+    }
+    if ('lineHeight' in patch && patch.lineHeight !== undefined) {
+      if (usingField) fieldPatch.lineHeight = patch.lineHeight
+      else blockPatch.lineHeight = patch.lineHeight
+    }
+    if ('letterSpacing' in patch && patch.letterSpacing !== undefined) {
+      if (usingField) fieldPatch.letterSpacing = patch.letterSpacing
+      else blockPatch.letterSpacing = patch.letterSpacing
+    }
+    if ('textCase' in patch && patch.textCase !== undefined) {
+      if (usingField) fieldPatch.fontCase = patch.textCase
+      else blockPatch.fontCase = patch.textCase
+    }
+
+    if (usingField && Object.keys(fieldPatch).length) patchField(fieldPatch)
+    if (Object.keys(blockPatch).length) onPatch(blockPatch)
+  }
 
   return (
     <div className="flex-1 overflow-auto px-4 py-4 space-y-4">
@@ -1057,167 +950,7 @@ function FontTab({
         </div>
       )}
 
-      {/* Family + Weight */}
-      <div>
-        <SectionLabel>Font</SectionLabel>
-        <div className="flex gap-2">
-          <select
-            value={ALL_KNOWN_FONTS.has(currentFont) ? currentFont : ''}
-            onChange={(e) => handleFont(e.target.value)}
-            className={cn(
-              'min-w-0 flex-1 rounded-xl border px-3 py-2.5 text-[12px] text-gray-700 focus:outline-none',
-              isUnknownFont
-                ? 'border-amber-300 bg-amber-50 focus:border-amber-400'
-                : 'border-gray-200 bg-white focus:border-blue-400',
-            )}
-          >
-            {isUnknownFont && <option value="" disabled>— select a font —</option>}
-            <optgroup label="System Fonts">
-              {SYSTEM_FONTS.map((f) => <option key={f} value={f}>{f}</option>)}
-            </optgroup>
-            <optgroup label="Google Fonts">
-              {GOOGLE_FONT_FAMILIES.map((f) => <option key={f} value={f}>{f}</option>)}
-            </optgroup>
-          </select>
-          <select
-            value={currentWeight}
-            onChange={(e) => handleWeight(Number(e.target.value))}
-            className="w-[108px] shrink-0 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-[12px] text-gray-700 focus:outline-none focus:border-blue-400"
-          >
-            <option value={100}>Thin</option>
-            <option value={200}>Extra Light</option>
-            <option value={300}>Light</option>
-            <option value={400}>Regular</option>
-            <option value={500}>Medium</option>
-            <option value={600}>Semi Bold</option>
-            <option value={700}>Bold</option>
-            <option value={800}>Extra Bold</option>
-            <option value={900}>Black</option>
-          </select>
-        </div>
-      </div>
-
-      {/* Size */}
-      <div>
-        <SectionLabel>Size</SectionLabel>
-        <div className="flex items-center gap-1 rounded-xl border border-gray-200 px-3 py-2.5">
-          <input
-            type="number" min={8} max={72}
-            value={currentSize}
-            onChange={(e) => handleSize(Number(e.target.value))}
-            className="w-full text-[12px] text-gray-700 focus:outline-none"
-          />
-          <span className="text-[10px] text-gray-400">px</span>
-        </div>
-      </div>
-
-      {/* Font Color */}
-      <ColorSwatch label="Font Color" value={currentColor} onChange={handleColor} />
-
-      {/* Style toggles */}
-      <div>
-        <SectionLabel>Style</SectionLabel>
-        <div className="flex gap-2">
-          {[
-            { icon: <Bold size={13} />,      active: currentBold,      handler: handleBold,   label: 'Bold' },
-            { icon: <Italic size={13} />,    active: currentItalic,    handler: handleItalic, label: 'Italic' },
-            { icon: <Underline size={13} />, active: currentUnderline, handler: handleUnder,  label: 'Underline' },
-          ].map(({ icon, active, handler, label }) => (
-            <button
-              key={label}
-              title={label}
-              onClick={handler}
-              className={cn(
-                'flex h-9 w-9 items-center justify-center rounded-xl border transition-colors',
-                active
-                  ? 'border-blue-400 bg-blue-50 text-blue-600'
-                  : 'border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50',
-              )}
-            >
-              {icon}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Case */}
-      <div>
-        <SectionLabel>Case</SectionLabel>
-        <div className="flex gap-2">
-          {([
-            { value: 'none',      label: 'aA', title: 'Default' },
-            { value: 'lowercase', label: 'aa', title: 'Lowercase' },
-            { value: 'uppercase', label: 'AA', title: 'Uppercase' },
-          ] as const).map(({ value, label, title }) => (
-            <button
-              key={value}
-              title={title}
-              onClick={() => handleCase(value)}
-              className={cn(
-                'flex h-9 flex-1 items-center justify-center rounded-xl border text-[12px] font-semibold transition-colors',
-                currentCase === value
-                  ? 'border-blue-400 bg-blue-50 text-blue-600'
-                  : 'border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50',
-              )}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Alignment */}
-      <div>
-        <SectionLabel>Alignment</SectionLabel>
-        <div className="flex gap-2">
-          {[
-            { icon: <AlignLeft size={13} />,   value: 'left'   as const },
-            { icon: <AlignCenter size={13} />, value: 'center' as const },
-            { icon: <AlignRight size={13} />,  value: 'right'  as const },
-          ].map(({ icon, value }) => (
-            <button
-              key={value}
-              onClick={() => handleAlign(value)}
-              className={cn(
-                'flex h-9 w-9 items-center justify-center rounded-xl border transition-colors',
-                currentAlign === value
-                  ? 'border-blue-400 bg-blue-50 text-blue-600'
-                  : 'border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50',
-              )}
-            >
-              {icon}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Line height */}
-      <div>
-        <div className="mb-2 flex items-center justify-between">
-          <SectionLabel>Line Height</SectionLabel>
-          <span className="text-[11px] text-gray-500">{currentLH.toFixed(1)}</span>
-        </div>
-        <input
-          type="range" min={1} max={3} step={0.1}
-          value={currentLH}
-          onChange={(e) => handleLH(Number(e.target.value))}
-          className="w-full accent-blue-500"
-        />
-      </div>
-
-      {/* Letter spacing */}
-      <div>
-        <div className="mb-2 flex items-center justify-between">
-          <SectionLabel>Letter Spacing</SectionLabel>
-          <span className="text-[11px] text-gray-500">{currentLS}px</span>
-        </div>
-        <input
-          type="range" min={-2} max={10} step={0.5}
-          value={currentLS}
-          onChange={(e) => handleLS(Number(e.target.value))}
-          className="w-full accent-blue-500"
-        />
-      </div>
+      <TextStyleControls value={value} onChange={handleChange} orientation="horizontal" />
 
       {/* Block-level defaults separator */}
       {activeTextKey && (

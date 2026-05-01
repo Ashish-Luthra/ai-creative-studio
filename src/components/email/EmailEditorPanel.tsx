@@ -2223,14 +2223,16 @@ export const EmailEditorPanel: React.FC = () => {
             )}
           </div>
 
-          {/* Subject line — editable, centre fill */}
+          {/* Subject line — editable, left aligned */}
           <input
             type="text"
             value={doc.subject ?? ''}
             onChange={(e) => updateSubject(e.target.value)}
             placeholder="Add email subject line…"
-            className="min-w-0 flex-1 bg-transparent text-center text-[11px] text-gray-700 placeholder:text-gray-300 focus:outline-none focus:ring-0"
+            className="w-48 shrink-0 bg-transparent text-left text-[11px] font-medium text-gray-700 placeholder:text-gray-300 focus:outline-none focus:ring-0"
           />
+
+          <div className="flex-1" />
 
           {/* ── Save / Save as New ── */}
           <div className="inline-flex items-center gap-1">

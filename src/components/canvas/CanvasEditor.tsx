@@ -14,8 +14,10 @@ import {
   seedDefaultCreative,
 } from '@/lib/canvas/fabricInit'
 import { CREATIVE_PRESETS, getPresetById, isPresetId } from '@/lib/canvas/presets'
-import { cn } from '@/lib/utils'
 import { ToolbarLeft, type RailTool } from './ToolbarLeft'
+import { OuterLeftNav } from './OuterLeftNav'
+import { CanvasTopHeader } from './CanvasTopHeader'
+import { CanvasTextRightPanel } from './CanvasTextRightPanel'
 import { AgentPill } from './AgentPill'
 import { EmailEditorPanel } from '@/components/email/EmailEditorPanel'
 import { ApprovedImagesPanel } from './ApprovedImagesPanel'
@@ -503,6 +505,16 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
     return () => ro.disconnect()
   }, [])
 
+  // ── Apply zoom to Fabric canvas ────────────────────────────
+  useEffect(() => {
+    const canvas = fabricRef.current
+    if (!canvas) return
+    const w = canvas.getWidth()
+    const h = canvas.getHeight()
+    canvas.zoomToPoint({ x: w / 2, y: h / 2 }, zoom)
+    canvas.requestRenderAll()
+  }, [zoom])
+
   // Guard against stale selection references when canvas objects are cleared/replaced.
   useEffect(() => {
     if (mode !== 'canvas') return
@@ -713,6 +725,62 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
       // open right panel only
     } else if (tool === 'projects') {
       // projects panel view
+    } else if (tool === 'text') {
+      const { Textbox } = await import('fabric')
+
+      // Frame-aware insert: if a creative-frame is currently active (or the
+      // selection sits inside one), place the textbox at that frame's centre
+      // and stamp `data.zoneId` (the creativeId) for downstream zone-locking.
+      let cx = canvas.getWidth() / 2
+      let cy = canvas.getHeight() / 2
+      let boxWidth = Math.max(180, canvas.getWidth() * 0.3)
+      let zoneId: string | null = null
+
+      const active = canvas.getActiveObject() as FabricObject | null
+      const activeData = (active as FabricObject & { data?: { kind?: string } } | null)?.data
+      let frame: FabricObject | null = null
+      if (active && activeData?.kind === 'creative-frame') {
+        frame = active
+      } else if (active) {
+        const cid = getCreativeIdFromObject(active)
+        if (cid) {
+          frame = canvas.getObjects().find((o) => {
+            const d = (o as FabricObject & { data?: { kind?: string; creativeId?: string } }).data
+            return d?.kind === 'creative-frame' && d?.creativeId === cid
+          }) ?? null
+        }
+      }
+      if (frame) {
+        const br = frame.getBoundingRect()
+        cx = br.left + br.width / 2
+        cy = br.top + br.height / 2
+        boxWidth = Math.max(120, br.width * 0.7)
+        const fid = (frame as FabricObject & { data?: { creativeId?: string } }).data?.creativeId
+        zoneId = fid ?? null
+      }
+
+      const tb = new Textbox('Add your text', {
+        left: cx,
+        top: cy,
+        originX: 'center',
+        originY: 'center',
+        width: boxWidth,
+        fontSize: 28,
+        fontFamily: 'Arial',
+        fill: '#111827',
+        textAlign: 'left',
+      })
+      if (zoneId) {
+        ;(tb as FabricObject & { data?: Record<string, unknown> }).data = { zoneId }
+      }
+      canvas.add(tb)
+      canvas.setActiveObject(tb)
+      // Enter editing immediately so the user can type without an extra click.
+      const editable = tb as unknown as { enterEditing?: () => void; selectAll?: () => void }
+      editable.enterEditing?.()
+      editable.selectAll?.()
+      canvas.requestRenderAll()
+      saveSnapshot()
     }
   }, [mode, saveSnapshot, handleCanvasExport, handleAddFrame])
 
@@ -784,35 +852,31 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-[#FDFDFD]">
-      {/* ── Top Nav ─────────────────────────────────────────── */}
-      <header className="flex h-10 shrink-0 items-center justify-between border-b border-gray-200 bg-white px-4">
-        <div className="flex items-center gap-1 rounded-lg bg-gray-100 p-0.5">
-          {(['canvas', 'email'] as const).map((m) => (
-            <button
-              key={m}
-              onClick={() => setMode(m)}
-              className={cn(
-                'rounded-md px-3 py-1 text-[11px] font-semibold transition-colors',
-                mode === m ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700',
-              )}
-            >
-              {m === 'canvas' ? 'Ad Canvas' : 'Email'}
-            </button>
-          ))}
-        </div>
-      </header>
-
       <div className="flex flex-1 overflow-hidden">
-        <ToolbarLeft onToolAction={handleToolAction} />
+        <OuterLeftNav />
+        {mode === 'canvas' && <ToolbarLeft onToolAction={handleToolAction} />}
 
         {/* ── Canvas surface ───────────────────────────────── */}
-        <main
-          ref={containerRef}
-          className="relative flex-1 overflow-hidden"
-          style={{
-            backgroundColor: '#F5F5F5',
-          }}
-        >
+        <main className="relative flex flex-1 flex-col overflow-hidden">
+          {mode === 'canvas' && (
+            <CanvasTopHeader
+              fileName={campaign.name}
+              onRename={(next) => updateCampaignMeta({ name: next })}
+              recentCampaigns={recentCampaigns.map((c) => ({
+                briefId: c.briefId,
+                name: c.name,
+                updatedAt: c.updatedAt,
+              }))}
+              onOpenRecent={(nextBriefId) => {
+                window.location.href = `/studio/${nextBriefId}/canvas?preset=${selectedPresetId}`
+              }}
+            />
+          )}
+          <div
+            ref={containerRef}
+            className="relative flex-1 overflow-hidden"
+            style={{ backgroundColor: '#F5F5F5' }}
+          >
           {/* Always in DOM — Fabric owns the wrapper div, removing it causes removeChild errors */}
           <canvas
             ref={canvasElRef}
@@ -822,6 +886,14 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
 
           {mode === 'email' && (
             <EmailEditorPanel />
+          )}
+
+          {mode === 'assets' && (
+            <ApprovedImagesPanel
+              open
+              onClose={() => setMode('canvas')}
+              onSelect={() => { /* browse-only from outer Assets nav */ }}
+            />
           )}
 
           {mode === 'canvas' && (
@@ -883,6 +955,17 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
           {mode === 'canvas' && agentPillVisible && (
             <AgentPill onSubmit={handleAgentSubmit} />
           )}
+
+          {mode === 'canvas' && isTextSelected && (
+            <CanvasTextRightPanel
+              canvas={fabricRef.current}
+              selected={selectedLayer}
+              position={toolbarPos}
+              onCommit={saveSnapshot}
+            />
+          )}
+
+          </div>
         </main>
       </div>
     </div>
