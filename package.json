@@ -23,6 +23,8 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "fabric": "^6.9.1",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^4.2.1",
     "lucide-react": "^1.8.0",
     "nanoid": "^5.1.9",
     "next": "16.2.4",

@@ -16,10 +16,10 @@ interface CreativeFrame {
   ry?: number
 }
 
-type CreativeRole = 'frame' | 'image' | 'scrim' | 'text'
+type CreativeRole = 'frame' | 'image' | 'scrim' | 'text' | 'shape'
 
 interface CreativeData {
-  kind: 'creative-frame' | 'creative-image' | 'creative-scrim' | 'creative-text'
+  kind: 'creative-frame' | 'creative-image' | 'creative-scrim' | 'creative-text' | 'creative-shape'
   creativeId: string
   role: CreativeRole
   frame?: CreativeFrame
@@ -122,13 +122,14 @@ const roleFromKind = (kind?: CreativeData['kind']): CreativeRole | null => {
   if (kind === 'creative-image') return 'image'
   if (kind === 'creative-scrim') return 'scrim'
   if (kind === 'creative-text') return 'text'
+  if (kind === 'creative-shape') return 'shape'
   return null
 }
 
 export const ensureCreativeMetadata = (canvas: Canvas) => {
   const creativeObjects = canvas.getObjects().filter((obj) => {
     const kind = asCreativeData(obj)?.kind
-    return kind === 'creative-frame' || kind === 'creative-image' || kind === 'creative-scrim' || kind === 'creative-text'
+    return kind === 'creative-frame' || kind === 'creative-image' || kind === 'creative-scrim' || kind === 'creative-text' || kind === 'creative-shape'
   })
   if (!creativeObjects.length) return
 
@@ -203,6 +204,29 @@ export function applySelectionStyle(obj: FabricObject) {
     cornerStyle: 'rect',
     cornerSize: 8,
     transparentCorners: false,
+  })
+}
+
+// Image is "saved into" the frame — frame becomes the primary handle.
+// Clicks fall through to the frame underneath, no chrome draws on the image.
+export const lockCreativeImage = (img: FabricObject) => {
+  img.set({
+    selectable: false,
+    evented: false,
+    hoverCursor: 'default',
+    hasControls: false,
+    hasBorders: false,
+  })
+}
+
+// Image is being re-cropped — user can drag/scale within the clipPath.
+export const unlockCreativeImage = (img: FabricObject) => {
+  img.set({
+    selectable: true,
+    evented: true,
+    hoverCursor: 'move',
+    hasControls: true,
+    hasBorders: true,
   })
 }
 
@@ -283,9 +307,10 @@ export async function seedDefaultCreative(
     rx: 0,
     ry: 0,
     fill: '#D1D5DB',
-    selectable: false,
-    evented: false,
-    hoverCursor: 'default',
+    // Frame is the primary click target — drag moves the whole creative block.
+    selectable: true,
+    evented: true,
+    hoverCursor: 'move',
     data: { kind: 'creative-frame', creativeId, role: 'frame' } satisfies CreativeData,
   })
   canvas.add(frame)
@@ -315,7 +340,6 @@ export async function seedDefaultCreative(
       originY: 'center',
       scaleX: scale,
       scaleY: scale,
-      selectable: true,
       data: {
         kind: 'creative-image',
         creativeId,
@@ -325,6 +349,7 @@ export async function seedDefaultCreative(
       } satisfies CreativeData,
     })
     applySelectionStyle(img)
+    lockCreativeImage(img)
     canvas.add(img)
   } catch {
     // Fallback: gradient placeholder when image isn't available yet
@@ -595,7 +620,142 @@ export async function replaceOrAddImageLayer(canvas: Canvas, imageUrl: string, s
   }
 
   applySelectionStyle(img)
+  lockCreativeImage(img)
   canvas.add(img)
-  canvas.setActiveObject(img)
+  // Promote the frame to active so the user immediately sees frame-selection
+  // chrome ("drag to move") rather than landing in image-edit mode.
+  const creativeId = (asCreativeData(img)?.creativeId) as string | undefined
+  const frame = creativeId
+    ? canvas.getObjects().find((o) => asCreativeData(o)?.kind === 'creative-frame' && asCreativeData(o)?.creativeId === creativeId)
+    : null
+  if (frame) {
+    canvas.setActiveObject(frame)
+  } else {
+    canvas.discardActiveObject()
+  }
   canvas.renderAll()
+}
+
+// ───────────────────────────────────────────────────────────────────────────────
+// Shape primitives — rectangle / oval / line / arrow / triangle / star / polygon
+// Inserted at frame center (frame-aware) or canvas center; tagged as
+// `creative-shape` so moveCreativeBlock + delete-block include them.
+
+export type ShapeKind = 'rectangle' | 'oval' | 'line' | 'arrow' | 'triangle' | 'star' | 'polygon'
+
+const DEFAULT_SHAPE_FILL = '#1B51B3'
+const DEFAULT_SHAPE_STROKE = '#1B51B3'
+
+const starPoints = (cx: number, cy: number, outerR: number, innerR: number, points = 5) => {
+  const out: { x: number; y: number }[] = []
+  const step = Math.PI / points
+  for (let i = 0; i < points * 2; i++) {
+    const r = i % 2 === 0 ? outerR : innerR
+    const a = i * step - Math.PI / 2
+    out.push({ x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) })
+  }
+  return out
+}
+
+const polygonPoints = (cx: number, cy: number, r: number, sides = 6) => {
+  const out: { x: number; y: number }[] = []
+  for (let i = 0; i < sides; i++) {
+    const a = (i / sides) * Math.PI * 2 - Math.PI / 2
+    out.push({ x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) })
+  }
+  return out
+}
+
+export async function insertShape(
+  canvas: Canvas,
+  kind: ShapeKind,
+  options: { creativeId?: string; cx?: number; cy?: number; size?: number } = {},
+): Promise<FabricObject> {
+  const { Rect, Ellipse, Line, Triangle, Polygon, Group } = await import('fabric')
+  const cx = options.cx ?? canvas.getWidth() / 2
+  const cy = options.cy ?? canvas.getHeight() / 2
+  const s = options.size ?? Math.min(canvas.getWidth(), canvas.getHeight()) * 0.18
+
+  const tagData = (obj: FabricObject) => {
+    // Always tag the kind so the shape colour panel shows; creativeId only
+    // when the shape is part of a creative block (so moveCreativeBlock and
+    // delete-block include it).
+    ;(obj as FabricObject & { data?: CreativeData }).data = {
+      kind: 'creative-shape',
+      creativeId: options.creativeId ?? '',
+      role: 'shape',
+    }
+    applySelectionStyle(obj)
+  }
+
+  let obj: FabricObject
+  switch (kind) {
+    case 'rectangle':
+      obj = new Rect({
+        left: cx, top: cy, originX: 'center', originY: 'center',
+        width: s * 1.4, height: s, rx: 4, ry: 4,
+        fill: DEFAULT_SHAPE_FILL,
+      })
+      break
+    case 'oval':
+      obj = new Ellipse({
+        left: cx, top: cy, originX: 'center', originY: 'center',
+        rx: s * 0.7, ry: s * 0.5,
+        fill: DEFAULT_SHAPE_FILL,
+      })
+      break
+    case 'line':
+      obj = new Line([cx - s, cy, cx + s, cy], {
+        stroke: DEFAULT_SHAPE_STROKE,
+        strokeWidth: 4,
+      })
+      break
+    case 'arrow': {
+      const shaft = new Line([0, 0, s * 1.4, 0], {
+        stroke: DEFAULT_SHAPE_STROKE,
+        strokeWidth: 4,
+        originX: 'left', originY: 'center',
+      })
+      const head = new Triangle({
+        left: s * 1.4, top: 0,
+        originX: 'right', originY: 'center',
+        width: s * 0.35, height: s * 0.35,
+        angle: 90,
+        fill: DEFAULT_SHAPE_FILL,
+      })
+      obj = new Group([shaft, head], {
+        left: cx, top: cy, originX: 'center', originY: 'center',
+      })
+      break
+    }
+    case 'triangle':
+      obj = new Triangle({
+        left: cx, top: cy, originX: 'center', originY: 'center',
+        width: s, height: s,
+        fill: DEFAULT_SHAPE_FILL,
+      })
+      break
+    case 'star': {
+      const pts = starPoints(0, 0, s / 2, s / 4, 5)
+      obj = new Polygon(pts, {
+        left: cx, top: cy, originX: 'center', originY: 'center',
+        fill: DEFAULT_SHAPE_FILL,
+      })
+      break
+    }
+    case 'polygon': {
+      const pts = polygonPoints(0, 0, s / 2, 6)
+      obj = new Polygon(pts, {
+        left: cx, top: cy, originX: 'center', originY: 'center',
+        fill: DEFAULT_SHAPE_FILL,
+      })
+      break
+    }
+  }
+
+  tagData(obj)
+  canvas.add(obj)
+  canvas.setActiveObject(obj)
+  canvas.requestRenderAll()
+  return obj
 }

@@ -436,9 +436,9 @@ export function TextStyleControls({
         <SectionLabel>Case</SectionLabel>
         <div className="flex gap-2">
           {([
-            { value: 'none' as const,      label: 'aA', title: 'Default' },
-            { value: 'lowercase' as const, label: 'aa', title: 'Lowercase' },
+            { value: 'none' as const,      label: 'Aa', title: 'Default' },
             { value: 'uppercase' as const, label: 'AA', title: 'Uppercase' },
+            { value: 'lowercase' as const, label: 'aa', title: 'Lowercase' },
           ]).map(({ value: caseVal, label, title }) => (
             <button
               key={caseVal}

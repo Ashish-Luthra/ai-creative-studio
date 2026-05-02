@@ -8,6 +8,10 @@ import {
   disposeCanvas,
   ensureCreativeMetadata,
   getCreativeIdFromObject,
+  getCreativeObjects,
+  insertShape,
+  lockCreativeImage,
+  unlockCreativeImage,
   initFabricCanvas,
   moveCreativeBlock,
   replaceOrAddImageLayer,
@@ -18,6 +22,8 @@ import { ToolbarLeft, type RailTool } from './ToolbarLeft'
 import { OuterLeftNav } from './OuterLeftNav'
 import { CanvasTopHeader } from './CanvasTopHeader'
 import { CanvasTextRightPanel } from './CanvasTextRightPanel'
+import { CanvasShapeRightPanel } from './CanvasShapeRightPanel'
+import { ShapesPanel, type ShapeKind } from './ShapesPanel'
 import { AgentPill } from './AgentPill'
 import { EmailEditorPanel } from '@/components/email/EmailEditorPanel'
 import { ApprovedImagesPanel } from './ApprovedImagesPanel'
@@ -133,8 +139,17 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
   const saveSnapshot = useCallback(() => {
     const fc = fabricRef.current
     if (!fc || restoringRef.current) return
-    pushUndo(JSON.stringify(fc.toJSON()))
-    localStorage.setItem(storageKey, JSON.stringify(fc.toJSON()))
+    const snapshot = JSON.stringify(fc.toJSON())
+    pushUndo(snapshot)
+    try {
+      localStorage.setItem(storageKey, snapshot)
+    } catch (err) {
+      // localStorage quota (~5MB) exceeded — typically because the canvas has
+      // embedded image data URLs. Undo history still works in-memory; only the
+      // cross-reload restore is lost. Real fix is to upload images to MinIO and
+      // store URLs instead of data URLs.
+      console.warn('[saveSnapshot] localStorage quota exceeded — snapshot kept in memory only', err)
+    }
   }, [pushUndo, storageKey])
 
   const updateCampaignMeta = useCallback((patch: Partial<CampaignMeta> = {}) => {
@@ -364,11 +379,38 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
       })
       c.on('mouse:dblclick', (event) => {
         const target = event.target
-        if (!target || target.type !== 'image') return
-        c.setActiveObject(target)
-        setSelectedLayer(target)
-        syncPos(target)
-        setShowApprovedImages(true)
+        if (!target) return
+        const data = (target as FabricObject & { data?: { kind?: string } }).data
+        // Double-click a frame → unlock its sibling image to re-edit (drag/scale
+        // within the clipPath). The image enters edit mode with cropPending: true,
+        // and the existing ImageSelectionToolbar appears.
+        if (data?.kind === 'creative-frame') {
+          const cid = getCreativeIdFromObject(target)
+          if (!cid) return
+          const image = getCreativeObjects(c, cid).find(
+            (o) => (o as FabricObject & { data?: { kind?: string } }).data?.kind === 'creative-image',
+          )
+          if (!image) return
+          unlockCreativeImage(image)
+          const imgData = (image as FabricObject & { data?: Record<string, unknown> }).data ?? {}
+          ;(image as FabricObject & { data?: Record<string, unknown> }).data = {
+            ...imgData,
+            cropPending: true,
+          }
+          c.setActiveObject(image)
+          setSelectedLayer(image)
+          syncPos(image)
+          c.requestRenderAll()
+          return
+        }
+        // Direct double-click on the image (already unlocked / loose image)
+        // — keep legacy behaviour: open the image picker.
+        if (target.type === 'image') {
+          c.setActiveObject(target)
+          setSelectedLayer(target)
+          syncPos(target)
+          setShowApprovedImages(true)
+        }
       })
       const storedPresetId = localStorage.getItem(presetStorageKey)
       const resolvedPresetId =
@@ -483,8 +525,35 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       if ((active as any).isEditing) return
 
-      canvas.remove(active)
+      // Collect every object to remove. If a creative-frame is in the
+      // selection (single or multi), expand it to the entire creative block
+      // (frame + image + scrim + text) so deleting a frame deletes its
+      // contents too. Non-frame layers are removed individually.
+      const seeds: FabricObject[] =
+        active.type === 'activeSelection'
+          ? ((active as FabricObject & { _objects?: FabricObject[] })._objects ?? [])
+          : [active]
+
+      const targets = new Set<FabricObject>()
+      const expandedCreativeIds = new Set<string>()
+
+      for (const obj of seeds) {
+        const data = (obj as FabricObject & { data?: { kind?: string } }).data
+        if (data?.kind === 'creative-frame') {
+          const cid = getCreativeIdFromObject(obj)
+          if (cid && !expandedCreativeIds.has(cid)) {
+            expandedCreativeIds.add(cid)
+            for (const member of getCreativeObjects(canvas, cid)) targets.add(member)
+          }
+        } else {
+          targets.add(obj)
+        }
+      }
+
+      if (targets.size === 0) return
+
       canvas.discardActiveObject()
+      for (const obj of targets) canvas.remove(obj)
       canvas.renderAll()
       setSelectedLayer(null)
       saveSnapshot()
@@ -545,6 +614,43 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
     link.download = `${briefId}-${selectedPresetId}.png`
     link.click()
   }, [briefId, selectedPresetId])
+
+  const handleCanvasMultiExport = useCallback(async (format: 'png' | 'pdf' | 'html') => {
+    const canvas = fabricRef.current
+    if (!canvas) return
+    const slug = (campaign.name || briefId || 'untitled-campaign')
+      .trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'untitled-campaign'
+    const dataUrl = canvas.toDataURL({ format: 'png', multiplier: 2 })
+    const w = canvas.getWidth() * 2
+    const h = canvas.getHeight() * 2
+
+    const triggerDownload = (href: string, filename: string) => {
+      const a = document.createElement('a')
+      a.href = href
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+    }
+
+    if (format === 'png') {
+      triggerDownload(dataUrl, `${slug}.png`)
+      return
+    }
+    if (format === 'pdf') {
+      const { jsPDF } = await import('jspdf')
+      const pdf = new jsPDF({ orientation: w >= h ? 'l' : 'p', unit: 'px', format: [w, h] })
+      pdf.addImage(dataUrl, 'PNG', 0, 0, w, h)
+      pdf.save(`${slug}.pdf`)
+      return
+    }
+    // HTML
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>${campaign.name || slug}</title></head><body style="margin:0;padding:0"><img src="${dataUrl}" alt="${campaign.name || slug}" style="display:block;max-width:100%;height:auto"/></body></html>`
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    triggerDownload(url, `${slug}.html`)
+    setTimeout(() => URL.revokeObjectURL(url), 0)
+  }, [campaign.name, briefId])
 
   const handlePresetChange = useCallback(async (presetId: string) => {
     const canvas = fabricRef.current
@@ -628,6 +734,43 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
     resetHistory()
     saveSnapshot()
   }, [extractCreativeInputs, generatedKey, resetHistory, saveSnapshot, selectedPresetId, setSelectedLayer, updateCampaignMeta])
+
+  const handleInsertShape = useCallback(async (kind: ShapeKind) => {
+    const canvas = fabricRef.current
+    if (!canvas) return
+    // Frame-aware: drop the shape at the active frame's centre and tag it with
+    // that frame's creativeId so it travels with the block. If no frame is
+    // active, fall back to canvas centre and an untagged loose shape.
+    const active = canvas.getActiveObject() as FabricObject | null
+    const activeData = (active as FabricObject & { data?: { kind?: string } } | null)?.data
+    let frame: FabricObject | null = null
+    if (active && activeData?.kind === 'creative-frame') {
+      frame = active
+    } else if (active) {
+      const cid = getCreativeIdFromObject(active)
+      if (cid) {
+        frame = canvas.getObjects().find((o) => {
+          const d = (o as FabricObject & { data?: { kind?: string; creativeId?: string } }).data
+          return d?.kind === 'creative-frame' && d?.creativeId === cid
+        }) ?? null
+      }
+    }
+    let cx = canvas.getWidth() / 2
+    let cy = canvas.getHeight() / 2
+    let size = Math.min(canvas.getWidth(), canvas.getHeight()) * 0.18
+    let creativeId: string | undefined
+    if (frame) {
+      const br = frame.getBoundingRect()
+      cx = br.left + br.width / 2
+      cy = br.top + br.height / 2
+      size = Math.min(br.width, br.height) * 0.45
+      const cid = getCreativeIdFromObject(frame)
+      if (cid) creativeId = cid
+    }
+    const obj = await insertShape(canvas, kind, { cx, cy, size, creativeId })
+    setSelectedLayer(obj)
+    saveSnapshot()
+  }, [saveSnapshot, setSelectedLayer])
 
   const handleAddFrame = useCallback(async () => {
     const canvas = fabricRef.current
@@ -721,6 +864,8 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
 
     if (tool === 'frame') {
       await handleAddFrame()
+    } else if (tool === 'image') {
+      setShowApprovedImages(true)
     } else if (tool === 'layout') {
       // open right panel only
     } else if (tool === 'projects') {
@@ -771,7 +916,15 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
         textAlign: 'left',
       })
       if (zoneId) {
-        ;(tb as FabricObject & { data?: Record<string, unknown> }).data = { zoneId }
+        // Tag with the canonical creative-block shape so moveCreativeBlock,
+        // delete-block, and getCreativeObjects all include this text. The
+        // earlier `{ zoneId }` shape was off — `getCreativeObjects` looks for
+        // `data.creativeId`, so the text was orphaned from its frame.
+        ;(tb as FabricObject & { data?: Record<string, unknown> }).data = {
+          kind: 'creative-text',
+          creativeId: zoneId,
+          role: 'text',
+        }
       }
       canvas.add(tb)
       canvas.setActiveObject(tb)
@@ -794,26 +947,72 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
 
   const handleSaveImageCrop = useCallback(() => {
     const canvas = fabricRef.current
-    if (!canvas || !selectedLayer || selectedLayer.type !== 'image') return
-    const imageLayer = selectedLayer as FabricObject & {
+    if (!canvas) return
+    // Resolve the active image — it's either selectedLayer (in edit mode) or
+    // the sibling image of a selected frame (rare, but handled).
+    let imageLayer: FabricObject | null = null
+    if (selectedLayer?.type === 'image') {
+      imageLayer = selectedLayer
+    } else if (selectedLayer) {
+      const cid = getCreativeIdFromObject(selectedLayer)
+      if (cid) {
+        imageLayer = getCreativeObjects(canvas, cid).find(
+          (o) => (o as FabricObject & { data?: { kind?: string } }).data?.kind === 'creative-image',
+        ) ?? null
+      }
+    }
+    if (!imageLayer) return
+
+    const withData = imageLayer as FabricObject & {
       data?: { kind?: string; cropPending?: boolean; frame?: unknown }
     }
-    imageLayer.data = {
-      ...imageLayer.data,
+    withData.data = {
+      ...withData.data,
       kind: 'creative-image',
       cropPending: false,
     }
+    lockCreativeImage(imageLayer)
+
+    // Snap focus to the frame so the user sees frame chrome, not image chrome.
+    const cid = getCreativeIdFromObject(imageLayer)
+    const frame = cid
+      ? getCreativeObjects(canvas, cid).find(
+          (o) => (o as FabricObject & { data?: { kind?: string } }).data?.kind === 'creative-frame',
+        )
+      : null
+    if (frame) {
+      canvas.setActiveObject(frame)
+      setSelectedLayer(frame)
+    } else {
+      canvas.discardActiveObject()
+      setSelectedLayer(null)
+    }
     canvas.renderAll()
     saveSnapshot()
-  }, [selectedLayer, saveSnapshot])
+  }, [selectedLayer, saveSnapshot, setSelectedLayer])
 
-  const imageCropPending =
-    selectedLayer?.type === 'image'
-      ? Boolean(
-          (selectedLayer as FabricObject & { data?: { cropPending?: boolean } }).data
-            ?.cropPending
-        )
-      : false
+  // Resolve the paired creative-image when the user has either the image
+  // (edit mode) or the frame (saved mode) selected. This drives the existing
+  // ImageSelectionToolbar UI without forcing the user into image-edit mode.
+  const pairedImage: FabricObject | null = (() => {
+    const canvas = fabricRef.current
+    if (!canvas || !selectedLayer) return null
+    if (selectedLayer.type === 'image') return selectedLayer
+    const cid = getCreativeIdFromObject(selectedLayer)
+    if (!cid) return null
+    return (
+      getCreativeObjects(canvas, cid).find(
+        (o) => (o as FabricObject & { data?: { kind?: string } }).data?.kind === 'creative-image',
+      ) ?? null
+    )
+  })()
+
+  const imageCropPending = pairedImage
+    ? Boolean(
+        (pairedImage as FabricObject & { data?: { cropPending?: boolean } }).data
+          ?.cropPending,
+      )
+    : false
 
   const handlePublish = useCallback(async (args: {
     platform: 'instagram' | 'linkedin'
@@ -848,7 +1047,10 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
   // Show FloatToolbar only when a text object is selected
   const isTextSelected =
     selectedLayer?.type === 'textbox' || selectedLayer?.type === 'i-text'
-  const isImageSelected = selectedLayer?.type === 'image'
+  // Show the ImageSelectionToolbar whenever the active selection is part of a
+  // creative block that has an image — whether the user picked the image
+  // directly (edit mode) or the frame (saved mode).
+  const isImageSelected = !!pairedImage
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-[#FDFDFD]">
@@ -870,6 +1072,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
               onOpenRecent={(nextBriefId) => {
                 window.location.href = `/studio/${nextBriefId}/canvas?preset=${selectedPresetId}`
               }}
+              onExport={handleCanvasMultiExport}
             />
           )}
           <div
@@ -912,6 +1115,8 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
                     window.location.href = `/studio/${nextBriefId}/canvas?preset=${presetId}`
                   }}
                 />
+              ) : activeTool === 'shapes' ? (
+                <ShapesPanel onInsert={(kind) => { void handleInsertShape(kind) }} />
               ) : (
                 <RightStudioPanel
                   activeTool={activeTool}
@@ -926,6 +1131,14 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
                 />
               )}
             </>
+          )}
+
+          {mode === 'canvas' && (
+            <CanvasShapeRightPanel
+              canvas={fabricRef.current}
+              selected={selectedLayer}
+              onCommit={saveSnapshot}
+            />
           )}
 
           <ApprovedImagesPanel

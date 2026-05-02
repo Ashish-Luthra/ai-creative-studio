@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { Check, ChevronDown, Eye, FolderOpen, Minus, Plus, Redo2, Save, Undo2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useCanvasStore } from '@/lib/canvas/canvasStore'
+import { ExportMenu, type ExportFormat } from '@/components/shared/ExportMenu'
 
 export interface CampaignMetaLite {
   briefId: string
@@ -18,6 +19,7 @@ export interface CanvasTopHeaderProps {
   onOpenRecent: (briefId: string) => void
   onSave?: () => void | Promise<void>
   onPreview?: () => void
+  onExport?: (format: ExportFormat) => void | Promise<void>
   saveStatus?: 'idle' | 'saving' | 'saved' | 'error'
 }
 
@@ -28,6 +30,7 @@ export const CanvasTopHeader: React.FC<CanvasTopHeaderProps> = ({
   onOpenRecent,
   onSave,
   onPreview,
+  onExport,
   saveStatus = 'idle',
 }) => {
   const zoom = useCanvasStore((s) => s.zoom)
@@ -137,6 +140,9 @@ export const CanvasTopHeader: React.FC<CanvasTopHeaderProps> = ({
         <Eye size={12} />
         Preview
       </button>
+
+      {/* Export */}
+      {onExport && <ExportMenu mode="canvas" onExport={onExport} />}
 
       {/* Zoom controls */}
       <div className="inline-flex items-center rounded-lg border border-gray-200 bg-white">

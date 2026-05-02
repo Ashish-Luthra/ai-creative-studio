@@ -21,6 +21,8 @@ import { TextEditPanel } from './TextEditPanel'
 import { ApprovedImagesPanel } from '@/components/canvas/ApprovedImagesPanel'
 import { AllyvateAssistant, type AllyContext } from '@/components/ai/AllyvateAssistant'
 import { EmailRightNav } from './EmailRightNav'
+import { SendTestEmailPanel } from './SendTestEmailPanel'
+import { ExportMenu, type ExportFormat } from '@/components/shared/ExportMenu'
 import { GOOGLE_FONT_FAMILIES, getGoogleFontStylesheetHrefs } from '@/lib/canvas/googleFonts'
 import { SPECS } from '@/lib/email/blockSpecs'
 
@@ -1776,7 +1778,11 @@ export const EmailEditorPanel: React.FC = () => {
   const [emailerNameInput, setEmailerNameInput] = useState('')
   const dropdownRef = useRef<HTMLDivElement>(null)
 
-  const { document: doc, previewMode, setPreviewMode, updateSubject, updatePreheader, syncFromCanvas, compiledHtml, setEmailerName } = useEmailStore()
+  const { document: doc, previewMode, setPreviewMode, updateSubject, updatePreheader, syncFromCanvas, compiledHtml, emailerName, setEmailerName } = useEmailStore()
+
+  // Send-test-email right-nav panel toggle (replaces the per-block right nav while open)
+  const [sendTestOpen, setSendTestOpen] = useState(false)
+  const previewIframeRef = useRef<HTMLIFrameElement | null>(null)
 
   // Toggle between live canvas editing and iframe-based email HTML preview
   const [showPreview, setShowPreview] = useState(false)
@@ -1916,6 +1922,82 @@ export const EmailEditorPanel: React.FC = () => {
       setTimeout(() => setSaveStatus('idle'), 3000)
     }
   }, [updateSubject, updatePreheader, setEmailerName])
+
+  // ── Export (PNG / PDF / HTML) ───────────────────────────────────────────────
+  const slugify = (s: string) =>
+    (s || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'untitled-campaign'
+
+  const downloadBlob = (data: BlobPart, filename: string, mime: string) => {
+    const blob = new Blob([data], { type: mime })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 0)
+  }
+
+  const handleEmailExport = useCallback(async (format: ExportFormat) => {
+    const base = slugify(emailerName)
+    if (format === 'html') {
+      downloadBlob(compiledHtml, `${base}.html`, 'text/html;charset=utf-8')
+      return
+    }
+
+    const iframe = previewIframeRef.current
+    const body = iframe?.contentDocument?.body
+    if (!body) {
+      // Iframe isn't mounted (e.g. user is in canvas view, not Preview).
+      // Fall back to creating a hidden iframe with previewSrcDoc.
+      const tmp = document.createElement('iframe')
+      tmp.style.position = 'fixed'
+      tmp.style.left = '-99999px'
+      tmp.style.top = '0'
+      tmp.style.width = '660px'
+      tmp.style.height = '1px'
+      tmp.srcdoc = previewSrcDoc
+      document.body.appendChild(tmp)
+      await new Promise<void>((resolve) => {
+        tmp.onload = () => resolve()
+      })
+      try {
+        const tmpBody = tmp.contentDocument?.body
+        if (!tmpBody) throw new Error('Preview unavailable')
+        const html2canvas = (await import('html2canvas')).default
+        const canvas = await html2canvas(tmpBody, { useCORS: true, backgroundColor: '#ffffff' })
+        const dataUrl = canvas.toDataURL('image/png')
+        if (format === 'png') {
+          downloadBlob(await (await fetch(dataUrl)).blob(), `${base}.png`, 'image/png')
+        } else {
+          const { jsPDF } = await import('jspdf')
+          const w = canvas.width
+          const h = canvas.height
+          const pdf = new jsPDF({ orientation: w >= h ? 'l' : 'p', unit: 'px', format: [w, h] })
+          pdf.addImage(dataUrl, 'PNG', 0, 0, w, h)
+          pdf.save(`${base}.pdf`)
+        }
+      } finally {
+        tmp.remove()
+      }
+      return
+    }
+
+    const html2canvas = (await import('html2canvas')).default
+    const canvas = await html2canvas(body, { useCORS: true, backgroundColor: '#ffffff' })
+    const dataUrl = canvas.toDataURL('image/png')
+    if (format === 'png') {
+      downloadBlob(await (await fetch(dataUrl)).blob(), `${base}.png`, 'image/png')
+    } else if (format === 'pdf') {
+      const { jsPDF } = await import('jspdf')
+      const w = canvas.width
+      const h = canvas.height
+      const pdf = new jsPDF({ orientation: w >= h ? 'l' : 'p', unit: 'px', format: [w, h] })
+      pdf.addImage(dataUrl, 'PNG', 0, 0, w, h)
+      pdf.save(`${base}.pdf`)
+    }
+  }, [emailerName, compiledHtml, previewSrcDoc])
 
   const handleTabClick = (tab: EmailTab) => {
     if (activeTab === tab) setPanelOpen((o) => !o)
@@ -2223,12 +2305,28 @@ export const EmailEditorPanel: React.FC = () => {
             )}
           </div>
 
-          {/* Subject line — editable, left aligned */}
+          {/* Campaign name — editable, persists on blur */}
           <input
             type="text"
-            value={doc.subject ?? ''}
-            onChange={(e) => updateSubject(e.target.value)}
-            placeholder="Add email subject line…"
+            value={emailerName}
+            onChange={(e) => setEmailerName(e.target.value)}
+            onBlur={async () => {
+              if (!currentEmailerId) return
+              const trimmed = emailerName.trim() || 'Untitled'
+              try {
+                const res = await fetch(`/api/emailers/${currentEmailerId}`, {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ name: trimmed }),
+                })
+                if (!res.ok) return
+                const updated = await res.json() as EmailerMeta
+                setSavedEmailers((prev) => prev.map((e) => e.id === updated.id ? updated : e))
+              } catch {
+                // swallow — UX stays optimistic
+              }
+            }}
+            placeholder="Untitled campaign"
             className="w-48 shrink-0 bg-transparent text-left text-[11px] font-medium text-gray-700 placeholder:text-gray-300 focus:outline-none focus:ring-0"
           />
 
@@ -2272,6 +2370,13 @@ export const EmailEditorPanel: React.FC = () => {
               </button>
             )}
           </div>
+
+          {/* ── Export menu ── */}
+          <ExportMenu
+            mode="email"
+            onExport={handleEmailExport}
+            onSendTest={() => setSendTestOpen(true)}
+          />
 
           {/* ── Desktop / Mobile toggle ── */}
           <div className="inline-flex rounded-lg bg-gray-100 p-0.5">
@@ -2370,6 +2475,7 @@ export const EmailEditorPanel: React.FC = () => {
               </div>
               {previewSrcDoc ? (
                 <iframe
+                  ref={previewIframeRef}
                   title="Email HTML Preview"
                   srcDoc={previewSrcDoc}
                   className="w-full border-0 block"
@@ -2571,9 +2677,15 @@ export const EmailEditorPanel: React.FC = () => {
         )}
       </div>
 
-      {/* ── Right Nav: EmailRightNav (when block selected) → Block Library ─ */}
+      {/* ── Right Nav: SendTest → EmailRightNav (when block selected) → Block Library ─ */}
       <aside className="flex w-[300px] shrink-0 flex-col border-l border-gray-200 bg-white">
-        {selectedBlock ? (
+        {sendTestOpen ? (
+          <SendTestEmailPanel
+            onClose={() => setSendTestOpen(false)}
+            previewSrcDoc={previewSrcDoc}
+            compiledHtml={compiledHtml}
+          />
+        ) : selectedBlock ? (
           <EmailRightNav
             block={selectedBlock}
             onPatch={handleBlockPatch}

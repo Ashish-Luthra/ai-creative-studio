@@ -65,6 +65,14 @@ export const CanvasTextRightPanel: React.FC<Props> = ({ canvas, selected, positi
   const apply = (patch: Record<string, unknown>) => {
     if (!t || !canvas) return
     t.set(patch)
+    // When text/font/size changes, Textbox needs to recompute its line breaks
+    // and bounding box. set() alone doesn't always trigger that — without
+    // initDimensions() the canvas re-renders the OLD glyph runs, which is why
+    // the Case (Aa/AA/aa) buttons appeared to do nothing on Ads.
+    if ('text' in patch || 'fontFamily' in patch || 'fontSize' in patch || 'fontWeight' in patch) {
+      ;(t as FabricObject & { initDimensions?: () => void }).initDimensions?.()
+    }
+    t.setCoords?.()
     canvas.requestRenderAll()
     onCommit()
   }
@@ -75,7 +83,21 @@ export const CanvasTextRightPanel: React.FC<Props> = ({ canvas, selected, positi
   const handleUnderline = () => { const n = !underline; setUnderline(n); apply({ underline: n }) }
   const handleAlign = (v: 'left' | 'center' | 'right') => { setTextAlign(v); apply({ textAlign: v }) }
   const handleSize = (v: number) => { setFontSize(v); apply({ fontSize: v }) }
-  const handleFont = (v: string) => { setFontFamily(v); apply({ fontFamily: v }) }
+  const handleFont = async (v: string) => {
+    setFontFamily(v)
+    // Google Fonts arrive via <link> in layout.tsx but the browser only fetches
+    // the actual font files when the family is referenced in the DOM. Fabric
+    // renders to <canvas>, which doesn't trigger the fetch. Force-load the
+    // font via the FontFace API, then apply + re-render so the new family
+    // actually shows on canvas instead of silently falling back.
+    try {
+      const weight = fontWeight || 400
+      await document.fonts.load(`${weight} ${fontSize}px "${v}"`)
+    } catch {
+      // FontFace API failed (offline / CSP) — apply anyway; browser will use fallback
+    }
+    apply({ fontFamily: v })
+  }
   const handleWeight = (v: number) => { setFontWeight(v); apply({ fontWeight: v }) }
   const handleColor = (v: string) => { setColor(v); apply({ fill: v }) }
   const handleLineHeight = (v: number) => { setLineHeight(v); apply({ lineHeight: v }) }
@@ -175,9 +197,9 @@ export const CanvasTextRightPanel: React.FC<Props> = ({ canvas, selected, positi
           <SectionLabel>Case</SectionLabel>
           <div className="flex gap-2">
             {[
-              { id: 'none' as const,      label: 'aA' },
-              { id: 'lowercase' as const, label: 'aa' },
+              { id: 'none' as const,      label: 'Aa' },
               { id: 'uppercase' as const, label: 'AA' },
+              { id: 'lowercase' as const, label: 'aa' },
             ].map(({ id, label }) => (
               <button
                 key={id}

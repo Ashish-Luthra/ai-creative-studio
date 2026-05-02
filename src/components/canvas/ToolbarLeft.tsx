@@ -1,6 +1,6 @@
 'use client'
 
-import { Folder, Grid2X2, Settings, Type } from 'lucide-react'
+import { Folder, Grid2X2, Image as ImageIcon, Settings, Type } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useState } from 'react'
 
@@ -9,6 +9,7 @@ export type RailTool =
   | 'layout'
   | 'frame'
   | 'shapes'
+  | 'image'
   | 'text'
   | 'hand'
   | 'settings'
@@ -69,6 +70,7 @@ export const ToolbarLeft: React.FC<ToolbarLeftProps> = ({ onToolAction }) => {
     { id: 'layout', icon: <Grid2X2 size={15} />, title: 'Layout / Template' },
     { id: 'frame', icon: FrameIcon, title: 'Add Frame (1:1)' },
     { id: 'shapes', icon: ShapesIcon, title: 'Shapes' },
+    { id: 'image', icon: <ImageIcon size={15} />, title: 'Images / Assets' },
     { id: 'text', icon: <Type size={15} />, title: 'Text' },
     { id: 'hand', icon: HandIcon, title: 'Cursor' },
   ]
