@@ -9,6 +9,7 @@ import type { Canvas, FabricObject } from 'fabric'
 import { cn } from '@/lib/utils'
 import { GOOGLE_FONT_FAMILIES } from '@/lib/canvas/googleFonts'
 import { ColorSwatch } from '@/components/shared/TextStyleControls'
+import { CanvasArrangeSection } from './CanvasArrangeSection'
 
 const SYSTEM_FONTS = [
   'Arial', 'Georgia', 'Helvetica', 'Tahoma',
@@ -308,6 +309,8 @@ export const CanvasTextRightPanel: React.FC<Props> = ({ canvas, selected, positi
             className="w-full accent-blue-500"
           />
         </Section>
+
+        <CanvasArrangeSection canvas={canvas} onCommit={onCommit} />
       </div>
     </aside>
   )

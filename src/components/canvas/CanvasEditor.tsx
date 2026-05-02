@@ -25,10 +25,13 @@ import { CanvasTopHeader } from './CanvasTopHeader'
 import { CanvasTextRightPanel } from './CanvasTextRightPanel'
 import { CanvasShapeRightPanel } from './CanvasShapeRightPanel'
 import { CanvasFrameRightPanel } from './CanvasFrameRightPanel'
+import { CanvasImageRightPanel } from './CanvasImageRightPanel'
 import { FrameActionsToolbar } from './FrameActionsToolbar'
 import { ShapesPanel, type ShapeKind } from './ShapesPanel'
 import { DrawSettingsPanel } from './DrawSettingsPanel'
 import { AgentPill } from './AgentPill'
+import { AllyvateAssistant } from '@/components/ai/AllyvateAssistant'
+import { CanvasAllyDock } from './CanvasAllyDock'
 import { EmailEditorPanel } from '@/components/email/EmailEditorPanel'
 import { ApprovedImagesPanel } from './ApprovedImagesPanel'
 import { RightStudioPanel } from './RightStudioPanel'
@@ -99,6 +102,12 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
   const [drawSettings, setDrawSettings] = useState({ color: '#1B51B3', thickness: 4 })
   const [showApprovedImages, setShowApprovedImages] = useState(false)
   const [agentPillVisible, setAgentPillVisible] = useState(false)
+  const [allyVisible, setAllyVisible] = useState(false)
+  const [allyAnchorX, setAllyAnchorX] = useState(0)
+  const [allyAnchorY, setAllyAnchorY] = useState(0)
+  const [allyTarget, setAllyTarget] = useState<FabricObject | null>(null)
+  const [allyExpandedPos, setAllyExpandedPos] = useState<{ left: number; top: number } | null>(null)
+  const [frameHoverRect, setFrameHoverRect] = useState<{ left: number; top: number; width: number; height: number } | null>(null)
   const [generatedPresetIds, setGeneratedPresetIds] = useState<string[]>([])
   const [variants, setVariants] = useState<CanvasVariant[]>([])
   const [campaign, setCampaign] = useState<CampaignMeta>({
@@ -112,6 +121,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
   const {
     mode, selectedLayer, selectedPresetId, zoom,
     setSelectedLayer, setFabricCanvas, setSelectedPresetId, setZoom, pushUndo, resetHistory, setMode,
+    undo, redo,
   } = useCanvasStore()
 
   const [toolbarPos, setToolbarPos] = useState({ x: 0, y: 0 })
@@ -266,6 +276,62 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
           setSelectedLayer(obj)
           setAgentPillVisible(isTextLikeObject(obj))
           if (obj) { syncPos(obj); syncToolbar(obj) }
+
+          const objData = (obj as FabricObject & { data?: { kind?: string; creativeId?: string } } | null)?.data
+          const isTextOnFrame =
+            !!obj &&
+            obj.type === 'textbox' &&
+            objData?.kind === 'creative-text' &&
+            !!objData?.creativeId
+
+          if (isTextOnFrame && obj) {
+            const containerRect = containerRef.current?.getBoundingClientRect()
+            const tbRect = obj.getBoundingRect()
+            // Find the enclosing frame to position the expanded card relative to.
+            const cid = objData?.creativeId
+            const frame = c.getObjects().find((o) => {
+              const d = (o as FabricObject & { data?: { kind?: string; creativeId?: string } }).data
+              return d?.kind === 'creative-frame' && d?.creativeId === cid
+            }) as FabricObject | undefined
+            const frameRect = frame?.getBoundingRect()
+            if (containerRect) {
+              setAllyAnchorX(containerRect.left + tbRect.left + tbRect.width / 2)
+              setAllyAnchorY(containerRect.top + tbRect.top)
+              // Place expanded card to the right of the frame if room, else below, else fall back.
+              if (frameRect) {
+                const CARD_W = 320
+                const CARD_H = 460
+                const GAP = 12
+                const vpW = window.innerWidth
+                const vpH = window.innerHeight
+                const frameRightVp = containerRect.left + frameRect.left + frameRect.width
+                const frameBottomVp = containerRect.top + frameRect.top + frameRect.height
+                const frameLeftVp = containerRect.left + frameRect.left
+                const frameTopVp = containerRect.top + frameRect.top
+                let pos: { left: number; top: number } | null = null
+                if (frameRightVp + GAP + CARD_W <= vpW) {
+                  pos = {
+                    left: frameRightVp + GAP,
+                    top: Math.max(8, Math.min(vpH - CARD_H - 8, frameTopVp)),
+                  }
+                } else if (frameBottomVp + GAP + CARD_H <= vpH) {
+                  pos = {
+                    left: Math.max(8, Math.min(vpW - CARD_W - 8, frameLeftVp)),
+                    top: frameBottomVp + GAP,
+                  }
+                }
+                setAllyExpandedPos(pos)
+              } else {
+                setAllyExpandedPos(null)
+              }
+            }
+            setAllyTarget(obj)
+            setAllyVisible(true)
+          } else {
+            setAllyVisible(false)
+            setAllyTarget(null)
+            setAllyExpandedPos(null)
+          }
         },
         onModified: (target) => {
           const textNormalized = normalizeTextboxScale(target)
@@ -444,6 +510,30 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
           setShowApprovedImages(true)
         }
       })
+      // Hover hint: when the cursor is over a creative-frame (or its inner
+      // image), surface a small "Double-click to change" overlay positioned at
+      // the frame's screen rect. Mirrors the email image-slot affordance.
+      const updateFrameHover = (target: FabricObject | undefined) => {
+        if (!target) { setFrameHoverRect(null); return }
+        const data = (target as FabricObject & { data?: { kind?: string; creativeId?: string } }).data
+        let frame: FabricObject | undefined
+        if (data?.kind === 'creative-frame') {
+          frame = target
+        } else if (data?.kind === 'creative-image') {
+          const cid = getCreativeIdFromObject(target)
+          if (cid) {
+            frame = c.getObjects().find((o) => {
+              const d = (o as FabricObject & { data?: { kind?: string; creativeId?: string } }).data
+              return d?.kind === 'creative-frame' && d?.creativeId === cid
+            }) as FabricObject | undefined
+          }
+        }
+        if (!frame) { setFrameHoverRect(null); return }
+        const br = frame.getBoundingRect()
+        setFrameHoverRect({ left: br.left, top: br.top, width: br.width, height: br.height })
+      }
+      c.on('mouse:over', (event) => updateFrameHover(event.target ?? undefined))
+      c.on('mouse:out',  ()      => setFrameHoverRect(null))
       const storedPresetId = localStorage.getItem(presetStorageKey)
       const resolvedPresetId =
         (initialPresetId && isPresetId(initialPresetId) ? initialPresetId : null)
@@ -595,6 +685,29 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [mode, saveSnapshot, setSelectedLayer])
 
+  // ── Global Cmd/Ctrl+Z (undo) and Cmd/Ctrl+Shift+Z / Cmd/Ctrl+Y (redo) ──
+  // Active in canvas mode. Skipped while typing in form fields, contentEditable,
+  // or while a Fabric Textbox is in edit mode (so typing into a textbox doesn't
+  // get hijacked).
+  useEffect(() => {
+    if (mode !== 'canvas') return
+    const handler = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey)) return
+      if (e.key.toLowerCase() !== 'z' && e.key.toLowerCase() !== 'y') return
+      const target = e.target as HTMLElement | null
+      const tag = target?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || target?.isContentEditable) return
+      const active = fabricRef.current?.getActiveObject() as (FabricObject & { isEditing?: boolean }) | null
+      if (active?.isEditing) return
+      const isRedo = (e.key.toLowerCase() === 'z' && e.shiftKey) || e.key.toLowerCase() === 'y'
+      e.preventDefault()
+      if (isRedo) void redo()
+      else void undo()
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [mode, undo, redo])
+
   // ── Exit Draw mode on Escape or click outside the canvas ──
   // While in draw mode, fabric intercepts every pointer event on the canvas
   // itself, so the user can't easily exit without going to another tool.
@@ -666,6 +779,24 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
   const handleAgentSubmit = useCallback((cmd: string) => {
     console.log('[AgentPill] command:', cmd)
   }, [])
+
+  const openAllyFromDock = useCallback(() => {
+    const containerRect = containerRef.current?.getBoundingClientRect()
+    if (containerRect) {
+      setAllyAnchorX(containerRect.left + containerRect.width / 2)
+      setAllyAnchorY(containerRect.bottom - 80)
+    }
+    setAllyTarget(null)
+    setAllyVisible(true)
+  }, [])
+
+  const handleAllyInsert = useCallback((text: string) => {
+    if (!allyTarget) return
+    const tb = allyTarget as FabricObject & { set?: (k: string, v: unknown) => void }
+    tb.set?.('text', text)
+    fabricRef.current?.requestRenderAll()
+    saveSnapshot()
+  }, [allyTarget, saveSnapshot])
 
   const handleCanvasExport = useCallback(() => {
     const canvas = fabricRef.current
@@ -1284,6 +1415,16 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
   const isTextSelected =
     selectedLayer?.type === 'textbox' || selectedLayer?.type === 'i-text'
 
+  // Selected image (loose or frame-bound) — shows the lightweight Arrange panel.
+  // Excludes shapes (which already have their own panel) and frames (Frame panel).
+  const isImageSelected = (() => {
+    const obj = selectedLayer
+    if (!obj) return false
+    const data = (obj as FabricObject & { data?: { kind?: string } }).data
+    if (data?.kind === 'creative-frame' || data?.kind === 'creative-shape') return false
+    return obj.type === 'image' || data?.kind === 'creative-image'
+  })()
+
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-[#FDFDFD]">
       <div className="flex flex-1 overflow-hidden">
@@ -1324,6 +1465,22 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
             className="absolute inset-0"
             style={{ display: mode === 'canvas' ? 'block' : 'none' }}
           />
+
+          {mode === 'canvas' && frameHoverRect && (
+            <div
+              className="pointer-events-none absolute z-[60] flex items-center justify-center"
+              style={{
+                left: frameHoverRect.left,
+                top: frameHoverRect.top,
+                width: frameHoverRect.width,
+                height: frameHoverRect.height,
+              }}
+            >
+              <span className="rounded bg-black/60 px-2 py-1 text-[10px] font-medium text-white">
+                Double-click to change
+              </span>
+            </div>
+          )}
 
           {mode === 'email' && (
             <EmailEditorPanel />
@@ -1432,11 +1589,38 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
             <AgentPill onSubmit={handleAgentSubmit} />
           )}
 
+          {mode === 'canvas' && (
+            <>
+              <AllyvateAssistant
+                visible={allyVisible}
+                context="text"
+                anchorX={allyAnchorX}
+                anchorY={allyAnchorY}
+                expandedSide="left"
+                expandedPosition={allyExpandedPos}
+                seedText={(allyTarget as (FabricObject & { text?: string }) | null)?.text ?? ''}
+                onClose={() => { setAllyVisible(false); setAllyTarget(null); setAllyExpandedPos(null) }}
+                onInsert={handleAllyInsert}
+              />
+              <CanvasAllyDock
+                visible={!allyVisible}
+                onClick={openAllyFromDock}
+              />
+            </>
+          )}
+
           {mode === 'canvas' && isTextSelected && (
             <CanvasTextRightPanel
               canvas={fabricRef.current}
               selected={selectedLayer}
               position={toolbarPos}
+              onCommit={saveSnapshot}
+            />
+          )}
+
+          {mode === 'canvas' && isImageSelected && (
+            <CanvasImageRightPanel
+              canvas={fabricRef.current}
               onCommit={saveSnapshot}
             />
           )}

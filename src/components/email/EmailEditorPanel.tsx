@@ -1754,11 +1754,19 @@ export const EmailEditorPanel: React.FC = () => {
   const [allyContext,  setAllyContext]  = useState<AllyContext>('text')
   const [allyAnchorX, setAllyAnchorX]  = useState(0)
   const [allyAnchorY, setAllyAnchorY]  = useState(0)
+  const [allySeedText, setAllySeedText] = useState('')
 
   const showAlly = useCallback((ctx: AllyContext, e: React.MouseEvent) => {
     setAllyContext(ctx)
     setAllyAnchorX(e.clientX)
     setAllyAnchorY(e.clientY)
+    if (ctx === 'text') {
+      const target = e.target as HTMLElement | null
+      const editable = target?.closest('[contenteditable]') as HTMLElement | null
+      setAllySeedText((editable ?? target)?.innerText?.trim() ?? '')
+    } else {
+      setAllySeedText('')
+    }
     setAllyVisible(true)
   }, [])
 
@@ -2708,6 +2716,7 @@ export const EmailEditorPanel: React.FC = () => {
         context={allyContext}
         anchorX={allyAnchorX}
         anchorY={allyAnchorY}
+        seedText={allySeedText}
         onClose={() => setAllyVisible(false)}
       />
 

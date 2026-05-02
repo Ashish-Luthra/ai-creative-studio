@@ -6,6 +6,7 @@ import type { Canvas, FabricObject } from 'fabric'
 import { cn } from '@/lib/utils'
 import { ColorSwatch } from '@/components/shared/TextStyleControls'
 import { updateLinearShape, type LinearConfig, type LinearHead } from '@/lib/canvas/fabricInit'
+import { CanvasArrangeSection } from './CanvasArrangeSection'
 
 interface Props {
   canvas: Canvas | null
@@ -162,6 +163,8 @@ export const CanvasShapeRightPanel: React.FC<Props> = ({ canvas, selected, onCom
             </div>
           </Section>
         )}
+
+        <CanvasArrangeSection canvas={canvas} onCommit={onCommit} />
       </div>
     </aside>
   )

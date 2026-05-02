@@ -50,7 +50,7 @@ const MOCK_NON_TEXT_REPLY: Record<'image' | 'design', string> = {
 
 // ─── Allyvate icon ────────────────────────────────────────────────────────────
 
-function AllyvateIcon({ size = 20 }: { size?: number }) {
+export function AllyvateIcon({ size = 20 }: { size?: number }) {
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
@@ -117,12 +117,18 @@ export interface AllyvateAssistantProps {
   onClose: () => void
   /** Called when user clicks Insert on a text variant */
   onInsert?: (text: string) => void
+  /** Which side of the viewport the expanded card sits on. Default 'right'. */
+  expandedSide?: 'left' | 'right'
+  /** Optional explicit viewport coords for the expanded card (top-left). Overrides expandedSide when provided. */
+  expandedPosition?: { left: number; top: number } | null
+  /** Current text content from the invoking element. When provided in 'text' context, shown in grey above the guidance prompt. */
+  seedText?: string
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function AllyvateAssistant({
-  visible, context, anchorX, anchorY, onClose, onInsert,
+  visible, context, anchorX, anchorY, onClose, onInsert, expandedSide = 'right', expandedPosition = null, seedText,
 }: AllyvateAssistantProps) {
   const [mode,            setMode]            = useState<'pill' | 'expanded'>('pill')
   const [activeCtx,       setActiveCtx]       = useState<AllyContext>(context)
@@ -259,7 +265,14 @@ export function AllyvateAssistant({
   const ctxLabel = activeCtx === 'text' ? 'Text' : activeCtx === 'image' ? 'Image' : 'Mood'
 
   return (
-    <div className="fixed right-[320px] top-1/2 z-[90] flex w-[320px] -translate-y-1/2 flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl">
+    <div
+      className={cn(
+        'fixed z-[90] flex w-[320px] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl',
+        !expandedPosition && 'top-1/2 -translate-y-1/2',
+        !expandedPosition && (expandedSide === 'left' ? 'left-[24px]' : 'right-[320px]'),
+      )}
+      style={expandedPosition ? { left: expandedPosition.left, top: expandedPosition.top } : undefined}
+    >
 
       {/* ── Header ── */}
       <div className="flex shrink-0 items-center justify-between border-b border-gray-100 px-4 py-3">
@@ -305,9 +318,16 @@ export function AllyvateAssistant({
       {/* ── Messages ── */}
       <div className="min-h-[120px] max-h-[360px] flex-1 overflow-auto px-4 py-3 space-y-4">
         {messages.length === 0 && !isTyping && (
-          <p className="mt-3 text-center text-[11px] text-gray-300">
-            Choose a quick action or describe what you&apos;d like
-          </p>
+          <div className="mt-3 space-y-2">
+            {activeCtx === 'text' && seedText && seedText.trim().length > 0 && (
+              <p className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-[11px] leading-relaxed text-gray-400 whitespace-pre-wrap">
+                {seedText}
+              </p>
+            )}
+            <p className="text-center text-[11px] text-gray-300">
+              Choose a quick action or describe what you&apos;d like
+            </p>
+          </div>
         )}
 
         {messages.map((msg) => (

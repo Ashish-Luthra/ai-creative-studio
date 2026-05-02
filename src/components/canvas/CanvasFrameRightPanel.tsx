@@ -34,17 +34,6 @@ const Section: React.FC<{ title: string; defaultOpen?: boolean; children: React.
   )
 }
 
-const cmdLabel = typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform) ? '⌘' : 'Ctrl'
-
-const ARRANGE_ACTIONS = [
-  { id: 'bringToFront', label: 'Bring to front', shortcut: `${cmdLabel}+⇧+]` },
-  { id: 'bringForward', label: 'Bring forward',  shortcut: `${cmdLabel}+]`     },
-  { id: 'sendBackward', label: 'Send backward',  shortcut: `${cmdLabel}+[`     },
-  { id: 'sendToBack',   label: 'Send to back',   shortcut: `${cmdLabel}+⇧+[`   },
-] as const
-
-type ArrangeAction = typeof ARRANGE_ACTIONS[number]['id']
-
 // Tiny ratio-rectangle preview for the Ad specs grid. Width/height of the
 // outer SVG box stays constant; the inner rect shrinks to match the ratio so
 // the user reads the proportions at a glance.
@@ -90,43 +79,6 @@ export const CanvasFrameRightPanel: React.FC<Props> = ({
     if (typeof fill === 'string' && fill !== '') setColor(fill)
   }, [frame])
 
-  const arrange = (action: ArrangeAction) => {
-    if (!canvas) return
-    const obj = canvas.getActiveObject() as FabricObject | null
-    if (!obj) return
-    const c = canvas as Canvas & {
-      bringObjectToFront?: (o: FabricObject) => void
-      bringObjectForward?: (o: FabricObject) => void
-      sendObjectBackwards?: (o: FabricObject) => void
-      sendObjectToBack?: (o: FabricObject) => void
-    }
-    switch (action) {
-      case 'bringToFront': c.bringObjectToFront?.(obj); break
-      case 'bringForward': c.bringObjectForward?.(obj); break
-      case 'sendBackward': c.sendObjectBackwards?.(obj); break
-      case 'sendToBack':   c.sendObjectToBack?.(obj);   break
-    }
-    canvas.requestRenderAll()
-    onCommit()
-  }
-
-  // Keyboard shortcuts — only active while the frame panel is mounted.
-  useEffect(() => {
-    if (!canvas || !frame) return
-    const onKey = (e: KeyboardEvent) => {
-      if (!(e.metaKey || e.ctrlKey)) return
-      const tag = (e.target as HTMLElement | null)?.tagName
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable) return
-      if (e.key === ']' && e.shiftKey) { e.preventDefault(); arrange('bringToFront') }
-      else if (e.key === ']')          { e.preventDefault(); arrange('bringForward') }
-      else if (e.key === '[' && e.shiftKey) { e.preventDefault(); arrange('sendToBack') }
-      else if (e.key === '[')          { e.preventDefault(); arrange('sendBackward') }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canvas, frame])
-
   if (!canvas || !frame) return null
 
   const handleColor = (next: string) => {
@@ -157,21 +109,6 @@ export const CanvasFrameRightPanel: React.FC<Props> = ({
 
         <Section title="Colour">
           <ColorSwatch label="" value={color} onChange={handleColor} />
-        </Section>
-
-        <Section title="Arrange">
-          <div className="space-y-1">
-            {ARRANGE_ACTIONS.map(({ id, label, shortcut }) => (
-              <button
-                key={id}
-                onClick={() => arrange(id)}
-                className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-[12px] text-gray-700 hover:bg-gray-100"
-              >
-                <span>{label}</span>
-                <span className="font-mono text-[10px] text-gray-400">{shortcut}</span>
-              </button>
-            ))}
-          </div>
         </Section>
 
         <Section title="Create All Sizes" defaultOpen={false}>
