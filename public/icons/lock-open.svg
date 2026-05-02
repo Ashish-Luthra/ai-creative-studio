@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="16px" height="20px" viewBox="0 0 16 20" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>lock-open</title>
+    <g id="lock-open" stroke="none" fill="none" transform="translate(-4, -2)" fill-rule="evenodd" stroke-width="1">
+        <g id="bx-lock-open" transform="translate(12, 12) scale(-1, 1) translate(-12, -12)" fill="#000000">
+            <path d="M12,4 C13.654,4 15,5.34599996 15,7 L17,7 C17,4.24300003 14.757,2 12,2 C9.24300003,2 7,4.24300003 7,7 L7,9 L6,9 C4.89699996,9 4,9.89699996 4,11 L4,20 C4,21.103 4.89699996,22 6,22 L18,22 C19.103,22 20,21.103 20,20 L20,11 C20,9.89699996 19.103,9 18,9 L9,9 L9,7 C9,5.34599996 10.346,4 12,4 Z M18.0020008,20 L13,20 L13,17.7220001 C13.595,17.3750001 14,16.737 14,16 C14,14.897 13.103,14 12,14 C10.897,14 10,14.897 10,16 C10,16.736 10.405,17.3750001 11,17.7220001 L11,20 L6,20 L6,11 L18,11 L18.0020008,20 Z" id="Vector" fill-rule="nonzero"></path>
+        </g>
+    </g>
+</svg>

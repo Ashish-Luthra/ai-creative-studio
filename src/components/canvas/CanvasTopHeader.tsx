@@ -1,7 +1,8 @@
 'use client'
 
 import React, { useEffect, useRef, useState } from 'react'
-import { Check, ChevronDown, Eye, FolderOpen, Minus, Plus, Redo2, Save, Undo2 } from 'lucide-react'
+import { Check, ChevronDown, Eye, FolderOpen, Minus, Plus, Redo2, Undo2 } from 'lucide-react'
+import { SaveIcon } from './AllyvateIcons'
 import { cn } from '@/lib/utils'
 import { useCanvasStore } from '@/lib/canvas/canvasStore'
 import { ExportMenu, type ExportFormat } from '@/components/shared/ExportMenu'
@@ -128,7 +129,7 @@ export const CanvasTopHeader: React.FC<CanvasTopHeaderProps> = ({
             : 'bg-gray-900 text-white hover:bg-gray-700',
         )}
       >
-        {saveStatus === 'saved' ? <Check size={11} /> : <Save size={11} />}
+        {saveStatus === 'saved' ? <Check size={11} /> : <SaveIcon size={11} />}
         {saveStatus === 'saving' ? 'Saving…' : saveStatus === 'saved' ? 'Saved' : saveStatus === 'error' ? 'Error' : 'Save'}
       </button>
 

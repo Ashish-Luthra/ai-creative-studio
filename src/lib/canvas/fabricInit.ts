@@ -345,11 +345,11 @@ export async function seedDefaultCreative(
         creativeId,
         role: 'image',
         frame: frameState,
-        cropPending: false,
+        cropPending: true,
       } satisfies CreativeData,
     })
     applySelectionStyle(img)
-    lockCreativeImage(img)
+    unlockCreativeImage(img)
     canvas.add(img)
   } catch {
     // Fallback: gradient placeholder when image isn't available yet
@@ -592,7 +592,7 @@ export async function replaceOrAddImageLayer(canvas: Canvas, imageUrl: string, s
       originY: 'center',
       scaleX: scale,
       scaleY: scale,
-      data: { kind: 'creative-image', creativeId, role: 'image', frame, cropPending: false } satisfies CreativeData,
+      data: { kind: 'creative-image', creativeId, role: 'image', frame, cropPending: true } satisfies CreativeData,
     })
     canvas.remove(target)
   } else {
@@ -615,15 +615,16 @@ export async function replaceOrAddImageLayer(canvas: Canvas, imageUrl: string, s
       originY: 'center',
       scaleX: scale,
       scaleY: scale,
-      data: { kind: 'creative-image', creativeId, role: 'image', frame, cropPending: false } satisfies CreativeData,
+      data: { kind: 'creative-image', creativeId, role: 'image', frame, cropPending: true } satisfies CreativeData,
     })
   }
 
   applySelectionStyle(img)
-  lockCreativeImage(img)
+  unlockCreativeImage(img)
   canvas.add(img)
-  // Promote the frame to active so the user immediately sees frame-selection
-  // chrome ("drag to move") rather than landing in image-edit mode.
+  // Image lands unlocked so the user can drag/scale it inside the clipPath
+  // immediately. The frame still wins the click-target competition for
+  // empty-area clicks because the image is constrained to the frame's bounds.
   const creativeId = (asCreativeData(img)?.creativeId) as string | undefined
   const frame = creativeId
     ? canvas.getObjects().find((o) => asCreativeData(o)?.kind === 'creative-frame' && asCreativeData(o)?.creativeId === creativeId)
@@ -643,8 +644,82 @@ export async function replaceOrAddImageLayer(canvas: Canvas, imageUrl: string, s
 
 export type ShapeKind = 'rectangle' | 'oval' | 'line' | 'arrow' | 'triangle' | 'star' | 'polygon'
 
+export type LinearHead = 'none' | 'line' | 'triangle' | 'triangle-reversed' | 'circle' | 'diamond'
+
+export interface LinearConfig {
+  x1: number
+  y1: number
+  x2: number
+  y2: number
+  thickness: number
+  headSize: number
+  startHead: LinearHead
+  endHead: LinearHead
+}
+
 const DEFAULT_SHAPE_FILL = '#1B51B3'
 const DEFAULT_SHAPE_STROKE = '#1B51B3'
+
+// Build an SVG path d-string for a line with optional arrowheads on either
+// end. Closed head shapes (triangle, diamond, circle) are appended as
+// subpaths; the parent fabric Path renders them filled because both stroke
+// and fill are set to the same colour. Open heads (line) draw via stroke
+// only and don't enclose an area.
+export const buildLinearPath = (cfg: LinearConfig): string => {
+  const { x1, y1, x2, y2, headSize, startHead, endHead } = cfg
+  let d = `M ${x1} ${y1} L ${x2} ${y2}`
+
+  // Append a head at endpoint (px, py) pointing away from anchor (ax, ay).
+  const head = (px: number, py: number, ax: number, ay: number, kind: LinearHead) => {
+    if (kind === 'none') return
+    const dx = px - ax, dy = py - ay
+    const len = Math.hypot(dx, dy) || 1
+    const ux = dx / len, uy = dy / len // unit vector along line, toward endpoint
+    const nx = -uy, ny = ux             // perpendicular
+    const h = headSize
+    const half = h * 0.5
+
+    // Anchor point of the head — `h` units back from the endpoint.
+    const bx = px - ux * h
+    const by = py - uy * h
+
+    if (kind === 'line') {
+      // Two open chevron strokes — no fill needed.
+      d += ` M ${bx + nx * half} ${by + ny * half} L ${px} ${py} L ${bx - nx * half} ${by - ny * half}`
+      return
+    }
+    if (kind === 'triangle') {
+      // Closed triangle pointing toward endpoint.
+      d += ` M ${px} ${py} L ${bx + nx * half} ${by + ny * half} L ${bx - nx * half} ${by - ny * half} Z`
+      return
+    }
+    if (kind === 'triangle-reversed') {
+      // Closed triangle pointing back toward the line.
+      const fx = px + ux * h
+      const fy = py + uy * h
+      d += ` M ${fx} ${fy} L ${px + nx * half} ${py + ny * half} L ${px - nx * half} ${py - ny * half} Z`
+      return
+    }
+    if (kind === 'diamond') {
+      // Closed diamond centred on the endpoint.
+      d += ` M ${px + ux * half} ${py + uy * half}`
+      d += ` L ${px + nx * half} ${py + ny * half}`
+      d += ` L ${px - ux * half} ${py - uy * half}`
+      d += ` L ${px - nx * half} ${py - ny * half} Z`
+      return
+    }
+    if (kind === 'circle') {
+      // Closed circle centred on the endpoint, radius = headSize/2.
+      const r = half
+      d += ` M ${px - r} ${py} a ${r} ${r} 0 1 1 ${r * 2} 0 a ${r} ${r} 0 1 1 ${-r * 2} 0 Z`
+      return
+    }
+  }
+
+  head(x2, y2, x1, y1, endHead)
+  head(x1, y1, x2, y2, startHead)
+  return d
+}
 
 const starPoints = (cx: number, cy: number, outerR: number, innerR: number, points = 5) => {
   const out: { x: number; y: number }[] = []
@@ -671,7 +746,7 @@ export async function insertShape(
   kind: ShapeKind,
   options: { creativeId?: string; cx?: number; cy?: number; size?: number } = {},
 ): Promise<FabricObject> {
-  const { Rect, Ellipse, Line, Triangle, Polygon, Group } = await import('fabric')
+  const { Rect, Ellipse, Triangle, Polygon, Path } = await import('fabric')
   const cx = options.cx ?? canvas.getWidth() / 2
   const cy = options.cy ?? canvas.getHeight() / 2
   const s = options.size ?? Math.min(canvas.getWidth(), canvas.getHeight()) * 0.18
@@ -705,28 +780,41 @@ export async function insertShape(
       })
       break
     case 'line':
-      obj = new Line([cx - s, cy, cx + s, cy], {
-        stroke: DEFAULT_SHAPE_STROKE,
-        strokeWidth: 4,
-      })
-      break
     case 'arrow': {
-      const shaft = new Line([0, 0, s * 1.4, 0], {
-        stroke: DEFAULT_SHAPE_STROKE,
-        strokeWidth: 4,
-        originX: 'left', originY: 'center',
-      })
-      const head = new Triangle({
-        left: s * 1.4, top: 0,
-        originX: 'right', originY: 'center',
-        width: s * 0.35, height: s * 0.35,
-        angle: 90,
-        fill: DEFAULT_SHAPE_FILL,
-      })
-      obj = new Group([shaft, head], {
+      // Path-based linear shape — one coherent fabric object so colour,
+      // thickness, and arrowhead toggles all act uniformly. Stored config
+      // on `data.linear` so the Shape panel can rebuild the path when any
+      // setting changes.
+      const half = s
+      const linear: LinearConfig = {
+        x1: -half, y1: 0, x2: half, y2: 0,
+        thickness: 4, headSize: 18,
+        startHead: 'none',
+        endHead: kind === 'arrow' ? 'triangle' : 'none',
+      }
+      const d = buildLinearPath(linear)
+      const path = new Path(d, {
         left: cx, top: cy, originX: 'center', originY: 'center',
+        stroke: DEFAULT_SHAPE_STROKE,
+        // Closed head subpaths (triangle / diamond / circle) render filled
+        // when fill matches stroke. Open heads (line) and the open shaft
+        // contribute no enclosed area, so fill is invisible there.
+        fill: DEFAULT_SHAPE_STROKE,
+        strokeWidth: linear.thickness,
+        strokeLineCap: 'round',
+        strokeLineJoin: 'round',
       })
-      break
+      ;(path as FabricObject & { data?: CreativeData & { linear?: LinearConfig } }).data = {
+        kind: 'creative-shape',
+        creativeId: options.creativeId ?? '',
+        role: 'shape',
+        linear,
+      } as unknown as CreativeData
+      applySelectionStyle(path)
+      canvas.add(path)
+      canvas.setActiveObject(path)
+      canvas.requestRenderAll()
+      return path
     }
     case 'triangle':
       obj = new Triangle({
@@ -758,4 +846,45 @@ export async function insertShape(
   canvas.setActiveObject(obj)
   canvas.requestRenderAll()
   return obj
+}
+
+// Patch a linear shape's config (thickness / start head / end head) and
+// regenerate its path string. Recreates the fabric Path because Path doesn't
+// always re-tokenize via `set('path', ...)`. Position and selection state are
+// preserved.
+export async function updateLinearShape(
+  canvas: Canvas,
+  current: FabricObject,
+  patch: Partial<LinearConfig>,
+): Promise<FabricObject | null> {
+  const data = (current as FabricObject & { data?: CreativeData & { linear?: LinearConfig } }).data
+  if (!data?.linear) return null
+  const next: LinearConfig = { ...data.linear, ...patch }
+  const { Path } = await import('fabric')
+  const d = buildLinearPath(next)
+  const stroke = (current as FabricObject & { stroke?: string }).stroke ?? DEFAULT_SHAPE_STROKE
+  const left = current.left ?? 0
+  const top = current.top ?? 0
+  const angle = current.angle ?? 0
+  const scaleX = current.scaleX ?? 1
+  const scaleY = current.scaleY ?? 1
+
+  const replacement = new Path(d, {
+    left, top, originX: 'center', originY: 'center', angle, scaleX, scaleY,
+    stroke,
+    fill: stroke,
+    strokeWidth: next.thickness,
+    strokeLineCap: 'round',
+    strokeLineJoin: 'round',
+  })
+  ;(replacement as FabricObject & { data?: CreativeData & { linear?: LinearConfig } }).data = {
+    ...data,
+    linear: next,
+  }
+  applySelectionStyle(replacement)
+  canvas.remove(current)
+  canvas.add(replacement)
+  canvas.setActiveObject(replacement)
+  canvas.requestRenderAll()
+  return replacement
 }

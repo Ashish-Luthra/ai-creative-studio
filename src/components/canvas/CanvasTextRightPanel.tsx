@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react'
 import {
   AlignCenter, AlignLeft, AlignRight,
-  Bold, Italic, Underline,
+  Bold, ChevronDown, Italic, Underline,
 } from 'lucide-react'
 import type { Canvas, FabricObject } from 'fabric'
 import { cn } from '@/lib/utils'
@@ -28,6 +28,25 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   )
 }
 
+// Collapsible section with chevron — Figma-style accordion. Defaults open.
+const Section: React.FC<{ title: string; defaultOpen?: boolean; children: React.ReactNode }> = ({
+  title, defaultOpen = true, children,
+}) => {
+  const [open, setOpen] = useState(defaultOpen)
+  return (
+    <div className="border-b border-gray-100 last:border-0">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center justify-between py-2 text-[10px] font-semibold uppercase tracking-wider text-gray-500 hover:text-gray-700"
+      >
+        {title}
+        <ChevronDown size={12} className={cn('transition-transform', open && 'rotate-180')} />
+      </button>
+      {open && <div className="pb-3">{children}</div>}
+    </div>
+  )
+}
+
 export const CanvasTextRightPanel: React.FC<Props> = ({ canvas, selected, position, onCommit }) => {
   const isText = !!selected && (selected.type === 'textbox' || selected.type === 'i-text')
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -37,6 +56,8 @@ export const CanvasTextRightPanel: React.FC<Props> = ({ canvas, selected, positi
   const [fontWeight, setFontWeight] = useState<number>(400)
   const [fontSize, setFontSize] = useState<number>(16)
   const [color, setColor] = useState<string>('#111827')
+  const [borderColor, setBorderColor] = useState<string>('#000000')
+  const [borderWidth, setBorderWidth] = useState<number>(0)
   const [italic, setItalic] = useState<boolean>(false)
   const [underline, setUnderline] = useState<boolean>(false)
   const [textAlign, setTextAlign] = useState<'left' | 'center' | 'right'>('left')
@@ -51,6 +72,8 @@ export const CanvasTextRightPanel: React.FC<Props> = ({ canvas, selected, positi
     setFontWeight(w)
     setFontSize(typeof t.fontSize === 'number' ? Math.round(t.fontSize) : 16)
     setColor(typeof t.fill === 'string' ? t.fill : '#111827')
+    setBorderColor(typeof t.stroke === 'string' && t.stroke ? t.stroke : '#000000')
+    setBorderWidth(typeof t.strokeWidth === 'number' ? t.strokeWidth : 0)
     setItalic(t.fontStyle === 'italic')
     setUnderline(!!t.underline)
     setTextAlign(['left', 'center', 'right'].includes(t.textAlign) ? t.textAlign : 'left')
@@ -100,6 +123,21 @@ export const CanvasTextRightPanel: React.FC<Props> = ({ canvas, selected, positi
   }
   const handleWeight = (v: number) => { setFontWeight(v); apply({ fontWeight: v }) }
   const handleColor = (v: string) => { setColor(v); apply({ fill: v }) }
+  const handleBorderColor = (v: string) => {
+    setBorderColor(v)
+    // Setting a border colour with no current width auto-promotes to 1px so
+    // the change is visible. User can dial it down or set 0 to remove.
+    if (!borderWidth) {
+      setBorderWidth(1)
+      apply({ stroke: v, strokeWidth: 1 })
+    } else {
+      apply({ stroke: v })
+    }
+  }
+  const handleBorderWidth = (v: number) => {
+    setBorderWidth(v)
+    apply({ strokeWidth: v, stroke: v > 0 ? borderColor : '' })
+  }
   const handleLineHeight = (v: number) => { setLineHeight(v); apply({ lineHeight: v }) }
   const handleLetterSpacing = (v: number) => { setLetterSpacing(v); apply({ charSpacing: v * 50 }) }
   const handleCase = (v: 'none' | 'lowercase' | 'uppercase') => {
@@ -115,11 +153,9 @@ export const CanvasTextRightPanel: React.FC<Props> = ({ canvas, selected, positi
 
   return (
     <aside className="absolute right-5 top-20 z-[60] flex max-h-[calc(100vh-120px)] w-72 flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl">
-      <div className="flex-1 overflow-auto px-4 py-4 space-y-5">
+      <div className="flex-1 overflow-auto px-4 py-2">
 
-        {/* Font */}
-        <div>
-          <SectionLabel>Font</SectionLabel>
+        <Section title="Font">
           <div className="flex gap-2">
             <select
               value={fontFamily}
@@ -149,11 +185,9 @@ export const CanvasTextRightPanel: React.FC<Props> = ({ canvas, selected, positi
               <option value={900}>Black</option>
             </select>
           </div>
-        </div>
+        </Section>
 
-        {/* Size */}
-        <div>
-          <SectionLabel>Size</SectionLabel>
+        <Section title="Size">
           <div className="flex items-center gap-1 rounded-xl border border-gray-200 px-3 py-2.5">
             <input
               type="number" min={8} max={400}
@@ -163,14 +197,29 @@ export const CanvasTextRightPanel: React.FC<Props> = ({ canvas, selected, positi
             />
             <span className="text-[10px] text-gray-400">px</span>
           </div>
-        </div>
+        </Section>
 
-        {/* Font color — shared with Email FontTab */}
-        <ColorSwatch label="Font Color" value={color} onChange={(v) => { setColor(v); handleColor(v) }} />
+        <Section title="Fill">
+          <ColorSwatch label="" value={color} onChange={handleColor} />
+        </Section>
 
-        {/* Style */}
-        <div>
-          <SectionLabel>Style</SectionLabel>
+        <Section title="Border" defaultOpen={false}>
+          <ColorSwatch label="" value={borderColor} onChange={handleBorderColor} />
+          <div className="mt-3 flex items-center justify-between gap-2">
+            <span className="text-[11px] text-gray-500">Thickness</span>
+            <div className="flex items-center gap-1 rounded-lg border border-gray-200 px-2 py-1">
+              <input
+                type="number" min={0} max={20} step={1}
+                value={borderWidth}
+                onChange={(e) => handleBorderWidth(Number(e.target.value))}
+                className="w-10 text-right text-[11px] text-gray-700 focus:outline-none"
+              />
+              <span className="text-[10px] text-gray-400">px</span>
+            </div>
+          </div>
+        </Section>
+
+        <Section title="Style">
           <div className="flex gap-2">
             {[
               { icon: <Bold size={13} />,      active: isBold,    handler: handleBold,      label: 'Bold' },
@@ -190,11 +239,9 @@ export const CanvasTextRightPanel: React.FC<Props> = ({ canvas, selected, positi
               </button>
             ))}
           </div>
-        </div>
+        </Section>
 
-        {/* Case */}
-        <div>
-          <SectionLabel>Case</SectionLabel>
+        <Section title="Case">
           <div className="flex gap-2">
             {[
               { id: 'none' as const,      label: 'Aa' },
@@ -213,11 +260,9 @@ export const CanvasTextRightPanel: React.FC<Props> = ({ canvas, selected, positi
               </button>
             ))}
           </div>
-        </div>
+        </Section>
 
-        {/* Alignment */}
-        <div>
-          <SectionLabel>Alignment</SectionLabel>
+        <Section title="Alignment">
           <div className="flex gap-2">
             {[
               { id: 'left' as const,   icon: <AlignLeft size={14} /> },
@@ -236,13 +281,12 @@ export const CanvasTextRightPanel: React.FC<Props> = ({ canvas, selected, positi
               </button>
             ))}
           </div>
-        </div>
+        </Section>
 
-        {/* Line height */}
-        <div>
+        <Section title="Line Height" defaultOpen={false}>
           <div className="mb-2 flex items-center justify-between">
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">Line height</span>
-            <span className="text-[11px] text-gray-500">{lineHeight.toFixed(1)}</span>
+            <span className="text-[11px] text-gray-500">Current</span>
+            <span className="text-[11px] text-gray-700">{lineHeight.toFixed(1)}</span>
           </div>
           <input
             type="range" min={0.8} max={3} step={0.1}
@@ -250,13 +294,12 @@ export const CanvasTextRightPanel: React.FC<Props> = ({ canvas, selected, positi
             onChange={(e) => handleLineHeight(Number(e.target.value))}
             className="w-full accent-blue-500"
           />
-        </div>
+        </Section>
 
-        {/* Letter spacing */}
-        <div>
+        <Section title="Letter Spacing" defaultOpen={false}>
           <div className="mb-2 flex items-center justify-between">
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">Letter spacing</span>
-            <span className="text-[11px] text-gray-500">{letterSpacing}px</span>
+            <span className="text-[11px] text-gray-500">Current</span>
+            <span className="text-[11px] text-gray-700">{letterSpacing}px</span>
           </div>
           <input
             type="range" min={-5} max={20} step={0.5}
@@ -264,7 +307,7 @@ export const CanvasTextRightPanel: React.FC<Props> = ({ canvas, selected, positi
             onChange={(e) => handleLetterSpacing(Number(e.target.value))}
             className="w-full accent-blue-500"
           />
-        </div>
+        </Section>
       </div>
     </aside>
   )

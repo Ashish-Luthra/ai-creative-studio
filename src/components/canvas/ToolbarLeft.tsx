@@ -11,6 +11,7 @@ export type RailTool =
   | 'shapes'
   | 'image'
   | 'text'
+  | 'draw'
   | 'hand'
   | 'settings'
 

@@ -18,17 +18,20 @@ import {
   seedDefaultCreative,
 } from '@/lib/canvas/fabricInit'
 import { CREATIVE_PRESETS, getPresetById, isPresetId } from '@/lib/canvas/presets'
-import { ToolbarLeft, type RailTool } from './ToolbarLeft'
+import { type RailTool } from './ToolbarLeft'
+import { CanvasFloatingToolbar } from './CanvasFloatingToolbar'
 import { OuterLeftNav } from './OuterLeftNav'
 import { CanvasTopHeader } from './CanvasTopHeader'
 import { CanvasTextRightPanel } from './CanvasTextRightPanel'
 import { CanvasShapeRightPanel } from './CanvasShapeRightPanel'
+import { CanvasFrameRightPanel } from './CanvasFrameRightPanel'
+import { FrameActionsToolbar } from './FrameActionsToolbar'
 import { ShapesPanel, type ShapeKind } from './ShapesPanel'
+import { DrawSettingsPanel } from './DrawSettingsPanel'
 import { AgentPill } from './AgentPill'
 import { EmailEditorPanel } from '@/components/email/EmailEditorPanel'
 import { ApprovedImagesPanel } from './ApprovedImagesPanel'
 import { RightStudioPanel } from './RightStudioPanel'
-import { ImageSelectionToolbar } from './ImageSelectionToolbar'
 import { ProjectsAssetsPanel } from './ProjectsAssetsPanel'
 import type { CanvasVariant } from './VariantsPanel'
 import type { PublishResult } from './PublishPanel'
@@ -93,6 +96,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
   const fabricRef = useRef<Canvas | null>(null)
   const restoringRef = useRef(false)
   const [activeTool, setActiveTool] = useState<RailTool | null>(null)
+  const [drawSettings, setDrawSettings] = useState({ color: '#1B51B3', thickness: 4 })
   const [showApprovedImages, setShowApprovedImages] = useState(false)
   const [agentPillVisible, setAgentPillVisible] = useState(false)
   const [generatedPresetIds, setGeneratedPresetIds] = useState<string[]>([])
@@ -305,6 +309,14 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
       })
       c.on('mouse:down', (event) => {
         const target = event.target
+        // Auto-dismiss tool-driven right-side pickers (Shapes / Layout /
+        // Projects / Settings) the moment the user starts interacting with
+        // the canvas. Selection-based panels (text colour, shape colour,
+        // image-selection toolbar) stay because they're driven by
+        // selectedLayer, not activeTool.
+        if (activeToolRef.current && activeToolRef.current !== 'hand') {
+          setActiveTool(null)
+        }
         if (!target) return
         ensureCreativeMetadata(c)
         const creativeId = getCreativeIdFromObject(target)
@@ -377,13 +389,33 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
           moved: false,
         }
       })
+      // Tag every free-drawn stroke as creative-shape so the user can
+      // re-select it later and the colour panel works on it. Strokes are
+      // loose (no creativeId) — they live above the frames at the moment.
+      c.on('path:created', (e: { path?: FabricObject }) => {
+        const p = e.path
+        if (!p) return
+        ;(p as FabricObject & { data?: Record<string, unknown> }).data = {
+          kind: 'creative-shape',
+          creativeId: '',
+          role: 'shape',
+        }
+        p.set({
+          borderColor: '#2563EB',
+          cornerColor: '#2563EB',
+          cornerStrokeColor: '#ffffff',
+          cornerStyle: 'rect',
+          cornerSize: 8,
+          transparentCorners: false,
+        })
+        saveSnapshot()
+      })
       c.on('mouse:dblclick', (event) => {
         const target = event.target
         if (!target) return
         const data = (target as FabricObject & { data?: { kind?: string } }).data
         // Double-click a frame → unlock its sibling image to re-edit (drag/scale
-        // within the clipPath). The image enters edit mode with cropPending: true,
-        // and the existing ImageSelectionToolbar appears.
+        // within the clipPath). The image enters edit mode with cropPending: true.
         if (data?.kind === 'creative-frame') {
           const cid = getCreativeIdFromObject(target)
           if (!cid) return
@@ -563,6 +595,36 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [mode, saveSnapshot, setSelectedLayer])
 
+  // ── Exit Draw mode on Escape or click outside the canvas ──
+  // While in draw mode, fabric intercepts every pointer event on the canvas
+  // itself, so the user can't easily exit without going to another tool.
+  // Listen on the document for clicks anywhere outside the canvas wrapper
+  // (left rail, top header, right panel, page background) and Escape — both
+  // turn off drawing mode and switch the tool back to Cursor so the strokes
+  // become selectable.
+  useEffect(() => {
+    if (mode !== 'canvas' || activeTool !== 'draw') return
+    const exit = () => {
+      const c = fabricRef.current
+      if (c) c.isDrawingMode = false
+      setActiveTool('hand')
+    }
+    const onPointerDown = (e: PointerEvent) => {
+      const container = containerRef.current
+      if (!container) return
+      if (!container.contains(e.target as Node)) exit()
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') exit()
+    }
+    document.addEventListener('pointerdown', onPointerDown, true)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown, true)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [mode, activeTool])
+
   // ── Resize observer ────────────────────────────────────────
   useEffect(() => {
     if (!containerRef.current) return
@@ -682,7 +744,6 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
     if (!canvas) return
     const shouldReplaceAll = window.confirm('Replicate to all sizes will replace all current creatives on canvas. Continue?')
     if (!shouldReplaceAll) return
-    const { copyText, imageUrl } = extractCreativeInputs()
     const canvasWidth = canvas.getWidth()
     const canvasHeight = canvas.getHeight()
     const gap = 24
@@ -715,11 +776,12 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
         const left = outerPadding + col * (cellWidth + gap) + (cellWidth - frameWidth) / 2
         const top = outerPadding + row * (cellHeight + gap) + (cellHeight - frameHeight) / 2
 
-        await seedDefaultCreative(canvas, imageUrl, copyText, preset, {
-          left,
-          top,
-          width: frameWidth,
-          height: frameHeight,
+        // Replicate produces blank frames — the user adds image / text / shapes
+        // per frame afterwards. Seeding default image+copy was the previous
+        // behaviour; intentionally removed.
+        await addBlankCreativeFrame(canvas, {
+          preset,
+          frameBounds: { left, top, width: frameWidth, height: frameHeight },
         })
       }
     } finally {
@@ -733,7 +795,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
     updateCampaignMeta({ activePresetId: selectedPresetId })
     resetHistory()
     saveSnapshot()
-  }, [extractCreativeInputs, generatedKey, resetHistory, saveSnapshot, selectedPresetId, setSelectedLayer, updateCampaignMeta])
+  }, [generatedKey, resetHistory, saveSnapshot, selectedPresetId, setSelectedLayer, updateCampaignMeta])
 
   const handleInsertShape = useCallback(async (kind: ShapeKind) => {
     const canvas = fabricRef.current
@@ -862,10 +924,23 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
     const canvas = fabricRef.current
     if (mode !== 'canvas' || !canvas) return
 
+    // Switching away from Draw turns off free-drawing mode. Fabric stays put
+    // — the strokes the user already laid down remain on canvas.
+    if (tool !== 'draw') {
+      canvas.isDrawingMode = false
+    }
+
     if (tool === 'frame') {
       await handleAddFrame()
     } else if (tool === 'image') {
       setShowApprovedImages(true)
+    } else if (tool === 'draw') {
+      const { PencilBrush } = await import('fabric')
+      const brush = new PencilBrush(canvas)
+      brush.color = drawSettings.color
+      brush.width = drawSettings.thickness
+      canvas.freeDrawingBrush = brush
+      canvas.isDrawingMode = true
     } else if (tool === 'layout') {
       // open right panel only
     } else if (tool === 'projects') {
@@ -991,18 +1066,179 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
     saveSnapshot()
   }, [selectedLayer, saveSnapshot, setSelectedLayer])
 
-  // Resolve the paired creative-image when the user has either the image
-  // (edit mode) or the frame (saved mode) selected. This drives the existing
-  // ImageSelectionToolbar UI without forcing the user into image-edit mode.
+  // Duplicate an entire creative block (frame + image + scrim + text + shapes)
+  // into the nearest vacant space. New creativeId so the copy is independent.
+  // The image clipPath is *deep-cloned* (not just shifted) — fabric v6's
+  // obj.clone(['clipPath']) shares the reference, which previously caused
+  // the original's clip to migrate and the image to disappear after a few
+  // lock/unlock toggles.
+  const handleDuplicateFrame = useCallback(async (frame: FabricObject) => {
+    const canvas = fabricRef.current
+    if (!canvas) return
+    const cid = getCreativeIdFromObject(frame)
+    if (!cid) return
+    const members = getCreativeObjects(canvas, cid)
+    if (members.length === 0) return
+
+    // ── Step 1: find a vacant position ───────────────────────────────────
+    const src = frame.getBoundingRect()
+    const gap = 24
+    const overlaps = (a: { left: number; top: number; width: number; height: number },
+                      b: { left: number; top: number; width: number; height: number }) =>
+      a.left < b.left + b.width && a.left + a.width > b.left &&
+      a.top  < b.top  + b.height && a.top  + a.height > b.top
+
+    const otherFrames = canvas.getObjects().filter((o) => {
+      const d = (o as FabricObject & { data?: { kind?: string } }).data
+      return d?.kind === 'creative-frame' && o !== frame
+    }).map((o) => o.getBoundingRect())
+
+    let candidate = { left: src.left + src.width + gap, top: src.top, width: src.width, height: src.height }
+    const cw = canvas.getWidth()
+    let collisions = 0
+    let rowAttempts = 0
+    while (otherFrames.some((f) => overlaps(candidate, f))) {
+      collisions++
+      if (collisions > 20) break
+      // Move right by the source frame's stride.
+      candidate = { ...candidate, left: candidate.left + src.width + gap }
+      // If we've run off the right edge, wrap to a new row.
+      if (candidate.left + candidate.width > cw) {
+        rowAttempts++
+        if (rowAttempts > 4) break
+        candidate = { left: src.left, top: candidate.top + src.height + gap, width: src.width, height: src.height }
+      }
+    }
+    const dx = candidate.left - src.left
+    const dy = candidate.top - src.top
+
+    // ── Step 2: clone every member, deep-clone clipPath, retag ──────────
+    const newId = `creative-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+    const { Rect } = await import('fabric')
+
+    const isFrameLabel = (o: FabricObject) => {
+      const d = (o as FabricObject & { data?: { kind?: string; moveHandle?: boolean } }).data
+      return d?.kind === 'creative-text' && d?.moveHandle === true
+    }
+
+    const clones: FabricObject[] = []
+    for (const obj of members) {
+      const cloned = await obj.clone(['data'])
+      cloned.set({
+        left: (cloned.left ?? 0) + dx,
+        top: (cloned.top ?? 0) + dy,
+      })
+
+      // Deep-clone clipPath — reconstruct from the original's geometry +
+      // dx/dy. This severs the shared reference that fabric v6 leaves intact
+      // when 'clipPath' is in propertiesToInclude.
+      const origClip = (obj as FabricObject & { clipPath?: { left?: number; top?: number; width?: number; height?: number; rx?: number; ry?: number } }).clipPath
+      if (origClip) {
+        ;(cloned as FabricObject & { clipPath?: object }).clipPath = new Rect({
+          left: (origClip.left ?? 0) + dx,
+          top:  (origClip.top  ?? 0) + dy,
+          width: origClip.width ?? 0,
+          height: origClip.height ?? 0,
+          rx: origClip.rx ?? 0,
+          ry: origClip.ry ?? 0,
+          absolutePositioned: true,
+        })
+      }
+
+      // Retag with the new creativeId so move-block, delete-block, lock and
+      // pairedFrame/pairedImage all resolve to the clone (not the source).
+      const data = (cloned as FabricObject & { data?: Record<string, unknown> }).data
+      if (data && typeof data === 'object') {
+        ;(cloned as FabricObject & { data?: Record<string, unknown> }).data = {
+          ...data,
+          creativeId: newId,
+        }
+      }
+
+      // Frame-label gets " copy" appended so the duplicate is identifiable.
+      if (isFrameLabel(obj)) {
+        const srcText = ((obj as FabricObject & { text?: string }).text ?? '') as string
+        const m = srcText.match(/^(.*?)( copy(?: (\d+))?)?$/)
+        let nextText: string
+        if (m && m[2]) {
+          // Already a copy — increment.
+          const n = m[3] ? Number(m[3]) + 1 : 2
+          nextText = `${m[1]} copy ${n}`
+        } else {
+          nextText = `${srcText} copy`
+        }
+        ;(cloned as FabricObject & { text?: string; initDimensions?: () => void }).text = nextText
+        ;(cloned as FabricObject & { initDimensions?: () => void }).initDimensions?.()
+      }
+
+      clones.push(cloned)
+      canvas.add(cloned)
+    }
+
+    // ── Step 3: activate the duplicated frame ────────────────────────────
+    const newFrame = clones.find(
+      (c) => (c as FabricObject & { data?: { kind?: string } }).data?.kind === 'creative-frame',
+    )
+    if (newFrame) {
+      canvas.setActiveObject(newFrame)
+      setSelectedLayer(newFrame)
+    }
+    canvas.requestRenderAll()
+    saveSnapshot()
+  }, [saveSnapshot, setSelectedLayer])
+
+  // Unlock the framed image so the user can drag/scale it inside the clipPath.
+  // Counterpart to handleSaveImageCrop. Driven from the FrameActionsToolbar.
+  const handleUnlockImage = useCallback(() => {
+    const canvas = fabricRef.current
+    if (!canvas || !selectedLayer) return
+    const cid = getCreativeIdFromObject(selectedLayer)
+    if (!cid) return
+    const image = getCreativeObjects(canvas, cid).find(
+      (o) => (o as FabricObject & { data?: { kind?: string } }).data?.kind === 'creative-image',
+    )
+    if (!image) return
+    unlockCreativeImage(image)
+    const data = (image as FabricObject & { data?: Record<string, unknown> }).data ?? {}
+    ;(image as FabricObject & { data?: Record<string, unknown> }).data = { ...data, cropPending: true }
+    canvas.setActiveObject(image)
+    setSelectedLayer(image)
+    canvas.requestRenderAll()
+  }, [selectedLayer, setSelectedLayer])
+
+  // Resolve the paired creative-image only when the user has the image
+  // itself or its frame selected. Selecting text or shapes inside the same
+  // creative block must NOT trigger the image toolbar — those layers have
+  // their own right-panel UIs (text colour panel, shape colour panel).
   const pairedImage: FabricObject | null = (() => {
     const canvas = fabricRef.current
     if (!canvas || !selectedLayer) return null
     if (selectedLayer.type === 'image') return selectedLayer
+    const selKind = (selectedLayer as FabricObject & { data?: { kind?: string } }).data?.kind
+    if (selKind !== 'creative-frame') return null
     const cid = getCreativeIdFromObject(selectedLayer)
     if (!cid) return null
     return (
       getCreativeObjects(canvas, cid).find(
         (o) => (o as FabricObject & { data?: { kind?: string } }).data?.kind === 'creative-image',
+      ) ?? null
+    )
+  })()
+
+  // Resolve the paired frame for the FrameActionsToolbar — same gate as
+  // pairedImage but returning the frame object so we can pin the toolbar to
+  // its top-right corner.
+  const pairedFrame: FabricObject | null = (() => {
+    const canvas = fabricRef.current
+    if (!canvas || !selectedLayer) return null
+    const selKind = (selectedLayer as FabricObject & { data?: { kind?: string } }).data?.kind
+    if (selKind === 'creative-frame') return selectedLayer
+    if (selectedLayer.type !== 'image' && selKind !== 'creative-image') return null
+    const cid = getCreativeIdFromObject(selectedLayer)
+    if (!cid) return null
+    return (
+      getCreativeObjects(canvas, cid).find(
+        (o) => (o as FabricObject & { data?: { kind?: string } }).data?.kind === 'creative-frame',
       ) ?? null
     )
   })()
@@ -1047,16 +1283,11 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
   // Show FloatToolbar only when a text object is selected
   const isTextSelected =
     selectedLayer?.type === 'textbox' || selectedLayer?.type === 'i-text'
-  // Show the ImageSelectionToolbar whenever the active selection is part of a
-  // creative block that has an image — whether the user picked the image
-  // directly (edit mode) or the frame (saved mode).
-  const isImageSelected = !!pairedImage
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-[#FDFDFD]">
       <div className="flex flex-1 overflow-hidden">
         <OuterLeftNav />
-        {mode === 'canvas' && <ToolbarLeft onToolAction={handleToolAction} />}
 
         {/* ── Canvas surface ───────────────────────────────── */}
         <main className="relative flex flex-1 flex-col overflow-hidden">
@@ -1080,6 +1311,13 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
             className="relative flex-1 overflow-hidden"
             style={{ backgroundColor: '#F5F5F5' }}
           >
+          {mode === 'canvas' && (
+            <CanvasFloatingToolbar
+              activeTool={activeTool}
+              onToolAction={handleToolAction}
+              onReplicateAll={() => { void handleReplicateToAll() }}
+            />
+          )}
           {/* Always in DOM — Fabric owns the wrapper div, removing it causes removeChild errors */}
           <canvas
             ref={canvasElRef}
@@ -1117,6 +1355,22 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
                 />
               ) : activeTool === 'shapes' ? (
                 <ShapesPanel onInsert={(kind) => { void handleInsertShape(kind) }} />
+              ) : activeTool === 'draw' ? (
+                <DrawSettingsPanel
+                  color={drawSettings.color}
+                  thickness={drawSettings.thickness}
+                  onChange={(patch) => {
+                    setDrawSettings((s) => {
+                      const next = { ...s, ...patch }
+                      const c = fabricRef.current
+                      if (c?.freeDrawingBrush) {
+                        if (patch.color !== undefined) c.freeDrawingBrush.color = patch.color
+                        if (patch.thickness !== undefined) c.freeDrawingBrush.width = patch.thickness
+                      }
+                      return next
+                    })
+                  }}
+                />
               ) : (
                 <RightStudioPanel
                   activeTool={activeTool}
@@ -1138,6 +1392,31 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
               canvas={fabricRef.current}
               selected={selectedLayer}
               onCommit={saveSnapshot}
+              onAfterReplace={(next) => setSelectedLayer(next)}
+            />
+          )}
+
+          {mode === 'canvas' && pairedFrame && selectedLayer === pairedFrame && (
+            <CanvasFrameRightPanel
+              canvas={fabricRef.current}
+              frame={pairedFrame}
+              selectedPresetId={selectedPresetId}
+              onPresetChange={(id) => { void handlePresetChange(id) }}
+              onReplicateAll={() => { void handleReplicateToAll() }}
+              onCommit={saveSnapshot}
+            />
+          )}
+
+          {mode === 'canvas' && pairedFrame && (
+            <FrameActionsToolbar
+              canvas={fabricRef.current}
+              frame={pairedFrame}
+              imageLocked={!imageCropPending}
+              onToggleLock={() => {
+                if (imageCropPending) handleSaveImageCrop()
+                else handleUnlockImage()
+              }}
+              onReplicate={() => { void handleDuplicateFrame(pairedFrame) }}
             />
           )}
 
@@ -1148,22 +1427,6 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
               void handleImageSelect(src)
             }}
           />
-
-          {mode === 'canvas' && isImageSelected && selectedLayer && (
-            <ImageSelectionToolbar
-              position={toolbarPos}
-              selectedPresetId={selectedPresetId}
-              onPresetChange={(presetId) => {
-                void handlePresetChange(presetId)
-              }}
-              onOpenMedia={() => setShowApprovedImages(true)}
-              onConvertToAll={() => {
-                void handleReplicateToAll()
-              }}
-              onSaveCrop={handleSaveImageCrop}
-              cropPending={imageCropPending}
-            />
-          )}
 
           {mode === 'canvas' && agentPillVisible && (
             <AgentPill onSubmit={handleAgentSubmit} />
