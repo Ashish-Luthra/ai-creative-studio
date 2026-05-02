@@ -612,6 +612,49 @@ The third pre-existing error (`RightStudioPanel.tsx:21` `'cta'` not in `RailTool
 
 ---
 
+### Session — 2026-05-02 (continued: figma toolbar, draw, frame chrome, fill/border)
+
+**Completed**
+- Replaced the vertical left rail (`ToolbarLeft` mount) with a horizontal **top floating toolbar** (`CanvasFloatingToolbar`) — Cursor / Grid / Frame / Shapes / Image / Text / Draw, divider, then Replicate All. `ToolbarLeft.tsx` kept on disk for rollback.
+- New **Pencil / Draw tool** (`'draw'` RailTool): lazy-imports fabric `PencilBrush`, drives `isDrawingMode`. New `DrawSettingsPanel` right-nav exposes Colour + Thickness in collapsible accordions and live-binds the brush. `path:created` listener tags strokes as `creative-shape` so they're re-selectable. Escape OR pointerdown outside the canvas exits draw mode and snaps `activeTool` back to Cursor.
+- **Shape colour split** in `CanvasShapeRightPanel`: Fill + Border for filled shapes (rect/oval/triangle/star/polygon); single Stroke section for linear shapes (line/arrow). Border colour auto-promotes width to 2px when set on a fill-only shape.
+- **Linear primitives extended**: `LinearHead` now `none / line / triangle / triangle-reversed / circle / diamond`. `buildLinearPath` emits closed sub-paths with `fill = stroke` so triangle/diamond/circle render filled, while line and the open shaft remain stroke-only. `updateLinearShape` rebuilds the path and replaces the fabric Path on thickness/head changes (preserving position/scale/rotation).
+- `CanvasTextRightPanel` Font Color split into **Fill + Border** (stroke colour + thickness). Both Fill / Border default to text-neutral colours; setting border colour with `strokeWidth=0` auto-promotes to 1px.
+- **Frame chrome** (`FrameActionsToolbar`): plain gray icons pinned to the frame's top-right corner — visually peer of the existing `Frame X:Y` label at top-left. Two icons: Lock/Unlock (state-mirroring — closed lock = locked, open lock = unlocked) and Duplicate. Custom Allyvate SVGs in `public/icons` (`lock-open.svg`, `lock-closed.svg`, `save.svg`) inlined as React components in `AllyvateIcons.tsx` so they inherit `currentColor` and share the same gray with lucide icons.
+- **Image default flipped to UNLOCKED** at frame creation (`cropPending: true`, `unlockCreativeImage`) — every image-creation path updated. The Lock icon now correctly mirrors state instead of showing a click-action affordance.
+- **`CanvasFrameRightPanel`** mounts when the frame is the active selection: Ad Specs (ratio-rectangle tile grid), Colour, Arrange (Bring to front / forward / Send backward / to back with Cmd-+]/[ keyboard shortcuts active globally while panel is mounted), Create All Sizes — all collapsible accordions.
+- **Frame Duplicate (per-frame copy)**: replaced the old per-frame "replicate-all" trigger with `handleDuplicateFrame`. Three robustness fixes:
+  - Deep-clones `clipPath` (severs fabric v6's reference-share that was making the original image vanish on lock-toggle).
+  - Vacant-space placement: scans existing frames, walks right then wraps to a new row before placing — never overlaps another frame.
+  - Cloned frame label gets ` copy` suffix; multiple copies increment to `copy 2`, `copy 3`, ...
+- **Removed `ImageSelectionToolbar`** entirely (the "Prompt box / Images / 9:16 / Replicate-all / Saved" pill above images). Save action moved into the top-nav Save button which now uses the new `save.svg` icon.
+- **Replicate All** (top toolbar) now produces blank frames per preset (no seeded image+text+scrim).
+- `mouse:down` on canvas auto-dismisses tool-driven right-side pickers (Shapes / Layout / Projects) so the right side clears as soon as the user starts canvas interaction. Selection-driven panels (text / shape / frame / image-edit) keep their existing selection-driven gating.
+
+**Architectural / design decisions**
+- All custom-icon files live in `public/icons/` and get inlined as React components in `AllyvateIcons.tsx` — no `<img>` tags for icons (so `currentColor` works and they participate in Tailwind text colour utilities).
+- "Click outside the canvas to escape modal-tool state" is now a pattern: implemented for Draw; the same approach can extend to other modal tools.
+- Lock icon semantics = state-mirroring (closed = locked, open = unlocked). Default state = unlocked.
+- Per-frame Duplicate = clone + vacant-space placement + label suffix. Per-canvas Replicate All = preset fan-out with blank frames. The two are explicitly distinct concepts; a single Copy icon on a frame triggers Duplicate (not Replicate All).
+
+**Pre-existing typecheck errors (carried over, not introduced this session)**
+- `src/components/canvas/CanvasEditor.tsx:645` — Fabric `Point` type mismatch.
+- `src/lib/email/canvasConverter.ts:222` — `textAlign` string narrowing.
+
+**Next steps (ordered)**
+1. Verify in user's browser: lock/unlock + label-edit on a duplicated frame work after the deep-clipPath fix. If label double-click still doesn't enter edit mode, escalate to deferring `groupMoveRef.creativeId` to the first `object:moving` event so short clicks don't get hijacked by the moveHandle interception.
+2. Move user-uploaded image data URLs into MinIO so `creative-canvas:dev-session` localStorage stops hitting the 5 MB quota.
+3. Wire `/api/public-images` and `/api/send-test-email` to MinIO/Resend per the doc-block recipes already in those routes.
+4. Migrate canvas-mode campaigns from localStorage to the same Supabase-backed flow Email already uses.
+5. Real drag-and-drop from the Shapes panel (currently click-to-insert).
+6. `handleReplicateToAll` should clone shapes belonging to the source frame into each replicated frame.
+7. Fix the two pre-existing typecheck errors above.
+
+**Blockers / open questions**
+- Preview iframe Fabric init has been stuck for many turns (`<canvas>` stays at `absolute inset-0`, never advancing to the post-init `lower-canvas` pair). Programmatic verification of canvas-level UX has been static-only for the last several turns. Not a code blocker — works in the user's actual browser tab on hard reload.
+
+---
+
 ### Session — 2026-05-01 (social icon replacement)
 
 #### Completed
