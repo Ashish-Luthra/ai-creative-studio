@@ -562,6 +562,56 @@ CREATE TABLE clusters (
 
 ## 11. Session Log
 
+### Session — 2026-05-02 (canvas polish + email export + image library restore)
+
+**Completed**
+- Canvas Text tool: floating-pill experiments removed; settled on the right-side `CanvasTextRightPanel` matching the studio panel pattern.
+- Shared `TextStyleControls` extracted from Email's `FontTab` into `src/components/shared/`; both modes now consume the same Font / Size / Weight / Bold / Italic / Underline / Case / Alignment / Line height / Letter spacing / `ColorSwatch` controls. `ColorSwatch` gained an inline HEX label.
+- Text Case row reordered to **Aa / AA / aa** (Default → Upper → Lower) in both Email FontTab and `CanvasTextRightPanel`. Case-not-changing bug on Ads fixed by calling `Textbox.initDimensions()` after text/font/size mutations so Fabric re-tokenises the glyph run.
+- Google Fonts on canvas: `handleFont` now `await`s `document.fonts.load()` before applying so the browser actually fetches the font file (Fabric renders to `<canvas>`, which never triggers Google Fonts' lazy loading on its own).
+- Empty `RightStudioPanel` pill suppressed for tools with no content (the panel only renders for `layout` and `hand`).
+- New rail icon **Images / Assets** opens the rich `ApprovedImagesPanel` (restored from commit `6b42fd6` after the `6db8751` AdStudio merge had stripped it down). Trash, AI re-categorise (Sparkles), Image DNA tag pills, filename + upload-date metadata, category dropdown, filter chips, brand-logo cloud-source tiles, and localStorage persistence are all back.
+- New **Shapes** rail panel: rectangle / oval / line / arrow / triangle / star / polygon. Click-to-insert is frame-aware (drops at active frame's centre, sized ~45% of the frame, tagged with the frame's `creativeId` so move-block / delete-block / hand-drag include them). New `CanvasShapeRightPanel` shows a single `ColorSwatch` when a `creative-shape` is selected; recolour recurses into Groups (so the arrow's shaft and head update together).
+- Frame-aware text insert: the Text tool now tags the textbox with `{ kind: 'creative-text', creativeId, role: 'text' }` instead of the old `{ zoneId }` shape, so frame drag and frame delete pull the text along with the image and scrim.
+- Keyboard Delete on a frame removes the entire creative block (frame + image + scrim + text + shapes via `getCreativeObjects`).
+- Framed image is **locked after Save** (`selectable: false, evented: false, hasControls: false, hasBorders: false`). Frame becomes the primary click target; double-click a frame to re-enter image-edit mode (image becomes selectable, `cropPending: true`, existing `ImageSelectionToolbar` appears). The `pairedImage` resolver in `CanvasEditor` keeps that toolbar working whether the user has the image (edit) or the frame (saved) selected.
+- `saveSnapshot`'s `localStorage.setItem` wrapped in try/catch with a `console.warn`. Quota errors no longer crash the editor; the real fix (uploading to MinIO and storing URLs instead of data URLs) is flagged as a TODO in code.
+- `/api/analyse-image` 400s on SVGs eliminated: client-side `isAnalysable(src)` gate skips SVG and unknown formats before the fetch fires (Anthropic vision only accepts jpeg/png/gif/webp).
+
+**Email**
+- Top-nav "Your email subject" replaced with a Campaign Name input bound to `emailerName` / `setEmailerName`. Persists via `PUT /api/emailers/{id}` on blur. Subject moved into the new Send-test panel.
+- New `SendTestEmailPanel` opens from the Export menu's 4th option in email mode. Phone-frame iframe preview, Subject (validated empty) and To inputs, Send button. Posts to a stubbed `/api/send-test-email` (validates with Zod, logs the payload, returns 200) whose top-of-file doc-block carries verbatim Resend and Nodemailer swap recipes.
+
+**Shared**
+- New `ExportMenu` component mounted in both `CanvasTopHeader` and the Email top nav. Canvas: PNG / PDF / HTML. Email: PNG / PDF / HTML / Send test email. PNG via Fabric or html2canvas; PDF via jsPDF (lazy-imported); HTML via Blob (canvas wraps PNG in `<img>`, email exports compiled `react-email` HTML).
+- New `/api/public-images` route does a Node `fs` scan of `public/` — replaces the hardcoded `FALLBACK_PUBLIC_IMAGES` list. Top-of-file doc-block has MinIO + Supabase + hybrid swap recipes for the dev team. Empty state and error UI added; no silent fallback to a hardcoded list.
+
+**Architectural / design decisions**
+- All cross-mode UI lives in `src/components/shared/` (`TextStyleControls`, `ExportMenu`). Module-local copies are forbidden — this was the root of the canvas-vs-email colour-picker drift earlier.
+- "Locked image, frame as primary handle" is the canonical UX for placed images. Re-entry via frame double-click; `lockCreativeImage` / `unlockCreativeImage` helpers in `fabricInit.ts`.
+- Floating element-anchored toolbars rejected; canvas right-side panels match the existing studio panel pattern (`absolute right-5 top-20 w-72 …`).
+- Stub-then-swap for external infra: `/api/public-images` (MinIO/Supabase) and `/api/send-test-email` (Resend/Nodemailer) carry verbatim swap recipes in their doc-blocks so the dev team can wire production paths without UI churn.
+- "Distrust the May 1 AdStudio merge" memory entry recorded — commit `6db8751` wholesale-replaced 9 canvas files and silently dropped features. Future sessions should `git log --oneline -- <path>` before extending any of those files.
+
+**Pre-existing typecheck errors (not introduced this session, not fixed)**
+- `src/components/canvas/CanvasEditor.tsx:583` — Fabric `Point` type mismatch.
+- `src/lib/email/canvasConverter.ts:222` — `textAlign` string narrowing.
+The third pre-existing error (`RightStudioPanel.tsx:21` `'cta'` not in `RailTool` union) is now resolved by the panel guard rewrite.
+
+**Next steps (ordered)**
+1. Move user-uploaded image data URLs out of the Fabric snapshot into MinIO so `creative-canvas:dev-session` localStorage stops hitting the 5 MB quota.
+2. Wire `/api/public-images` to MinIO (or the hybrid Supabase-metadata + MinIO-storage layout) per the doc-block recipe; remove dev-only fs scan.
+3. Wire `/api/send-test-email` to Resend (recommended) per the doc-block recipe.
+4. Real drag-and-drop from the Shapes panel to the canvas (currently click-to-insert).
+5. `handleReplicateToAll` should clone shapes belonging to the source frame into each replicated frame.
+6. Migrate canvas-mode campaigns from localStorage to the same Supabase-backed flow Email already uses.
+7. Fix the two pre-existing typecheck errors above.
+
+**Blockers / open questions**
+- None blocking. External infra (MinIO / Supabase / Resend) deferred per user direction; dev work continues against stubs and the local `public/` folder.
+
+---
+
 ### Session — 2026-05-01 (social icon replacement)
 
 #### Completed
