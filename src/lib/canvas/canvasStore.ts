@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import type { Canvas, FabricObject } from 'fabric'
 
-export type CanvasMode = 'canvas' | 'email' | 'assets'
+export type CanvasMode = 'canvas' | 'email' | 'assets' | 'landing-page' | 'case-study'
 
 interface CanvasState {
   mode: CanvasMode

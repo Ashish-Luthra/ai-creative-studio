@@ -22,10 +22,24 @@ const AssetsIcon = (
   </svg>
 )
 
+const PageIcon = (
+  <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="currentColor" className="h-[18px] w-[18px]">
+    <path d="M14,2 L6,2 C4.9,2 4,2.9 4,4 L4,20 C4,21.1 4.9,22 6,22 L18,22 C19.1,22 20,21.1 20,20 L20,8 L14,2 Z M18,20 L6,20 L6,4 L13,4 L13,9 L18,9 L18,20 Z M8,14 L16,14 L16,16 L8,16 L8,14 Z M8,10 L16,10 L16,12 L8,12 L8,10 Z" />
+  </svg>
+)
+
+const CaseStudyIcon = (
+  <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="currentColor" className="h-[18px] w-[18px]">
+    <path d="M19,3 L5,3 C3.9,3 3,3.9 3,5 L3,19 C3,20.1 3.9,21 5,21 L19,21 C20.1,21 21,20.1 21,19 L21,5 C21,3.9 20.1,3 19,3 Z M9,17 L7,17 L7,10 L9,10 L9,17 Z M13,17 L11,17 L11,7 L13,7 L13,17 Z M17,17 L15,17 L15,13 L17,13 L17,17 Z" />
+  </svg>
+)
+
 const ITEMS: { id: CanvasMode; label: string; icon: React.ReactNode }[] = [
-  { id: 'canvas', label: 'Ads',    icon: AdsIcon },
-  { id: 'email',  label: 'Email',  icon: EmailIcon },
-  { id: 'assets', label: 'Assets', icon: AssetsIcon },
+  { id: 'canvas',       label: 'Ads',      icon: AdsIcon },
+  { id: 'email',        label: 'Email',    icon: EmailIcon },
+  { id: 'landing-page', label: 'Page',     icon: PageIcon },
+  { id: 'case-study',   label: 'Case',     icon: CaseStudyIcon },
+  { id: 'assets',       label: 'Assets',   icon: AssetsIcon },
 ]
 
 export const OuterLeftNav: React.FC = () => {

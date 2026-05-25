@@ -33,6 +33,7 @@ import { AgentPill } from './AgentPill'
 import { AllyvateAssistant } from '@/components/ai/AllyvateAssistant'
 import { CanvasAllyDock } from './CanvasAllyDock'
 import { EmailEditorPanel } from '@/components/email/EmailEditorPanel'
+import { PageEditorPanel } from '@/components/page/PageEditorPanel'
 import { ApprovedImagesPanel } from './ApprovedImagesPanel'
 import { RightStudioPanel } from './RightStudioPanel'
 import { ProjectsAssetsPanel } from './ProjectsAssetsPanel'
@@ -1484,6 +1485,10 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
 
           {mode === 'email' && (
             <EmailEditorPanel />
+          )}
+
+          {(mode === 'landing-page' || mode === 'case-study') && (
+            <PageEditorPanel mode={mode} />
           )}
 
           {mode === 'assets' && (
