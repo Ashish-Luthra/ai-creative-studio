@@ -192,7 +192,7 @@ function convertSocial(cb: CanvasBlock): EmailSection {
   const borderWidth = iconStyle === 'filled' ? 0 : 1
 
   // Alignment mapping for table
-  const alignMap = { left: 'left', center: 'center', right: 'right' }
+  const alignMap = { left: 'left', center: 'center', right: 'right' } as const
   const tableAlign = alignMap[iconPosition]
 
   const iconCells = iconsToRender.map(({ key, name, svg }) => {

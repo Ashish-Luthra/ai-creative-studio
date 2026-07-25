@@ -9,7 +9,7 @@ import {
   Save, FolderOpen, ChevronDown as ChevronDownIcon, Check, Loader2, PlusCircle,
   Image as ImageIcon, Eye, EyeOff,
 } from 'lucide-react'
-import type { EmailerMeta } from '@/lib/supabase'
+import type { EmailerMeta } from '@/types/emailer'
 import type { CanvasBlock } from '@/types/canvas'
 import { nanoid } from 'nanoid'
 import { cn } from '@/lib/utils'
@@ -1901,7 +1901,7 @@ export const EmailEditorPanel: React.FC = () => {
     }
   }, [emailerNameInput, buildPayload, saveModalMode, setEmailerName])
 
-  // Load an emailer from Supabase into the canvas
+  // Load a saved emailer into the canvas
   const handleLoadEmailer = useCallback(async (id: string) => {
     setShowEmailerDropdown(false)
     setSaveStatus('saving') // reuse spinner while loading

@@ -1,16 +1,17 @@
 /**
- * local-store.ts — File-based emailer persistence for local development.
+ * local-store.ts — File-based emailer persistence.
  *
- * Used automatically by the API routes when Supabase is not configured
- * (NEXT_PUBLIC_SUPABASE_URL is empty). Stores data in .data/emailers.json
- * at the project root. The .data directory is gitignored.
+ * The demo persistence layer (mirrors the AIDemoAgent JSON-store pattern,
+ * e.g. brand-kit-store). Stores data in .data/emailers.json at the project
+ * root; the .data directory is gitignored. Production path: Postgres (Neon)
+ * behind the Allyvate API layer (ADR 0001 — one Postgres).
  *
  * Server-side only — never import this from client components.
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import type { EmailerRow, EmailerMeta } from './supabase'
+import type { EmailerRow, EmailerMeta } from '@/types/emailer'
 
 const DATA_DIR  = join(process.cwd(), '.data')
 const DATA_FILE = join(DATA_DIR, 'emailers.json')
@@ -40,7 +41,7 @@ function now(): string {
   return new Date().toISOString()
 }
 
-// ── Public API — mirrors the Supabase query shapes used in the API routes ────
+// ── Public API — the query shapes used by the API routes ─────────────────────
 
 /** List all emailers, most recently updated first (metadata only, no blocks). */
 export function localListEmailers(): EmailerMeta[] {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
+import { AI_MODEL } from '@/lib/llm'
 
 export const runtime = 'nodejs'
 import { z } from 'zod'
@@ -42,7 +43,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const response = await client.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: AI_MODEL,
       max_tokens: 512,
       system: SYSTEM_PROMPT,
       messages: [{ role: 'user', content: userPrompt }],

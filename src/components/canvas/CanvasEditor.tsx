@@ -756,7 +756,11 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
     if (!canvas) return
     const w = canvas.getWidth()
     const h = canvas.getHeight()
-    canvas.zoomToPoint({ x: w / 2, y: h / 2 }, zoom)
+    // Fabric v6 requires a real Point instance, not a plain {x,y} literal.
+    void import('fabric').then(({ Point }) => {
+      canvas.zoomToPoint(new Point(w / 2, h / 2), zoom)
+      canvas.requestRenderAll()
+    })
     canvas.requestRenderAll()
   }, [zoom])
 

@@ -8,6 +8,6 @@ interface CanvasPageProps {
 export default async function CanvasPage({ params, searchParams }: CanvasPageProps) {
   const { briefId } = await params
   const { preset } = await searchParams
-  // TODO: validate briefId + gate1Approved from Supabase before rendering
+  // TODO: validate briefId + gate1Approved from the Allyvate API before rendering
   return <CanvasEditorClient briefId={briefId} initialPresetId={preset} />
 }

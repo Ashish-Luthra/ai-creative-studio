@@ -16,23 +16,23 @@
 
 ---
 
-## 1. Tech Stack (Locked -- Do Not Change Without Explicit Instruction)
+## 1. Tech Stack (Aligned to the Allyvate Sales Demo stack — 2026-07-25, explicit user instruction. The AIDemoAgent monorepo CLAUDE.md/ADRs take precedence over this file on any conflict.)
 
 | Layer | Package / Tool | Notes |
 |--------------------|----------------------------------------|-----------------------------------------|
-| Framework | Next.js 15 (App Router) | React Server Components where appropriate |
+| Framework | Next.js 16 (App Router) | Matches AIDemoAgent apps |
 | Language | TypeScript 5.x, strict mode | No JS-only files in src/ |
-| Styling | Tailwind CSS v3 | No inline style tags unless dynamic Fabric.values |
+| Styling | Tailwind CSS v4 | No inline style tags unless dynamic Fabric values |
 | UI Components | shadcn/ui (Radix primitives) | Do not install MUI, Chakra, or AntDesign |
 | Canvas engine | Fabric.js 6.x | Must be loaded client-side only -- use dynamic import |
 | State management | Zustand 5.x | One store per domain -- no monolithic global store |
 | Agent harness | LangGraph (Python) | Exposed via FastAPI -- not inlined in Next.js |
-| AI API | Anthropic Claude API (claude-sonnet-4-20250514) | Brief agent, copy gen, insight gen |
+| AI API | Anthropic Claude API — env `AI_MODEL`, default `claude-sonnet-5` | Never hardcode model ids; import AI_MODEL from src/lib/llm.ts |
 | Image generation | FLUX.1 via Replicate AP@| Background gen only |
 | Image processing | rembg + SAM2 (Python FastAPI) | Background removal, subject masking |
 | Email compiler | react-email (by Resend) | NO BeeFree SDK |
-| Database | Supabase (Postgres + pgvector) | POC vector store -- no Qdrant yet |
-| Storage | Supabase Storage | Prod: S3/GCS later |
+| Persistence | File-based local store (`src/lib/local-store.ts`, `.data/`) | **Supabase REMOVED (2026-07-25).** Production path = Neon Postgres behind the Allyvate API (AIDemoAgent ADR 0001 — one Postgres) |
+| Storage | Local `public/` scan (dev) | Prod: S3-compatible object storage behind the Allyvate API |
 | Export | Puppeteer (server-side) | PNG 2x, JPG, HTML, ZIP |
 | Image compositing | sharp (Node.js) | On api routes only |
 | Figma extraction | Figma REST API + MCP | Optional -- conditional on brand setup |
@@ -184,8 +184,7 @@ ai-creative-studio
 ### 4.4 Environment Variables
 
 - All env vars are defined in `.env.local` (git-ignored) and documented in `.env.example` (committed).
-- Server-side only: `ANTHROPIC_API_KEY` | `SUPABASE_SERVICE_KEY` | `REPLICATE_API_KEY`
-- Client-safe (prefixed `NEXT_PUBLIC_`): `NEXT_PUBLIC_SUPABASE_URL` | `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- Server-side only: `ANTHROPIC_API_KEY` | `AI_PROVIDER` | `AI_MODEL`
 - NEVER expose private keys to the client.
 
 ### 4.5 File Naming

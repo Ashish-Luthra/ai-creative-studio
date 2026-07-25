@@ -3,7 +3,7 @@
  *
  * Control which provider/model is used via environment variables:
  *   AI_PROVIDER = 'anthropic' | 'openai'          (default: 'anthropic')
- *   AI_MODEL    = 'claude-opus-4-5' | 'gpt-4o' …  (default per provider below)
+ *   AI_MODEL    = 'claude-sonnet-5' | 'gpt-4o' …  (default per provider below)
  *
  * Only the server-side (API routes) should import this file.
  */
@@ -33,7 +33,7 @@ export const AI_PROVIDER = ((resolveKey('AI_PROVIDER') ?? 'anthropic')) as LLMPr
 
 export const AI_MODEL: string =
   resolveKey('AI_MODEL') ??
-  (AI_PROVIDER === 'openai' ? 'gpt-4o' : 'claude-opus-4-5')
+  (AI_PROVIDER === 'openai' ? 'gpt-4o' : 'claude-sonnet-5')
 
 // ── Shared types ─────────────────────────────────────────────────────────────
 
