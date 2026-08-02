@@ -3,6 +3,45 @@
 
 ---
 
+## 0.0 THIS REPO IS DOWNSTREAM — read before changing anything
+
+**Set by the user, 2026-08-02.** Two products share one Creative Studio:
+
+| | Repo | What it is |
+|---|---|---|
+| **Upstream — source of truth** | `AIDemoAgent` → `apps/salesdemo-ui` | AI Sales Agent **+** Creative Studio |
+| **Downstream — this repo** | `ai-creative-studio` | Standalone app for creative work |
+
+**Creative Studio changes are made in AIDemoAgent FIRST.** Once the user approves them there, they
+are ported here. Do not make a Creative Studio change in this repo first, and do not port one in
+without that approval — the two will diverge and the next port will conflict.
+
+Non-studio work that is genuinely specific to the standalone app can start here, but say so
+explicitly rather than assuming.
+
+**Porting mechanics** (established by `878393d`, which brought this repo to parity — 292 files):
+
+- This repo deliberately uses **salesdemo-ui's layout** so code ports verbatim rather than being
+  rewritten: `src/studio/**` (canvas/email/page), `src/lib/**` (brand kits, content engine,
+  vertical detection), `src/screens`, `src/ui`, routes under `src/app/**`.
+- Aliases mirrored: `@/*`, `@studio/*`, `@martechos/ui` → `src/ui/index.ts`, `react-router-dom` →
+  `src/lib/router-compat.tsx`.
+- **The one gotcha:** salesdemo keeps routes in `app/`, this repo in `src/app/`. Same number of
+  `../` hops, different landing point — app-route imports must drop the `src/` segment
+  (`../../../src/lib/x` → `../../../lib/x`).
+- **Test runners differ.** This repo is vitest; salesdemo writes some suites with `node:test`.
+  Convert on port (swap the `test` import, drop `.ts` specifiers). `npm test` here = 184 tests.
+- Generated assets are gitignored on both sides (`data/`, `.data/`,
+  `public/{brand-kits,content-images,published}/`), so **this repo starts with an empty corpus** —
+  the brief context API honestly reports `"no signal — defaulted"` until a brand kit is added
+  through the UI.
+
+**Open question, undecided:** the port brought *everything* across, including sales-agent surfaces
+(`/calls`, the Brain push when content is approved). If "standalone creative app" is meant to be
+creative-only, those are candidates to trim. Ask — do not assume either way.
+
+---
+
 ## 0. Project Overview
 
 **Product:**Ï  AI Creative Studio
