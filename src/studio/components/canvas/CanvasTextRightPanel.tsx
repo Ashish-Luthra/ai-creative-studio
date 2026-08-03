@@ -19,8 +19,10 @@ const SYSTEM_FONTS = [
 interface Props {
   canvas: Canvas | null
   selected: FabricObject | null
-  position: { x: number; y: number }
+  position?: { x: number; y: number }
   onCommit: () => void
+  /** Render in-flow inside CanvasRightSidebar instead of floating. */
+  embedded?: boolean
 }
 
 // Collapsible section with chevron — Figma-style accordion. Defaults open.
@@ -42,7 +44,7 @@ const Section: React.FC<{ title: string; defaultOpen?: boolean; children: React.
   )
 }
 
-export const CanvasTextRightPanel: React.FC<Props> = ({ canvas, selected, onCommit }) => {
+export const CanvasTextRightPanel: React.FC<Props> = ({ canvas, selected, onCommit, embedded = false }) => {
   const isText = !!selected && (selected.type === 'textbox' || selected.type === 'i-text')
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const t = (isText ? selected : null) as any
@@ -147,7 +149,9 @@ export const CanvasTextRightPanel: React.FC<Props> = ({ canvas, selected, onComm
   }
 
   return (
-    <aside className="absolute right-5 top-20 z-[60] flex max-h-[calc(100vh-120px)] w-72 flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl">
+    <aside className={embedded
+      ? 'flex w-full flex-col bg-white'
+      : 'absolute right-5 top-20 z-[60] flex max-h-[calc(100vh-120px)] w-72 flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl'}>
       <div className="flex-1 overflow-auto px-4 py-2">
 
         <Section title="Font">

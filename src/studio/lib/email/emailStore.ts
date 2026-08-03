@@ -40,6 +40,17 @@ interface EmailEditorState {
   emailerName: string
   setEmailerName: (name: string) => void
 
+  /**
+   * A saved emailer picked outside the editor (studio home's recent-work
+   * list). The panel consumes it on mount and loads via its own
+   * handleLoadEmailer — the canvas blocks live in panel state, so only the
+   * panel can restore them. In-memory only.
+   */
+  pendingEmailerId: string | null
+  requestOpenEmailer: (id: string) => void
+  /** Atomic read-and-clear, so StrictMode's double mount loads it once. */
+  consumePendingEmailerId: () => string | null
+
   // Selection
   selectedBlockId: string | null
   selectedSectionId: string | null
@@ -149,6 +160,14 @@ export const useEmailStore = create<EmailEditorState>((set, get) => ({
   setSelectedSection: (id) => set({ selectedSectionId: id }),
   setPreviewMode: (mode) => set({ previewMode: mode }),
   setEmailerName: (name) => set({ emailerName: name }),
+
+  pendingEmailerId: null,
+  requestOpenEmailer: (id) => set({ pendingEmailerId: id }),
+  consumePendingEmailerId: () => {
+    const id = get().pendingEmailerId
+    if (id) set({ pendingEmailerId: null })
+    return id
+  },
 
   // ── Sections ───────────────────────────────────────────────────────────────
   addSection: ({ layout, afterSectionId }) => {

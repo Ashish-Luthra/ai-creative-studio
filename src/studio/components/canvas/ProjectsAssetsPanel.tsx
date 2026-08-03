@@ -24,6 +24,12 @@ interface ProjectsAssetsPanelProps {
   onRecentCampaignOpen: (briefId: string, presetId: string) => void
 }
 
+/** updatedAt is ISO now; entries written before the switch stay as they are. */
+const formatUpdatedAt = (value: string) => {
+  const ms = Date.parse(value)
+  return Number.isNaN(ms) ? value : new Date(ms).toLocaleString()
+}
+
 export const ProjectsAssetsPanel: React.FC<ProjectsAssetsPanelProps> = ({
   generatedPresetIds,
   selectedPresetId,
@@ -112,7 +118,7 @@ export const ProjectsAssetsPanel: React.FC<ProjectsAssetsPanelProps> = ({
             Resume latest draft ({campaign.activePresetId || selectedPresetId})
           </button>
           {campaign.updatedAt && (
-            <div className="text-[11px] text-blue-500">Updated: {campaign.updatedAt}</div>
+            <div className="text-[11px] text-blue-500">Updated: {formatUpdatedAt(campaign.updatedAt)}</div>
           )}
         </div>
       )}
@@ -131,7 +137,7 @@ export const ProjectsAssetsPanel: React.FC<ProjectsAssetsPanelProps> = ({
                   className="w-full rounded-md border border-gray-200 px-2 py-1.5 text-left hover:bg-gray-50"
                 >
                   <div className="truncate text-xs font-medium text-gray-800">{item.name}</div>
-                  <div className="truncate text-[11px] text-gray-500">{item.briefId} • {item.updatedAt ?? 'No timestamp'}</div>
+                  <div className="truncate text-[11px] text-gray-500">{item.briefId} • {item.updatedAt ? formatUpdatedAt(item.updatedAt) : 'No timestamp'}</div>
                 </button>
               ))}
             {recentCampaigns.filter((item) => item.briefId !== campaign.briefId).length === 0 && (

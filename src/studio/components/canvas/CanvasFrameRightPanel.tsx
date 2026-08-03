@@ -6,6 +6,7 @@ import type { Canvas, FabricObject } from 'fabric'
 import { cn } from '@studio/lib/utils'
 import { ColorSwatch } from '@studio/components/shared/TextStyleControls'
 import { CREATIVE_PRESETS } from '@studio/lib/canvas/presets'
+import { RatioTile } from './RatioTile'
 
 interface Props {
   canvas: Canvas | null
@@ -14,6 +15,8 @@ interface Props {
   onPresetChange: (presetId: string) => void
   onReplicateAll: () => void
   onCommit: () => void
+  /** Render in-flow inside CanvasRightSidebar instead of floating. */
+  embedded?: boolean
 }
 
 const Section: React.FC<{ title: string; defaultOpen?: boolean; children: React.ReactNode }> = ({
@@ -34,42 +37,8 @@ const Section: React.FC<{ title: string; defaultOpen?: boolean; children: React.
   )
 }
 
-// Tiny ratio-rectangle preview for the Ad specs grid. Width/height of the
-// outer SVG box stays constant; the inner rect shrinks to match the ratio so
-// the user reads the proportions at a glance.
-const RatioTile: React.FC<{ width: number; height: number; selected: boolean; onClick: () => void; label: string }> = ({
-  width, height, selected, onClick, label,
-}) => {
-  const ratio = width / height
-  const boxW = 28
-  const boxH = 28
-  let w = boxW, h = boxH
-  if (ratio >= 1) { h = Math.round(boxH / ratio) }
-  else            { w = Math.round(boxW * ratio) }
-  return (
-    <button
-      onClick={onClick}
-      title={label}
-      className={cn(
-        'flex flex-col items-center gap-1 rounded-lg border px-1.5 py-2 transition-colors',
-        selected
-          ? 'border-blue-400 bg-blue-50 text-blue-600'
-          : 'border-gray-200 text-gray-700 hover:border-blue-300 hover:bg-blue-50',
-      )}
-    >
-      <span className="flex h-7 w-7 items-center justify-center">
-        <span
-          className={cn('block rounded-[2px] border', selected ? 'border-blue-500' : 'border-gray-400')}
-          style={{ width: w, height: h }}
-        />
-      </span>
-      <span className="text-[9px] font-medium leading-none">{label}</span>
-    </button>
-  )
-}
-
 export const CanvasFrameRightPanel: React.FC<Props> = ({
-  canvas, frame, selectedPresetId, onPresetChange, onReplicateAll, onCommit,
+  canvas, frame, selectedPresetId, onPresetChange, onReplicateAll, onCommit, embedded = false,
 }) => {
   const [color, setColor] = useState('#FFFFFF')
 
@@ -89,7 +58,9 @@ export const CanvasFrameRightPanel: React.FC<Props> = ({
   }
 
   return (
-    <aside className="absolute right-5 top-20 z-[60] flex max-h-[calc(100vh-120px)] w-72 flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl">
+    <aside className={embedded
+      ? 'flex w-full flex-col bg-white'
+      : 'absolute right-5 top-20 z-[60] flex max-h-[calc(100vh-120px)] w-72 flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl'}>
       <div className="flex-1 overflow-auto px-4 py-2">
 
         <Section title="Ad Specs">

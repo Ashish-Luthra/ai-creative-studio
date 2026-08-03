@@ -19,6 +19,8 @@ export interface CanvasTopHeaderProps {
   recentCampaigns: CampaignMetaLite[]
   onOpenRecent: (briefId: string) => void
   onSave?: () => void | Promise<void>
+  /** Opens (or reopens) the brief agent — the pill it replaces is gone. */
+  onAgentClick?: () => void
   onPublishClick?: () => void
   onPreview?: () => void
   onExport?: (format: ExportFormat) => void | Promise<void>
@@ -31,6 +33,7 @@ export const CanvasTopHeader: React.FC<CanvasTopHeaderProps> = ({
   recentCampaigns,
   onOpenRecent,
   onSave,
+  onAgentClick,
   onPublishClick,
   onPreview,
   onExport,
@@ -117,6 +120,17 @@ export const CanvasTopHeader: React.FC<CanvasTopHeaderProps> = ({
 
       {/* Spacer */}
       <div className="flex-1" />
+
+      {/* Agent — the entry into the brief flow now that the canvas pill is gone */}
+      {onAgentClick && (
+        <button
+          onClick={onAgentClick}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-2.5 py-1 text-[11px] font-medium text-gray-700 transition-colors hover:border-gray-300 hover:text-gray-900"
+        >
+          <span className="text-[10px] font-black">✦</span>
+          Agent
+        </button>
+      )}
 
       {/* Save */}
       <button

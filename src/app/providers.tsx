@@ -68,7 +68,8 @@ function AppShell({ children }: { children: ReactNode }) {
         id: 'studio',
         label: 'Creative Studio',
         icon: LayoutPanelLeft,
-        route: '/studio/ads',
+        // The agent-first home screen, not a surface — the sub-items carry those.
+        route: '/studio',
         // Icons mirror the studio's own mode rail so the sub-items stay
         // recognisable once the nav collapses to icons only.
         children: [
@@ -90,7 +91,7 @@ function AppShell({ children }: { children: ReactNode }) {
       : pathname.startsWith('/studio/')
         ? `studio-${pathname.split('/')[2] ?? 'ads'}`
         : pathname.startsWith('/studio')
-          ? 'studio-ads'
+          ? 'studio' // bare /studio = the home screen; highlight the parent
           : 'brand-center';
 
   // Clear the React Query cache whenever the logged-in user changes so that

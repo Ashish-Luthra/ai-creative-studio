@@ -33,7 +33,10 @@ async function saveScreenshots(domain: string, mobile: Buffer, desktop: Buffer):
   await fs.mkdir(dir, { recursive: true });
   await fs.writeFile(path.join(dir, 'mobile.jpg'), mobile);
   await fs.writeFile(path.join(dir, 'desktop.jpg'), desktop);
-  return { mobile: `/brand-kits/${domain}/mobile.jpg`, desktop: `/brand-kits/${domain}/desktop.jpg` };
+  return {
+    mobile: `/api/brand-kit/asset/${domain}/mobile.jpg`,
+    desktop: `/api/brand-kit/asset/${domain}/desktop.jpg`,
+  };
 }
 
 /**
@@ -69,7 +72,7 @@ async function localizeLogo(src: string | null | undefined, domain: string, vari
     const dir = path.join(process.cwd(), 'public', 'brand-kits', domain);
     await fs.mkdir(dir, { recursive: true });
     await fs.writeFile(path.join(dir, `logo-${variant}.${ext}`), buf);
-    return `/brand-kits/${domain}/logo-${variant}.${ext}`;
+    return `/api/brand-kit/asset/${domain}/logo-${variant}.${ext}`;
   } catch {
     return src;
   }

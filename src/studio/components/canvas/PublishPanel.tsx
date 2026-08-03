@@ -32,7 +32,8 @@ export const PublishPanel: React.FC<PublishPanelProps> = ({ onPublish, onClose }
   const [result, setResult] = useState<PublishResult | null>(null)
 
   return (
-    <aside className="absolute right-5 top-20 z-50 w-80 rounded-2xl border border-gray-200 bg-white/95 p-4 shadow-[0_10px_24px_rgba(0,0,0,0.10)] backdrop-blur-sm">
+    // right-[304px]: clear of the permanent 288px controls sidebar.
+    <aside className="absolute right-[304px] top-20 z-50 w-80 rounded-2xl border border-gray-200 bg-white/95 p-4 shadow-[0_10px_24px_rgba(0,0,0,0.10)] backdrop-blur-sm">
       <div className="mb-2 flex items-center justify-between">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">Publish</h3>
         {onClose && (

@@ -28,14 +28,12 @@ import { CanvasImageRightPanel } from './CanvasImageRightPanel'
 import { FrameActionsToolbar } from './FrameActionsToolbar'
 import { ShapesPanel, type ShapeKind } from './ShapesPanel'
 import { DrawSettingsPanel } from './DrawSettingsPanel'
-import { AgentPill } from './AgentPill'
-import { AllyvateAssistant } from '@studio/components/ai/AllyvateAssistant'
-import { CanvasAllyDock } from './CanvasAllyDock'
+import { AllyvateAssistant, type AllyContext } from '@studio/components/ai/AllyvateAssistant'
+import { CanvasRightSidebar, SidebarSection, SidebarSelectionLabel } from './CanvasRightSidebar'
 import { EmailEditorPanel } from '@studio/components/email/EmailEditorPanel'
 import { PageEditorPanel } from '@studio/components/page/PageEditorPanel'
 import { ApprovedImagesPanel } from './ApprovedImagesPanel'
 import { RightStudioPanel } from './RightStudioPanel'
-import { ProjectsAssetsPanel } from './ProjectsAssetsPanel'
 import type { CanvasVariant } from './VariantsPanel'
 import { PublishPanel, type PublishResult as LivePublishResult, type PublishPlatform } from './PublishPanel'
 import { VariantsPanel } from './VariantsPanel'
@@ -111,19 +109,20 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
   const fabricRef = useRef<Canvas | null>(null)
   const restoringRef = useRef(false)
   const [activeTool, setActiveTool] = useState<RailTool | null>(null)
+  /** Which persistent right-sidebar section is open (accordion). */
+  const [openSection, setOpenSection] = useState<'design' | 'shapes' | 'draw' | null>('design')
   const [drawSettings, setDrawSettings] = useState({ color: '#1B51B3', thickness: 4 })
   const [showApprovedImages, setShowApprovedImages] = useState(false)
-  const [agentPillVisible, setAgentPillVisible] = useState(false)
-  // The pill is now always shown in canvas mode (agentic entry point); the
-  // selection-driven visibility state stays for the setter call sites.
-  void agentPillVisible
   const [allyVisible, setAllyVisible] = useState(false)
+  const [allyContext, setAllyContext] = useState<AllyContext>('text')
   const [allyAnchorX, setAllyAnchorX] = useState(0)
   const [allyAnchorY, setAllyAnchorY] = useState(0)
   const [allyTarget, setAllyTarget] = useState<FabricObject | null>(null)
   const [allyExpandedPos, setAllyExpandedPos] = useState<{ left: number; top: number } | null>(null)
   const [frameHoverRect, setFrameHoverRect] = useState<{ left: number; top: number; width: number; height: number } | null>(null)
+  // Read by the retired ProjectsAssetsPanel; the persistence side still matters.
   const [generatedPresetIds, setGeneratedPresetIds] = useState<string[]>([])
+  void generatedPresetIds
   const [variants, setVariants] = useState<CanvasVariant[]>([])
   const [publishOpen, setPublishOpen] = useState(false)
   const briefSpecsRef = useRef<Map<string, BriefSpecClient>>(new Map())
@@ -168,6 +167,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
   } = useCanvasStore()
 
   const [toolbarPos, setToolbarPos] = useState({ x: 0, y: 0 })
+  void toolbarPos // FloatToolbar leftover; syncPos still feeds it
   const [tbState, setTbState] = useState<TbState>(DEFAULT_TB)
   const tbStateRef = useRef<TbState>(DEFAULT_TB)
   tbStateRef.current = tbState
@@ -226,7 +226,9 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
     const next: CampaignMeta = {
       ...campaign,
       ...patch,
-      updatedAt: new Date().toLocaleString(),
+      // ISO, not toLocaleString(): "2/8/2026" round-trips through Date.parse
+      // as the wrong month on d/m/y machines. Display sites format it.
+      updatedAt: new Date().toISOString(),
     }
     setCampaign(next)
     localStorage.setItem(campaignKey, JSON.stringify(next))
@@ -296,6 +298,13 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
     }
   }, [selectedLayer, saveSnapshot])
 
+  // The bottom toolbar's tool buttons pop their sidebar section open.
+  useEffect(() => {
+    if (activeTool === 'shapes') setOpenSection('shapes')
+    else if (activeTool === 'draw') setOpenSection('draw')
+    else if (activeTool === 'layout') setOpenSection('design')
+  }, [activeTool])
+
   const isTextLikeObject = useCallback((obj: FabricObject | null | undefined) => {
     if (!obj) return false
     if (obj.type === 'textbox' || obj.type === 'i-text') return true
@@ -338,17 +347,20 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
         height: h,
         onSelect: (obj) => {
           setSelectedLayer(obj)
-          setAgentPillVisible(isTextLikeObject(obj))
           if (obj) { syncPos(obj); syncToolbar(obj) }
 
           const objData = (obj as FabricObject & { data?: { kind?: string; creativeId?: string } } | null)?.data
-          const isTextOnFrame =
+          // Ally rides the selection: clicking a text or an image summons the
+          // collapsed pill next to it (frames and shapes stay quiet).
+          const isImageObj =
             !!obj &&
-            obj.type === 'textbox' &&
-            objData?.kind === 'creative-text' &&
-            !!objData?.creativeId
+            objData?.kind !== 'creative-frame' &&
+            objData?.kind !== 'creative-shape' &&
+            (obj.type === 'image' || objData?.kind === 'creative-image')
+          const isAllyTarget = isTextLikeObject(obj) || isImageObj
 
-          if (isTextOnFrame && obj) {
+          if (isAllyTarget && obj) {
+            setAllyContext(isImageObj ? 'image' : 'text')
             const containerRect = containerRef.current?.getBoundingClientRect()
             const tbRect = obj.getBoundingRect()
             // Find the enclosing frame to position the expanded card relative to.
@@ -552,7 +564,15 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
           const image = getCreativeObjects(c, cid).find(
             (o) => (o as FabricObject & { data?: { kind?: string } }).data?.kind === 'creative-image',
           )
-          if (!image) return
+          // Blank frame (no image yet) → open the picker to insert one. The
+          // frame stays selected so replaceOrAddImageLayer targets it.
+          if (!image) {
+            c.setActiveObject(target)
+            setSelectedLayer(target)
+            syncPos(target)
+            setShowApprovedImages(true)
+            return
+          }
           unlockCreativeImage(image)
           const imgData = (image as FabricObject & { data?: Record<string, unknown> }).data ?? {}
           ;(image as FabricObject & { data?: Record<string, unknown> }).data = {
@@ -626,7 +646,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
         const initialCampaign: CampaignMeta = {
           briefId,
           name: 'Untitled',
-          updatedAt: new Date().toLocaleString(),
+          updatedAt: new Date().toISOString(),
           activePresetId: resolvedPresetId,
         }
         setCampaign(initialCampaign)
@@ -840,18 +860,17 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
     }
   }, [mode, selectedLayer, setSelectedLayer])
 
-  useEffect(() => {
-    if (mode !== 'canvas') {
-      setAgentPillVisible(false)
-    }
-  }, [mode])
 
   /**
    * The pill opens the brief workspace rather than firing a one-shot brief.
    */
   const handleAgentSubmit = useCallback((cmd: string) => {
     setPublishOpen(false)
-    const fresh = !qualifySession || qualifySession.dismissed
+    // Read through the store: the pending-intent consume effect runs in the
+    // same commit as hydrate, so the subscribed `qualifySession` closure can
+    // still be null when a stored session was just restored.
+    const live = useBriefStore.getState().session
+    const fresh = !live || live.dismissed
     if (fresh) startQualify({ briefId, intent: cmd })
 
     // The FIRST brief has to be asset-checked too. Checking only follow-ups is
@@ -861,7 +880,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
       return
     }
     if (!fresh) addQualifyMessage({ from: 'user', body: cmd })
-  }, [addQualifyMessage, briefId, qualifySession, startQualify])
+  }, [addQualifyMessage, briefId, startQualify])
 
   /** Live publish: render the canvas @2x and hand it to the connector route. */
   const handleLivePublish = useCallback(async (args: { platform: PublishPlatform; placement: string; caption: string }): Promise<LivePublishResult> => {
@@ -1111,24 +1130,32 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
   }, [addQualifyMessage, applyGeneratedCopy, dockQualify, handleBriefSpecs, router, setAssetType, setQualifyStatus])
   handleQualifyChatRef.current = handleQualifyChat
 
+  // An intent typed on the studio home page rides in on the store and goes
+  // through the real submit path (asset check included). Declared after the
+  // ref assignment above so a mismatched first brief can reach
+  // handleQualifyChat. consumePendingIntent is atomic, so StrictMode's double
+  // mount and dep churn replay nothing.
+  useEffect(() => {
+    const intent = useBriefStore.getState().consumePendingIntent()
+    if (intent) handleAgentSubmit(intent)
+  }, [handleAgentSubmit])
 
-  const openAllyFromDock = useCallback(() => {
-    const containerRect = containerRef.current?.getBoundingClientRect()
-    if (containerRect) {
-      setAllyAnchorX(containerRect.left + containerRect.width / 2)
-      setAllyAnchorY(containerRect.bottom - 80)
-    }
-    setAllyTarget(null)
-    setAllyVisible(true)
-  }, [])
+  /** Reopen (or start) the brief flow from the header's Agent button. */
+  const handleAgentOpen = useCallback(() => {
+    setPublishOpen(false)
+    const live = useBriefStore.getState().session
+    if (live) setQualifyDismissed(false)
+    else startQualify({ briefId, intent: '' })
+  }, [briefId, setQualifyDismissed, startQualify])
 
   const handleAllyInsert = useCallback((text: string) => {
-    if (!allyTarget) return
+    // Insert only rewrites text targets — an image selection has no text slot.
+    if (!allyTarget || !isTextLikeObject(allyTarget)) return
     const tb = allyTarget as FabricObject & { set?: (k: string, v: unknown) => void }
     tb.set?.('text', text)
     fabricRef.current?.requestRenderAll()
     saveSnapshot()
-  }, [allyTarget, saveSnapshot])
+  }, [allyTarget, isTextLikeObject, saveSnapshot])
 
   const handleCanvasExport = useCallback(() => {
     const canvas = fabricRef.current
@@ -1762,6 +1789,9 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
   const isTextSelected =
     selectedLayer?.type === 'textbox' || selectedLayer?.type === 'i-text'
 
+  const isShapeSelected =
+    (selectedLayer as (FabricObject & { data?: { kind?: string } }) | null)?.data?.kind === 'creative-shape'
+
   // Selected image (loose or frame-bound) — shows the lightweight Arrange panel.
   // Excludes shapes (which already have their own panel) and frames (Frame panel).
   const isImageSelected = (() => {
@@ -1795,6 +1825,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
                 window.location.href = `/studio/${nextBriefId}/canvas?preset=${selectedPresetId}`
               }}
               onExport={handleCanvasMultiExport}
+              onAgentClick={handleAgentOpen}
               onPublishClick={() => { setPublishOpen((v) => !v); setQualifyDismissed(true) }}
             />
           )}
@@ -1849,26 +1880,85 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
             />
           )}
 
+          {/* ── The single right control bar: selection controls on top,
+                 then the persistent Design / Shapes / Draw sections. ── */}
           {mode === 'canvas' && (
-            <>
-              {activeTool === 'projects' ? (
-                <ProjectsAssetsPanel
-                  generatedPresetIds={generatedPresetIds}
+            <CanvasRightSidebar>
+              {isTextSelected && (
+                <>
+                  <SidebarSelectionLabel>Text selected</SidebarSelectionLabel>
+                  <CanvasTextRightPanel
+                    embedded
+                    canvas={fabricRef.current}
+                    selected={selectedLayer}
+                    onCommit={saveSnapshot}
+                  />
+                </>
+              )}
+              {isShapeSelected && (
+                <>
+                  <SidebarSelectionLabel>Shape selected</SidebarSelectionLabel>
+                  <CanvasShapeRightPanel
+                    embedded
+                    canvas={fabricRef.current}
+                    selected={selectedLayer}
+                    onCommit={saveSnapshot}
+                    onAfterReplace={(next) => setSelectedLayer(next)}
+                  />
+                </>
+              )}
+              {pairedFrame && selectedLayer === pairedFrame && (
+                <>
+                  <SidebarSelectionLabel>Frame selected</SidebarSelectionLabel>
+                  <CanvasFrameRightPanel
+                    embedded
+                    canvas={fabricRef.current}
+                    frame={pairedFrame}
+                    selectedPresetId={selectedPresetId}
+                    onPresetChange={(id) => { void handlePresetChange(id) }}
+                    onReplicateAll={() => { void handleReplicateToAll() }}
+                    onCommit={saveSnapshot}
+                  />
+                </>
+              )}
+              {isImageSelected && (
+                <>
+                  <SidebarSelectionLabel>Image selected</SidebarSelectionLabel>
+                  <CanvasImageRightPanel
+                    embedded
+                    canvas={fabricRef.current}
+                    onCommit={saveSnapshot}
+                  />
+                </>
+              )}
+              <SidebarSection
+                title="Design"
+                open={openSection === 'design'}
+                onToggle={() => setOpenSection((s) => (s === 'design' ? null : 'design'))}
+              >
+                <RightStudioPanel
+                  embedded
+                  activeTool="layout"
                   selectedPresetId={selectedPresetId}
-                  campaign={campaign}
-                  recentCampaigns={recentCampaigns}
-                  onCampaignRename={(nextName) => updateCampaignMeta({ name: nextName })}
-                  onPresetOpen={(presetId) => {
-                    void handlePresetChange(presetId)
-                  }}
-                  onRecentCampaignOpen={(nextBriefId, presetId) => {
-                    window.location.href = `/studio/${nextBriefId}/canvas?preset=${presetId}`
-                  }}
+                  onPresetChange={handlePresetChange}
+                  onAddFrame={() => { void handleAddFrame() }}
+                  onConvertToAll={() => { void handleReplicateToAll() }}
                 />
-              ) : activeTool === 'shapes' ? (
-                <ShapesPanel onInsert={(kind) => { void handleInsertShape(kind) }} />
-              ) : activeTool === 'draw' ? (
+              </SidebarSection>
+              <SidebarSection
+                title="Shapes"
+                open={openSection === 'shapes'}
+                onToggle={() => setOpenSection((s) => (s === 'shapes' ? null : 'shapes'))}
+              >
+                <ShapesPanel embedded onInsert={(kind) => { void handleInsertShape(kind) }} />
+              </SidebarSection>
+              <SidebarSection
+                title="Draw"
+                open={openSection === 'draw'}
+                onToggle={() => setOpenSection((s) => (s === 'draw' ? null : 'draw'))}
+              >
                 <DrawSettingsPanel
+                  embedded
                   color={drawSettings.color}
                   thickness={drawSettings.thickness}
                   onChange={(patch) => {
@@ -1883,40 +1973,8 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
                     })
                   }}
                 />
-              ) : (
-                <RightStudioPanel
-                  activeTool={activeTool}
-                  selectedPresetId={selectedPresetId}
-                  onPresetChange={handlePresetChange}
-                  onAddFrame={() => {
-                    void handleAddFrame()
-                  }}
-                  onConvertToAll={() => {
-                    void handleReplicateToAll()
-                  }}
-                />
-              )}
-            </>
-          )}
-
-          {mode === 'canvas' && (
-            <CanvasShapeRightPanel
-              canvas={fabricRef.current}
-              selected={selectedLayer}
-              onCommit={saveSnapshot}
-              onAfterReplace={(next) => setSelectedLayer(next)}
-            />
-          )}
-
-          {mode === 'canvas' && pairedFrame && selectedLayer === pairedFrame && (
-            <CanvasFrameRightPanel
-              canvas={fabricRef.current}
-              frame={pairedFrame}
-              selectedPresetId={selectedPresetId}
-              onPresetChange={(id) => { void handlePresetChange(id) }}
-              onReplicateAll={() => { void handleReplicateToAll() }}
-              onCommit={saveSnapshot}
-            />
+              </SidebarSection>
+            </CanvasRightSidebar>
           )}
 
           {mode === 'canvas' && pairedFrame && (
@@ -1940,11 +1998,6 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
             }}
           />
 
-          {mode === 'canvas' && !(qualifyActive && !qualifySession?.docked) && (
-            <AgentPill onSubmit={handleAgentSubmit} disabled={qualifySession?.status === 'generating'} placeholder="Describe your creative — I'll design on-brand options…" />
-          )}
-
-
           {/* The brief follows the work: once it routes a landing-page request
               to the page builder, the conversation has to be reachable there
               too, or the user loses the thread they were iterating on. */}
@@ -1952,6 +2005,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
             <BriefWorkspace
               onGenerate={(payload) => { void handleQualifyGenerate(payload) }}
               onChat={(text) => { void handleQualifyChat(text) }}
+              dockOffset={mode === 'canvas'}
             />
           )}
 
@@ -1968,39 +2022,19 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ briefId = 'dev-sessi
             />
           )}
 
+          {/* Ally appears only when a text or image is clicked, as a collapsed
+              pill next to the selection; it expands from there. */}
           {mode === 'canvas' && (
-            <>
-              <AllyvateAssistant
-                visible={allyVisible}
-                context="text"
-                anchorX={allyAnchorX}
-                anchorY={allyAnchorY}
-                expandedSide="left"
-                expandedPosition={allyExpandedPos}
-                seedText={(allyTarget as (FabricObject & { text?: string }) | null)?.text ?? ''}
-                onClose={() => { setAllyVisible(false); setAllyTarget(null); setAllyExpandedPos(null) }}
-                onInsert={handleAllyInsert}
-              />
-              <CanvasAllyDock
-                visible={!allyVisible}
-                onClick={openAllyFromDock}
-              />
-            </>
-          )}
-
-          {mode === 'canvas' && isTextSelected && (
-            <CanvasTextRightPanel
-              canvas={fabricRef.current}
-              selected={selectedLayer}
-              position={toolbarPos}
-              onCommit={saveSnapshot}
-            />
-          )}
-
-          {mode === 'canvas' && isImageSelected && (
-            <CanvasImageRightPanel
-              canvas={fabricRef.current}
-              onCommit={saveSnapshot}
+            <AllyvateAssistant
+              visible={allyVisible}
+              context={allyContext}
+              anchorX={allyAnchorX}
+              anchorY={allyAnchorY}
+              expandedSide="left"
+              expandedPosition={allyExpandedPos}
+              seedText={(allyTarget as (FabricObject & { text?: string }) | null)?.text ?? ''}
+              onClose={() => { setAllyVisible(false); setAllyTarget(null); setAllyExpandedPos(null) }}
+              onInsert={handleAllyInsert}
             />
           )}
 

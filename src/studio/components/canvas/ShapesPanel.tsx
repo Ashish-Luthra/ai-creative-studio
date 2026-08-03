@@ -4,6 +4,8 @@ export type ShapeKind = 'rectangle' | 'oval' | 'line' | 'arrow' | 'triangle' | '
 
 interface ShapesPanelProps {
   onInsert: (kind: ShapeKind) => void
+  /** Render in-flow inside CanvasRightSidebar instead of floating. */
+  embedded?: boolean
 }
 
 const TILES: { kind: ShapeKind; label: string; svg: React.ReactNode }[] = [
@@ -57,9 +59,11 @@ const TILES: { kind: ShapeKind; label: string; svg: React.ReactNode }[] = [
   },
 ]
 
-export const ShapesPanel: React.FC<ShapesPanelProps> = ({ onInsert }) => (
-  <aside className="absolute right-5 top-20 z-50 w-72 rounded-2xl border border-gray-200 bg-white/95 p-4 shadow-[0_10px_24px_rgba(0,0,0,0.10)] backdrop-blur-sm">
-    <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">Shapes</h3>
+export const ShapesPanel: React.FC<ShapesPanelProps> = ({ onInsert, embedded = false }) => (
+  <aside className={embedded
+    ? 'w-full bg-white px-3 py-1'
+    : 'absolute right-5 top-20 z-50 w-72 rounded-2xl border border-gray-200 bg-white/95 p-4 shadow-[0_10px_24px_rgba(0,0,0,0.10)] backdrop-blur-sm'}>
+    {!embedded && <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">Shapes</h3>}
     <div className="grid grid-cols-3 gap-2">
       {TILES.map(({ kind, label, svg }) => (
         <button

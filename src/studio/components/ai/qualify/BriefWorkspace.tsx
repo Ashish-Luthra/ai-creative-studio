@@ -39,10 +39,13 @@ export interface QualifyPayload {
 export function BriefWorkspace({
   onGenerate,
   onChat,
+  dockOffset = false,
 }: {
   onGenerate: (payload: QualifyPayload) => void;
   /** Free-form turn once a draft exists (refinement, or a different asset). */
   onChat: (text: string) => void;
+  /** Shift the docked panel left of the ads canvas's permanent controls sidebar. */
+  dockOffset?: boolean;
 }) {
   const session = useBriefStore((s) => s.session);
   const setContext = useBriefStore((s) => s.setContext);
@@ -330,7 +333,7 @@ export function BriefWorkspace({
   // ── Docked: right-hand rail for iterating on a visible draft ───────────────
   if (docked) {
     return (
-      <div className="absolute right-5 top-20 z-[95] flex max-h-[70vh] w-80 flex-col gap-3 rounded-2xl border border-gray-200 bg-white p-4 shadow-2xl">
+      <div className={`absolute ${dockOffset ? 'right-[304px]' : 'right-5'} top-20 z-[95] flex max-h-[70vh] w-80 flex-col gap-3 rounded-2xl border border-gray-200 bg-white p-4 shadow-2xl`}>
         {header}
         <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">{transcript}</div>
         {composer}

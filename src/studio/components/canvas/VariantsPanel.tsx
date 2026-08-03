@@ -24,7 +24,8 @@ export const VariantsPanel: React.FC<VariantsPanelProps> = ({
   onExport,
 }) => {
   return (
-    <aside className="absolute right-5 top-20 z-50 w-80 rounded-2xl border border-gray-200 bg-white/95 p-4 shadow-[0_10px_24px_rgba(0,0,0,0.10)] backdrop-blur-sm">
+    // right-[304px]: clear of the permanent 288px controls sidebar.
+    <aside className="absolute right-[304px] top-20 z-50 w-80 rounded-2xl border border-gray-200 bg-white/95 p-4 shadow-[0_10px_24px_rgba(0,0,0,0.10)] backdrop-blur-sm">
       <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">Variants</h3>
       <p className="mb-3 text-sm text-gray-600">Generate, compare, and apply creative variants.</p>
       <button

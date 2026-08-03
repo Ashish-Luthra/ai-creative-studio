@@ -131,7 +131,7 @@ export async function downloadFontFiles(
         family: decl.family,
         weight: decl.weight,
         style: decl.style,
-        file: `/brand-kits/${domain}/fonts/${filename}`,
+        file: `/api/brand-kit/asset/${domain}/fonts/${filename}`,
         format: decl.format,
       });
     } catch {

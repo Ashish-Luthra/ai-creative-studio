@@ -9,6 +9,8 @@ interface Props {
   color: string
   thickness: number
   onChange: (patch: { color?: string; thickness?: number }) => void
+  /** Render in-flow inside CanvasRightSidebar instead of floating. */
+  embedded?: boolean
 }
 
 const Section: React.FC<{ title: string; defaultOpen?: boolean; children: React.ReactNode }> = ({
@@ -29,10 +31,12 @@ const Section: React.FC<{ title: string; defaultOpen?: boolean; children: React.
   )
 }
 
-export const DrawSettingsPanel: React.FC<Props> = ({ color, thickness, onChange }) => (
-  <aside className="absolute right-5 top-20 z-[60] w-72 rounded-2xl border border-gray-200 bg-white shadow-xl">
+export const DrawSettingsPanel: React.FC<Props> = ({ color, thickness, onChange, embedded = false }) => (
+  <aside className={embedded
+    ? 'w-full bg-white'
+    : 'absolute right-5 top-20 z-[60] w-72 rounded-2xl border border-gray-200 bg-white shadow-xl'}>
     <div className="px-4 py-2">
-      <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">Pencil</h3>
+      {!embedded && <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">Pencil</h3>}
       <Section title="Colour">
         <ColorSwatch label="" value={color} onChange={(v) => onChange({ color: v })} />
       </Section>

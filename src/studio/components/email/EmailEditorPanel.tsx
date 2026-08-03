@@ -1931,6 +1931,14 @@ export const EmailEditorPanel: React.FC = () => {
     }
   }, [updateSubject, updatePreheader, setEmailerName])
 
+  // An emailer picked on the studio home page rides in on the store; the
+  // canvas blocks are panel state, so only handleLoadEmailer can restore
+  // them. The atomic consume makes StrictMode's double mount load it once.
+  useEffect(() => {
+    const id = useEmailStore.getState().consumePendingEmailerId()
+    if (id) void handleLoadEmailer(id)
+  }, [handleLoadEmailer])
+
   // ── Export (PNG / PDF / HTML) ───────────────────────────────────────────────
   const slugify = (s: string) =>
     (s || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'untitled-campaign'

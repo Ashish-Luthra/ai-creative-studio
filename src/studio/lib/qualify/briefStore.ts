@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import type { Vertical } from '../../../lib/vertical-detect';
-import { QUALIFY_CATALOGUE_VERSION, getTask, getTasks, type QualifyQuestion } from './qualifyCatalogue';
+// The .ts extension keeps this importable under node:test (strip-types
+// resolves relative imports literally), matching the __tests__ convention.
+import { QUALIFY_CATALOGUE_VERSION, getTask, getTasks, type QualifyQuestion } from './qualifyCatalogue.ts';
 
 /**
  * The qualifying session.
@@ -68,6 +70,15 @@ export interface BriefSession {
 
 interface BriefStore {
   session: BriefSession | null;
+  /**
+   * An intent typed on the studio home page, waiting for CanvasEditor to feed
+   * it through the real agent-submit path (asset check included). In-memory
+   * only — a hard reload of /studio/ads must not replay it.
+   */
+  pendingIntent: string | null;
+  setPendingIntent: (intent: string) => void;
+  /** Atomic read-and-clear, so StrictMode's double mount consumes it once. */
+  consumePendingIntent: () => string | null;
   start: (args: { briefId: string; intent: string }) => void;
   hydrate: (briefId: string) => void;
   setContext: (ctx: {
@@ -136,6 +147,15 @@ function persist(session: BriefSession | null) {
 
 export const useBriefStore = create<BriefStore>((set, get) => ({
   session: null,
+  pendingIntent: null,
+
+  setPendingIntent: (intent) => set({ pendingIntent: intent }),
+
+  consumePendingIntent: () => {
+    const intent = get().pendingIntent;
+    if (intent) set({ pendingIntent: null });
+    return intent;
+  },
 
   start: ({ briefId, intent }) => {
     const session: BriefSession = {
@@ -170,7 +190,14 @@ export const useBriefStore = create<BriefStore>((set, get) => ({
       if (!raw) return;
       const stored = JSON.parse(raw) as BriefSession;
       // Discard rather than replay: question ids may have moved under it.
-      if (stored.schemaVersion !== 1 || stored.catalogueVersion !== QUALIFY_CATALOGUE_VERSION) {
+      // The version check alone doesn't catch session-shape drift from a dev
+      // iteration that forgot to bump schemaVersion, so also check the shape.
+      if (
+        stored.schemaVersion !== 1 ||
+        stored.catalogueVersion !== QUALIFY_CATALOGUE_VERSION ||
+        !Array.isArray(stored.messages) ||
+        typeof stored.answers !== 'object' || stored.answers === null
+      ) {
         window.localStorage.removeItem(storageKey(briefId));
         return;
       }

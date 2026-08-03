@@ -13,6 +13,8 @@ interface Props {
   selected: FabricObject | null
   onCommit: () => void
   onAfterReplace?: (next: FabricObject) => void
+  /** Render in-flow inside CanvasRightSidebar instead of floating. */
+  embedded?: boolean
 }
 
 type WithLinear = FabricObject & { data?: { kind?: string; linear?: LinearConfig } }
@@ -41,7 +43,7 @@ const Section: React.FC<{ title: string; defaultOpen?: boolean; children: React.
   )
 }
 
-export const CanvasShapeRightPanel: React.FC<Props> = ({ canvas, selected, onCommit, onAfterReplace }) => {
+export const CanvasShapeRightPanel: React.FC<Props> = ({ canvas, selected, onCommit, onAfterReplace, embedded = false }) => {
   const [fillColor, setFillColor] = useState('#1B51B3')
   const [borderColor, setBorderColor] = useState('#000000')
   const [borderWidth, setBorderWidth] = useState(0)
@@ -125,7 +127,9 @@ export const CanvasShapeRightPanel: React.FC<Props> = ({ canvas, selected, onCom
   )
 
   return (
-    <aside className="absolute right-5 top-20 z-[60] flex max-h-[calc(100vh-120px)] w-72 flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl">
+    <aside className={embedded
+      ? 'flex w-full flex-col bg-white'
+      : 'absolute right-5 top-20 z-[60] flex max-h-[calc(100vh-120px)] w-72 flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl'}>
       <div className="flex-1 overflow-auto px-4 py-2">
         {!isLinear && (
           <Section title="Fill">
