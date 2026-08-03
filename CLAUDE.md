@@ -35,6 +35,14 @@ explicitly rather than assuming.
   `public/{brand-kits,content-images,published}/`), so **this repo starts with an empty corpus** —
   the brief context API honestly reports `"no signal — defaulted"` until a brand kit is added
   through the UI.
+- **Port log**: `41f04a8` brought this repo to parity with AIDemoAgent `2261a7d`. `1d5bbf8`
+  (2026-08-03) ported the 12 commits after that (`2261a7d..5116b12`): the studio home screen
+  (`/studio` → agent-first prompt page with the designed capability-card tiles), the ads-canvas
+  chrome de-clutter (one collapsible right sidebar, tool pill moved to the bottom, AgentPill/Ally
+  dock removed in favor of selection-driven Ally + a header Agent button), the RatioTile ad-type
+  grid, and four smaller carried-along fixes (brand-kit assets via a route handler, favicon,
+  double-click-blank-frame image picker, persisted-session shape guard). `npm test` here = 199
+  tests. **Next port point: AIDemoAgent `5116b12`.**
 
 **Open question, undecided:** the port brought *everything* across, including sales-agent surfaces
 (`/calls`, the Brain push when content is approved). If "standalone creative app" is meant to be
