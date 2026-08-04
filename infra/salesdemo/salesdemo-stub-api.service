@@ -1,0 +1,19 @@
+[Unit]
+Description=SalesDemo stub API (magic-link auth + workspace endpoints, :58000)
+After=network.target
+
+[Service]
+Type=simple
+User=ec2-user
+WorkingDirectory=/home/ec2-user/salesdemo/apps/salesdemo-ui
+ExecStart=/usr/bin/env node scripts/dev-stub-api.cjs
+Restart=always
+RestartSec=5
+# Public-deploy hardening (see docs/DEPLOY-SALESDEMO.md):
+Environment=APP_URL=https://salesdemo.allyvate.ai
+Environment=DISABLE_DEV_LOGIN=1
+# Restrict who can log in (comma-separated). Edit then: sudo systemctl daemon-reload && sudo systemctl restart salesdemo-stub-api
+Environment=ALLOWED_EMAILS=ashish.luthra@gmail.com,it@allyvate.ai
+
+[Install]
+WantedBy=multi-user.target

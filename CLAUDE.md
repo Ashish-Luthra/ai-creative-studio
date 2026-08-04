@@ -3,6 +3,53 @@
 
 ---
 
+## 0.0 THIS REPO IS DOWNSTREAM — read before changing anything
+
+**Set by the user, 2026-08-02.** Two products share one Creative Studio:
+
+| | Repo | What it is |
+|---|---|---|
+| **Upstream — source of truth** | `AIDemoAgent` → `apps/salesdemo-ui` | AI Sales Agent **+** Creative Studio |
+| **Downstream — this repo** | `ai-creative-studio` | Standalone app for creative work |
+
+**Creative Studio changes are made in AIDemoAgent FIRST.** Once the user approves them there, they
+are ported here. Do not make a Creative Studio change in this repo first, and do not port one in
+without that approval — the two will diverge and the next port will conflict.
+
+Non-studio work that is genuinely specific to the standalone app can start here, but say so
+explicitly rather than assuming.
+
+**Porting mechanics** (established by `878393d`, which brought this repo to parity — 292 files):
+
+- This repo deliberately uses **salesdemo-ui's layout** so code ports verbatim rather than being
+  rewritten: `src/studio/**` (canvas/email/page), `src/lib/**` (brand kits, content engine,
+  vertical detection), `src/screens`, `src/ui`, routes under `src/app/**`.
+- Aliases mirrored: `@/*`, `@studio/*`, `@martechos/ui` → `src/ui/index.ts`, `react-router-dom` →
+  `src/lib/router-compat.tsx`.
+- **The one gotcha:** salesdemo keeps routes in `app/`, this repo in `src/app/`. Same number of
+  `../` hops, different landing point — app-route imports must drop the `src/` segment
+  (`../../../src/lib/x` → `../../../lib/x`).
+- **Test runners differ.** This repo is vitest; salesdemo writes some suites with `node:test`.
+  Convert on port (swap the `test` import, drop `.ts` specifiers). `npm test` here = 184 tests.
+- Generated assets are gitignored on both sides (`data/`, `.data/`,
+  `public/{brand-kits,content-images,published}/`), so **this repo starts with an empty corpus** —
+  the brief context API honestly reports `"no signal — defaulted"` until a brand kit is added
+  through the UI.
+- **Port log**: `41f04a8` brought this repo to parity with AIDemoAgent `2261a7d`. `1d5bbf8`
+  (2026-08-03) ported the 12 commits after that (`2261a7d..5116b12`): the studio home screen
+  (`/studio` → agent-first prompt page with the designed capability-card tiles), the ads-canvas
+  chrome de-clutter (one collapsible right sidebar, tool pill moved to the bottom, AgentPill/Ally
+  dock removed in favor of selection-driven Ally + a header Agent button), the RatioTile ad-type
+  grid, and four smaller carried-along fixes (brand-kit assets via a route handler, favicon,
+  double-click-blank-frame image picker, persisted-session shape guard). `npm test` here = 199
+  tests. **Next port point: AIDemoAgent `5116b12`.**
+
+**Open question, undecided:** the port brought *everything* across, including sales-agent surfaces
+(`/calls`, the Brain push when content is approved). If "standalone creative app" is meant to be
+creative-only, those are candidates to trim. Ask — do not assume either way.
+
+---
+
 ## 0. Project Overview
 
 **Product:**Ï  AI Creative Studio
@@ -16,23 +63,23 @@
 
 ---
 
-## 1. Tech Stack (Locked -- Do Not Change Without Explicit Instruction)
+## 1. Tech Stack (Aligned to the Allyvate Sales Demo stack — 2026-07-25, explicit user instruction. The AIDemoAgent monorepo CLAUDE.md/ADRs take precedence over this file on any conflict.)
 
 | Layer | Package / Tool | Notes |
 |--------------------|----------------------------------------|-----------------------------------------|
-| Framework | Next.js 15 (App Router) | React Server Components where appropriate |
+| Framework | Next.js 16 (App Router) | Matches AIDemoAgent apps |
 | Language | TypeScript 5.x, strict mode | No JS-only files in src/ |
-| Styling | Tailwind CSS v3 | No inline style tags unless dynamic Fabric.values |
+| Styling | Tailwind CSS v4 | No inline style tags unless dynamic Fabric values |
 | UI Components | shadcn/ui (Radix primitives) | Do not install MUI, Chakra, or AntDesign |
 | Canvas engine | Fabric.js 6.x | Must be loaded client-side only -- use dynamic import |
 | State management | Zustand 5.x | One store per domain -- no monolithic global store |
 | Agent harness | LangGraph (Python) | Exposed via FastAPI -- not inlined in Next.js |
-| AI API | Anthropic Claude API (claude-sonnet-4-20250514) | Brief agent, copy gen, insight gen |
+| AI API | Anthropic Claude API — env `AI_MODEL`, default `claude-sonnet-5` | Never hardcode model ids; import AI_MODEL from src/lib/llm.ts |
 | Image generation | FLUX.1 via Replicate AP@| Background gen only |
 | Image processing | rembg + SAM2 (Python FastAPI) | Background removal, subject masking |
 | Email compiler | react-email (by Resend) | NO BeeFree SDK |
-| Database | Supabase (Postgres + pgvector) | POC vector store -- no Qdrant yet |
-| Storage | Supabase Storage | Prod: S3/GCS later |
+| Persistence | File-based local store (`src/lib/local-store.ts`, `.data/`) | **Supabase REMOVED (2026-07-25).** Production path = Neon Postgres behind the Allyvate API (AIDemoAgent ADR 0001 — one Postgres) |
+| Storage | Local `public/` scan (dev) | Prod: S3-compatible object storage behind the Allyvate API |
 | Export | Puppeteer (server-side) | PNG 2x, JPG, HTML, ZIP |
 | Image compositing | sharp (Node.js) | On api routes only |
 | Figma extraction | Figma REST API + MCP | Optional -- conditional on brand setup |
@@ -184,8 +231,7 @@ ai-creative-studio
 ### 4.4 Environment Variables
 
 - All env vars are defined in `.env.local` (git-ignored) and documented in `.env.example` (committed).
-- Server-side only: `ANTHROPIC_API_KEY` | `SUPABASE_SERVICE_KEY` | `REPLICATE_API_KEY`
-- Client-safe (prefixed `NEXT_PUBLIC_`): `NEXT_PUBLIC_SUPABASE_URL` | `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- Server-side only: `ANTHROPIC_API_KEY` | `AI_PROVIDER` | `AI_MODEL`
 - NEVER expose private keys to the client.
 
 ### 4.5 File Naming

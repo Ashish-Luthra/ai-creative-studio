@@ -1,0 +1,475 @@
+{
+  "toolPolicy": {
+    "ariaLabel": "Tool policy for this mode",
+    "title": "Tools",
+    "noneValue": "—",
+    "none": "none",
+    "allowed": "Allowed:",
+    "blocked": "Blocked:"
+  },
+  "handoff": {
+    "ariaLabel": "Mode handoff",
+    "transition": {
+      "createToReview": "Create → Review",
+      "reviewToExecute": "Review → Execute",
+      "executeToAsk": "Execute → Ask",
+      "default": "Mode handoff"
+    },
+    "primaryLine": {
+      "draftReady": "Draft ready for review",
+      "runSummaryAvailable": "Run summary available",
+      "default": "Handoff"
+    },
+    "noReferences": "No references recorded for this handoff.",
+    "refreshTitle": "Refresh workspace state",
+    "dismissTitle": "Dismiss"
+  },
+  "shell": {
+    "errorTitleLoadShell": "Failed to load Studio shell",
+    "noTabs": "No tabs for this mode/context.",
+    "readOnlyBadge": "Read only",
+    "centerTabs": {
+      "context": "Context Summary",
+      "relatedObjects": "Related Objects",
+      "recommendations": "Recommendations"
+    },
+    "evidenceAccess": {
+      "denied": "Evidence access denied: {{message}}",
+      "prodRestricted": "Prod evidence is restricted to checker/auditor/admin roles.",
+      "notAccessible": "Evidence is not accessible for this execution."
+    }
+  },
+  "execute": {
+    "executionState": "Execution state",
+    "failedLoadBlockers": "Failed to load blockers",
+    "blockedLabel": "Blocked:",
+    "approvalRequired": "Approval Required",
+    "recommended": "Recommended:",
+    "openReview": "Open Review",
+    "launchReadiness": "Launch readiness",
+    "checklist": {
+      "planAttached": "Execution plan attached",
+      "approvalsComplete": "Required approvals complete",
+      "noActiveBlockers": "No active blockers",
+      "environmentConfirmed": "Environment confirmed"
+    },
+    "meta": {
+      "environment": "Environment",
+      "mode": "Mode",
+      "unknown": "unknown"
+    },
+    "launchActions": "Launch actions",
+    "launchSteps": {
+      "validating": "Validating artifacts…",
+      "compiling": "Compiling execution plan…",
+      "creating": "Starting execution…"
+    },
+    "launching": "Launching…",
+    "launchFailed": "Launch failed.",
+    "dismiss": "Dismiss",
+    "dryRun": "Dry Run",
+    "launchToProd": "Launch to Prod",
+    "resolveBlockers": "Resolve blockers above before launching.",
+    "terminalSummary": "Execution {{status}}. See the Run and Evidence tabs for details.",
+    "run": {
+      "runStatus": "Run status",
+      "stop": "Stop",
+      "stopping": "Stopping…",
+      "started": "Started",
+      "finished": "Finished",
+      "failedLoadLogs": "Failed to load logs",
+      "runTimeline": "Run timeline",
+      "executionLogs": "Execution logs",
+      "loading": "Loading…",
+      "loadingLogs": "Loading logs…",
+      "noLogsYet": "No logs yet."
+    },
+    "validation": {
+      "title": "Validation checks",
+      "items": {
+        "schema": "Preflight schema validation",
+        "policy": "Policy compliance check",
+        "budget": "Budget cap verification",
+        "window": "Launch window check",
+        "integrity": "Artifact integrity check"
+      },
+      "blockedPrefix": "Validation blocked:"
+    },
+    "evidence": {
+      "failedLoadEvidence": "Failed to load evidence",
+      "title": "Evidence pack",
+      "loading": "Loading…",
+      "packLabel": "Pack: {{packId}}",
+      "none": "No evidence captured yet.",
+      "openEvidence": "Open evidence",
+      "artifactRefsTitle": "Artifact references ({{count}})",
+      "hashesTitle": "Hashes / checksums",
+      "timelineTitle": "Timeline",
+      "timelineEvidenceGenerated": "Evidence generated",
+      "timelineExecutionStarted": "Execution started",
+      "timelineExecutionFinished": "Execution finished"
+    },
+    "noExecutionSelected": {
+      "title": "No execution selected",
+      "hintPrefix": "Launch from the Studio or pass",
+      "hintSuffix": "in the URL."
+    },
+    "failedLoadExecutePayload": "Failed to load execute payload",
+    "failedLoadExecutionDetails": "Failed to load execution details"
+  }
+  ,
+  "sidecar": {
+    "mode": {
+      "ask": "Ask",
+      "create": "Create",
+      "review": "Review",
+      "execute": "Execute"
+    },
+    "quickActions": {
+      "ask": {
+        "0": "Why is this blocked?",
+        "1": "Pending approvals?",
+        "2": "Summarize workstream"
+      },
+      "create": {
+        "0": "Refine headline copy",
+        "1": "Add a variant"
+      },
+      "review": {
+        "0": "Explain this change",
+        "1": "Check compliance"
+      },
+      "execute": {
+        "0": "Why is this blocked?",
+        "1": "Show run details"
+      }
+    },
+    "agents": {
+      "title": "Mention an agent",
+      "items": {
+        "strategist": { "label": "Strategy", "desc": "Campaign planning & goal alignment" },
+        "operator": { "label": "Ops", "desc": "Execution & workflow management" },
+        "creator": { "label": "Creative", "desc": "Copy, creative assets & variants" },
+        "performance": { "label": "Analytics", "desc": "Metrics, KPIs & performance data" },
+        "compliance": { "label": "Compliance", "desc": "BFSI policy & regulatory checks" },
+        "analyst": { "label": "Research", "desc": "Market research & audience insights" }
+      }
+    },
+    "relativeTime": {
+      "justNow": "just now",
+      "minutesAgo": "{{count}}m ago",
+      "hoursAgo": "{{count}}h ago",
+      "daysAgo": "{{count}}d ago"
+    },
+    "toolbar": {
+      "closeTab": "Close tab",
+      "newSession": "New session",
+      "sessionHistory": "Session history",
+      "sessionOptions": "Session options",
+      "attachArtifact": "Attach artifact",
+      "mentionAgent": "Mention agent",
+      "advancedOptions": "Advanced options"
+    },
+    "menu": {
+      "sessionActions": "Session actions menu",
+      "renameSession": "Rename session",
+      "archiveSession": "Archive session",
+      "copySessionLink": "Copy session link",
+      "exportMessages": "Export messages"
+    },
+    "export": {
+      "noMessages": "No messages."
+    },
+    "history": {
+      "title": "All sessions",
+      "empty": "No sessions yet."
+    },
+    "errors": {
+      "failedLoadSessions": "Failed to load sessions",
+      "failedLoadMessages": "Failed to load messages"
+    },
+    "message": {
+      "structuredOutput": "Structured output",
+      "composer": {
+        "advancedTitle": "Advanced options",
+        "responseStyleTitle": "Response style",
+        "contextDepthTitle": "Context depth",
+        "style": {
+          "prose": "prose",
+          "concise": "concise",
+          "structured": "structured"
+        },
+        "depth": {
+          "full": "full",
+          "shallow": "shallow"
+        },
+        "toggles": {
+          "includeArtifacts": "Include artifacts in context",
+          "includeHistory": "Include session history"
+        },
+        "placeholder": {
+          "ask": "Ask a question…",
+          "create": "Describe what to create…",
+          "review": "Add a comment…",
+          "execute": "Give a command…"
+        },
+        "ariaInput": "Studio message input",
+        "ariaSend": "Send",
+        "helperAsk": "Ask mode — no tools, commands or actions will be triggered.",
+        "helperOther": "Attach artifacts or reference context · ⌘+Enter to send",
+        "fallbackAttachmentOnly": "(File attached — URLs are in the message context.)",
+        "dropHint": "Drop files — Media, PDF, Figma (.fig), Sketch (.sketch), Office (Word/PPT/Excel), fonts",
+        "noSessionForUpload": "Select or create a chat session first.",
+        "uploadFailedTitle": "Upload failed",
+        "uploadFailed": "Could not upload the file."
+      }
+    }
+  }
+  ,
+  "contextRail": {
+    "util": {
+      "context": "Context",
+      "search": "Search",
+      "history": "History",
+      "library": "Library",
+      "queue": "Queue"
+    },
+    "sections": {
+      "workstream": "Workstream",
+      "description": "Description",
+      "initiative": "Initiative",
+      "goalLinkage": "Goal Linkage",
+      "audience": "Audience",
+      "budget": "Budget",
+      "channels": "Channels",
+      "kpis": "KPIs",
+      "pullRequests": "Pull Requests",
+      "attachments": "Attachments & Context"
+    },
+    "loading": "Loading…",
+    "emDash": "—",
+    "noWorkstream": "No workstream",
+    "inProgress": "In Progress",
+    "noDescriptionAdded": "No description added",
+    "noInitiativeLinked": "No initiative linked",
+    "noGoalsLinked": "No goals linked",
+    "currentRun": "Current Run",
+    "activeReview": "Active Review",
+    "activeRun": "Active Run",
+    "searchPlaceholder": "Search workstreams, PRs, runs…",
+    "recent": "Recent",
+    "quickJump": "Quick Jump",
+    "quickJumpItems": {
+      "workstreams": "Workstreams",
+      "prs": "PRs",
+      "runs": "Runs",
+      "assets": "Assets",
+      "policies": "Policies"
+    },
+    "noResults": "No results for \"{{query}}\"",
+    "sessions": "Sessions",
+    "recentActivity": "Recent Activity",
+    "agents": "Agents",
+    "contextRefs": "Context Refs",
+    "activeContext": "Active Context",
+    "pendingReviewAction": "Pending review action",
+    "high": "High",
+    "medium": "Medium",
+    "low": "Low",
+    "executionInProgress": "Execution in progress",
+    "active": "Active",
+    "pendingApprovals": "Pending Approvals",
+    "reviewRequests": "Review Requests",
+    "blockedRuns": "Blocked Runs",
+    "noActiveItems": "No active items assigned to you.",
+    "agentCopyTitle": "Click to copy {{handle}}",
+    "contextRefTypes": {
+      "brandKit": "BrandKit",
+      "businessContext": "Business Context",
+      "policyPack": "Policy Pack",
+      "dataContract": "Data Contract",
+      "other": "Context"
+    },
+    "queue": {
+      "pullRequestFallback": "Pull request",
+      "noPendingApprovals": "No pending approvals.",
+      "noReviewRequests": "No review requests.",
+      "noBlockedRuns": "No blocked runs yet.",
+      "approvalStatus": {
+        "pendingMaker": "Awaiting maker",
+        "pendingChecker": "Awaiting checker",
+        "changesRequested": "Changes requested",
+        "other": "Pending"
+      },
+      "reviewRequests": {
+        "from": "From {{from}}"
+      }
+    }
+  }
+  ,
+  "reviewPanel": {
+    "title": "New Review",
+    "ariaClose": "Close",
+    "artifactUnderReview": "Artifact under review",
+    "workstreamLabel": "Workstream",
+    "resolvingVersion": "Resolving version…",
+    "versionNotFound": "Version not found — review may use latest",
+    "noWorkstreamSelected": "No workstream selected. Open Studio from a workstream.",
+    "titleLabel": "Title",
+    "optional": "optional",
+    "descriptionLabel": "Description",
+    "titlePlaceholder": "Describe what's being reviewed…",
+    "descriptionPlaceholder": "What changed? What should reviewers focus on?",
+    "riskLevelTitle": "Risk level",
+    "risk": {
+      "auto": "Auto (recommended)",
+      "low": "Low — maker approval only",
+      "medium": "Medium — maker approval",
+      "high": "High — maker + checker"
+    },
+    "riskHelpAuto": "Risk is classified automatically from the workspace policy pack.",
+    "riskHelpHigh": "High-risk reviews require both maker and checker approval before execution.",
+    "approvalFlowTitle": "Approval flow",
+    "approvalFlowBody": "After submission, anyone with the maker role can approve. {{highRiskSentence}} Separation of duties is enforced — you cannot approve your own review.",
+    "approvalFlowHighRiskSentence": "High-risk reviews additionally require a checker.",
+    "failedCreateReview": "Failed to create review",
+    "cancel": "Cancel",
+    "creating": "Creating…",
+    "submitForReview": "Submit for review"
+  }
+  ,
+  "ask": {
+    "suggestedQuestionsTitle": "Suggested questions",
+    "suggestedPrompts": {
+      "0": "Why is this workstream blocked?",
+      "1": "What changed in the current review?",
+      "2": "What approvals are still pending?",
+      "3": "Summarize the latest run evidence."
+    },
+    "latestAnswerTitle": "Latest answer",
+    "noLatestAnswer": "Ask a question in the sidecar or tap a suggested question above.",
+    "answerHistoryTitle": "Answer history",
+    "activeReviewTitle": "Active review",
+    "activeReviewFallback": "Active review",
+    "reviewHelper": "In review — see Review mode for actions",
+    "activeRunTitle": "Active run",
+    "runHelper": "See Execute mode for logs and evidence",
+    "approvalsBlockersTitle": "Approvals & blockers",
+    "approvalsRows": {
+      "openPrs": "Open PRs",
+      "activeBlockers": "Active blockers",
+      "pendingApprovals": "Pending approvals",
+      "relatedArtifacts": "Related artifacts"
+    },
+    "approvalsSubs": {
+      "inReview": "{{count}} in review",
+      "none": "None",
+      "checkExecuteTab": "Check Execute tab",
+      "noneDetected": "None detected",
+      "awaitingChecker": "Awaiting checker",
+      "seeCreateMode": "See Create mode"
+    },
+    "askAboutRelatedTitle": "Ask about related objects",
+    "relatedQuestions": {
+      "reviewStatus": "What is the current review status?",
+      "reviewApprovers": "Who needs to approve this PR?",
+      "runBlockers": "Are there any blockers on the current run?",
+      "runOutcome": "What was the outcome of the last execution?",
+      "approvalsPending": "What approvals are still pending?",
+      "openBlockers": "Show open blockers for this workstream."
+    },
+    "activeContextTitle": "Active context",
+    "noWorkstreamSelected": "No workstream selected",
+    "readOnlyBody": "Ask mode is read-only. The assistant answers questions grounded in your workstream context but does not call tools, run searches, trigger commands, or make any changes to artifacts, reviews, or executions.",
+    "canDoTitle": "What the assistant can do",
+    "wontDoTitle": "What the assistant won't do",
+    "canDo": {
+      "0": "Answer questions about workstream status",
+      "1": "Summarise review history and approvals",
+      "2": "Explain execution logs and evidence",
+      "3": "Describe policy checks and compliance",
+      "4": "Surface blockers and pending items"
+    },
+    "wontDo": {
+      "0": "Call external tools or MCP connectors",
+      "1": "Run web searches or live data lookups",
+      "2": "Execute commands or trigger jobs",
+      "3": "Modify artifacts, approvals, or reviews",
+      "4": "Send messages or create PRs"
+    },
+    "recommendations": {
+      "submitForReview": {
+        "title": "Submit for review",
+        "desc": "Artifacts look complete — ready to create a PR.",
+        "prompt": "What is left before I can submit this workstream for review?"
+      },
+      "checkPendingApprovals": {
+        "title": "Check pending approvals",
+        "desc": "One or more approvals may be blocking progress.",
+        "prompt": "What approvals are still pending for this workstream?"
+      },
+      "explainComplianceStatus": {
+        "title": "Explain compliance status",
+        "desc": "Review policy checks before launching.",
+        "prompt": "Summarize the compliance status for this workstream."
+      },
+      "suggestOptimizations": {
+        "title": "Suggest optimizations",
+        "desc": "Ask the strategist for tactical improvements.",
+        "prompt": "What can be improved in the current campaign plan?"
+      }
+    }
+  }
+  ,
+  "create": {
+    "failedLoadCreateWorkspace": "Failed to load create workspace",
+    "noWorkstreamSelected": {
+      "title": "No workstream selected",
+      "hintPrefix": "Open Studio from a workstream or pass",
+      "hintSuffix": "in the URL."
+    },
+    "plan": {
+      "workstreamPlan": "Workstream plan",
+      "latestPlannerRun": "Latest planner run",
+      "runId": "Run ID",
+      "status": "Status",
+      "intentPreview": "Intent preview",
+      "draftActions": "Draft actions",
+      "noPlanYet": "No plan yet",
+      "noPlanHelp": "Ask the @strategist or @creator agent to draft a plan for this workstream."
+    },
+    "creative": {
+      "aiAssistedCreative": "AI-assisted creative",
+      "aiAssistedHelp": "Use the @creator agent in the session sidecar to generate copy, creative briefs, or variants.",
+      "brandReferences": "Brand references",
+      "noCreativeBreakdown": "No creative breakdown generated yet.",
+      "noBrandReferencesYet": "No brand references captured yet."
+    },
+    "calendar": {
+      "campaignTimeline": "Campaign timeline",
+      "aiDateDisclaimer": "Campaign plan dates are AI-generated estimates. Adjust in the planner.",
+      "noCampaignTimelineYet": "No campaign timeline generated yet."
+    },
+    "primaryObject": {
+      "title": "Workstream context",
+      "name": "Name",
+      "type": "Type",
+      "plannerRuns": "Planner runs",
+      "artifactFallback": "Artifact"
+    },
+    "fieldLabels": {
+      "workstreamId": "Workstream ID",
+      "artifactKind": "Type",
+      "plannerRunCount": "Planner runs",
+      "latestPlannerRunId": "Latest run",
+      "latestPlannerRunStatus": "Run status",
+      "intentPreview": "Intent preview",
+      "title": "Title",
+      "name": "Name",
+      "status": "Status",
+      "createdAt": "Created",
+      "updatedAt": "Updated"
+    }
+  }
+}
+

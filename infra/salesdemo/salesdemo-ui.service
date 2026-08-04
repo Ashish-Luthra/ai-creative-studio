@@ -1,0 +1,16 @@
+[Unit]
+Description=SalesDemo Agent frontend (Next.js, :3100)
+After=network.target
+
+[Service]
+Type=simple
+User=ec2-user
+WorkingDirectory=/home/ec2-user/salesdemo/apps/salesdemo-ui
+# .env.local (gitignored, copied to the box) provides ANTHROPIC_API_KEY etc.
+ExecStart=/usr/bin/env node node_modules/next/dist/bin/next start -p 3100
+Restart=always
+RestartSec=5
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target
